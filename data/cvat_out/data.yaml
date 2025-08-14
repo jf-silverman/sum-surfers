@@ -1,0 +1,6 @@
+names:
+  0: Surfer
+path: ../data/cvat_out/split_dataset
+train: images/train
+val: images/val
+test: images/test
