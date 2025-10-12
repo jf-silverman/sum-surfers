@@ -1,5 +1,5 @@
 # large files not needed in repo
-data/not needed in repo	
+data/not_needed_in_repo
 
 # OS files
 .DS_Store
