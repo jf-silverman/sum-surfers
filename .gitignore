@@ -1,3 +1,6 @@
+# large files not needed in repo
+data/not needed in repo	
+
 # OS files
 .DS_Store
 __MACOSX/
