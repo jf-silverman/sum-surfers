@@ -1,0 +1,6 @@
+train: /Users/jfs-m3/Documents/DS/sum-surfers/data/cvat_out_yolo_rebuilt/images/train
+val: /Users/jfs-m3/Documents/DS/sum-surfers/data/cvat_out_yolo_rebuilt/images/val
+test: /Users/jfs-m3/Documents/DS/sum-surfers/data/cvat_out_yolo_rebuilt/images/test
+
+nc: 1
+names: ['surfer']
