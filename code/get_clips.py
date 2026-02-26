@@ -7,7 +7,7 @@ import pytz
 
 # ---------- CONFIG ----------
 CAMERA_ID = "5834946f3421b20545c4b51a"  # replace with your camera ID
-ACCESS_TOKEN = "c3ab57d4bffd52ed467dcfa4b7a14d38d711a316"  # replace with your token
+ACCESS_TOKEN = "e1ccb7839d4ef779b5e03173312297b0e1d9b985"  # replace with your token
 OUT_DIR = Path("data/not_needed_in_repo/surf_clips")
 CLIP_DURATION_SEC = 5  # 5-second clips
 
