@@ -1,3 +1,4 @@
+import os
 import requests
 from pathlib import Path
 from datetime import datetime, timedelta, time
@@ -6,9 +7,11 @@ from astral.sun import sun
 import pytz
 
 # ---------- CONFIG ----------
-CAMERA_ID = "5834946f3421b20545c4b51a"  # replace with your camera ID
-ACCESS_TOKEN = "e1ccb7839d4ef779b5e03173312297b0e1d9b985"  # replace with your token
-OUT_DIR = Path("data/not_needed_in_repo/surf_clips")
+CAMERA_ID = os.environ["SURFLINE_CAMERA_ID"]
+ACCESS_TOKEN = os.environ["SURFLINE_ACCESS_TOKEN"]
+# Resolve data dir relative to project root (parent of this script's directory)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+OUT_DIR = _PROJECT_ROOT / "data" / "not_needed_in_repo" / "surf_clips"
 CLIP_DURATION_SEC = 5  # 5-second clips
 
 # Camera location for sunrise/sunset

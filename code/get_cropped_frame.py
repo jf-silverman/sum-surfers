@@ -4,8 +4,9 @@ from datetime import datetime
 import json
 
 # ---------- CONFIG ----------
-INPUT_DIR = Path("data/not_needed_in_repo/surf_clips")           # Folder containing date/time subfolders
-OUTPUT_DIR = Path("data/j_shore_cam/surf_crops")         # Where cropped frames will go
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+INPUT_DIR = _PROJECT_ROOT / "data" / "not_needed_in_repo" / "surf_clips"
+OUTPUT_DIR = _PROJECT_ROOT / "data" / "j_shore_cam" / "surf_crops"
 LOG_FILE = OUTPUT_DIR / "skipped_frames.log"
 FRAME_TIME_SEC = 2.5                     # Take frame at 2.5s into clip
 ROI_X, ROI_Y, ROI_W, ROI_H = 0, 420, 1280, 180  # Crop region
