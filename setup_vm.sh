@@ -17,8 +17,8 @@ sudo apt-get update -q
 sudo apt-get install -y --no-install-recommends \
     git \
     python3.11 python3.11-venv python3.11-dev \
-    libgl1 libglib2.0-0 \   # required by OpenCV
-    ffmpeg                   # optional, useful for video debugging
+    libgl1 libglib2.0-0 \
+    ffmpeg
 
 echo "=== [2/6] Create virtual environment ==="
 cd "$PROJECT_DIR"
@@ -49,11 +49,11 @@ echo "$SUDOERS_LINE" | sudo tee /etc/sudoers.d/surfer-shutdown > /dev/null
 sudo chmod 0440 /etc/sudoers.d/surfer-shutdown
 
 echo "=== [6/6] Install cron job ==="
-# Runs at 20:00 VM local time every day.
+# Runs at 20:00 VM local time every 3 days.
 # The VM timezone is set to America/Los_Angeles so 20:00 is after sunset year-round.
 sudo timedatectl set-timezone America/Los_Angeles
 
-CRON_JOB="0 20 * * * $PROJECT_DIR/run_pipeline.sh >> /var/log/surfers.log 2>&1"
+CRON_JOB="0 20 */3 * * $PROJECT_DIR/run_pipeline.sh >> /var/log/surfers.log 2>&1"
 # Append only if not already present
 ( crontab -l 2>/dev/null | grep -qF "run_pipeline.sh" ) \
     || ( crontab -l 2>/dev/null; echo "$CRON_JOB" ) | crontab -

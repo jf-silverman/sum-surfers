@@ -2,10 +2,9 @@
 
 ## Overview
 
-The pipeline runs on a small GCP Compute Engine VM that wakes up at 20:00 PT daily,
+The pipeline runs on a small GCP Compute Engine VM that wakes up at 20:00 PT every 3 days,
 downloads clips, extracts frames, runs YOLOv8 inference, and then shuts itself down.
-Total daily compute time is ~10 minutes.  At `e2-micro` spot pricing (~$0.002/hr) the
-monthly compute cost is well under $1.
+Each run takes about ~10 minutes. At spot pricing, compute cost is very low.
 
 ---
 
@@ -133,12 +132,12 @@ gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
   --role="roles/compute.instanceAdmin.v1"
 ```
 
-### 5d — Create the Cloud Scheduler job (triggers at 19:55 PT daily)
+### 5d — Create the Cloud Scheduler job (triggers at 19:55 PT every 3 days)
 
 ```bash
-gcloud scheduler jobs create http start-surf-detector-daily \
+gcloud scheduler jobs create http start-surf-detector-every-3-days \
   --location=us-west2 \
-  --schedule="55 19 * * *" \
+  --schedule="55 19 */3 * *" \
   --time-zone="America/Los_Angeles" \
   --uri="https://us-west2-YOUR_PROJECT_ID.cloudfunctions.net/start-surf-detector" \
   --http-method=POST \
@@ -150,7 +149,7 @@ finishes ~20:10, and `sudo shutdown -h now` turns the VM off.
 
 ---
 
-## Step 6 — Retrieve daily predictions from the VM (optional)
+## Step 6 — Retrieve predictions from the VM (optional)
 
 After the pipeline runs, sync the predictions CSV back to your Mac or to GCS:
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# run_pipeline.sh — Daily surfer detection pipeline
+# run_pipeline.sh — Surfer detection pipeline
 # Runs on the GCP VM via cron.  Logs to /var/log/surfers.log.
 #
-# Schedule (cron example — runs at 20:00 local time every day):
-#   0 20 * * * /home/surfer/sum-surfers/run_pipeline.sh >> /var/log/surfers.log 2>&1
+# Schedule (cron example — runs at 20:00 local time every 3 days):
+#   0 20 */3 * * /home/surfer/sum-surfers/run_pipeline.sh >> /var/log/surfers.log 2>&1
 
 set -euo pipefail
 

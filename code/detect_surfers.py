@@ -2,7 +2,7 @@
 detect_surfers.py
 -----------------
 Runs tiled YOLOv8 inference on cropped surf frames and appends results to
-predictions.csv.  Designed to be called from run_pipeline.sh daily.
+predictions.csv. Designed to be called from run_pipeline.sh on a schedule.
 
 Tiling mirrors the training setup:
   - Input crop: 1280 x 180 px (full ROI width)
