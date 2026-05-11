@@ -48,6 +48,12 @@ log "Step 2 done."
 
 # ── Step 3: Run YOLO inference ────────────────────────────────────────────────
 log "Step 3/3 — Running surfer detection..."
+# Default to recent-only processing so first run on a fresh machine does not
+# backfill old historical crops unless explicitly requested.
+export DETECT_MODE="${DETECT_MODE:-recent}"
+export DETECT_RECENT_DAYS="${DETECT_RECENT_DAYS:-7}"
+# Optional manual backfill override:
+#   export DETECT_START_DATE=2025-10-01
 python "$SCRIPT_DIR/code/detect_surfers.py"
 log "Step 3 done."
 

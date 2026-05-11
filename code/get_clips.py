@@ -1,4 +1,6 @@
 import os
+import random
+import time as time_mod
 import requests
 from pathlib import Path
 from datetime import datetime, timedelta, time
@@ -13,6 +15,10 @@ ACCESS_TOKEN = os.environ["SURFLINE_ACCESS_TOKEN"]
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = _PROJECT_ROOT / "data" / "not_needed_in_repo" / "surf_clips"
 CLIP_DURATION_SEC = 5  # 5-second clips
+DAY_LOOKBACK_DAYS = int(os.environ.get("CLIP_LOOKBACK_DAYS", "5"))
+REQUEST_TIMEOUT_SEC = float(os.environ.get("CLIP_REQUEST_TIMEOUT_SEC", "20"))
+REQUEST_BASE_DELAY_SEC = float(os.environ.get("CLIP_REQUEST_DELAY_SEC", "0.35"))
+REQUEST_JITTER_SEC = float(os.environ.get("CLIP_REQUEST_JITTER_SEC", "0.25"))
 
 # Camera location for sunrise/sunset
 LOCATION = dict(
@@ -25,6 +31,19 @@ LOCATION = dict(
 # --------------------------------
 
 BASE_URL = f"https://services.surfline.com/cameras/{CAMERA_ID}/clip?accessToken={ACCESS_TOKEN}"
+
+
+def _is_transient_response(status_code, body_text):
+    if status_code in {429, 500, 502, 503, 504}:
+        return True
+    body = (body_text or "").lower()
+    transient_markers = [
+        "bad gateway",
+        "cloudflare",
+        "temporarily unavailable",
+        "gateway timeout",
+    ]
+    return any(marker in body for marker in transient_markers)
 
 # Surfline clip pattern (~9-minute intervals starting at 12:08 AM)
 def generate_clip_start_times():
@@ -49,15 +68,35 @@ def download_clip(start_ms, end_ms, out_path):
     """Two-step API: request clip JSON, then download MP4"""
     payload = {"startTimestampInMs": start_ms, "endTimestampInMs": end_ms}
     headers = {"Content-Type": "application/json"}
-    resp = requests.post(BASE_URL, headers=headers, json=payload)
+
+    try:
+        resp = requests.post(BASE_URL, headers=headers, json=payload, timeout=REQUEST_TIMEOUT_SEC)
+    except requests.RequestException as e:
+        raise RuntimeError(f"Transient network error requesting clip JSON: {type(e).__name__}: {e}") from e
+
     if resp.status_code != 200:
-        raise RuntimeError(f"Failed to request clip JSON: {resp.status_code} {resp.text}")
+        transient = _is_transient_response(resp.status_code, resp.text)
+        label = "TRANSIENT" if transient else "NON_TRANSIENT"
+        body_preview = " ".join(resp.text.split())[:180]
+        raise RuntimeError(
+            f"{label} HTTP {resp.status_code} from clip JSON API. Body: {body_preview}"
+        )
 
-    clip_url = resp.json().get("clipUrl")
+    try:
+        resp_json = resp.json()
+    except ValueError as e:
+        raise RuntimeError("NON_TRANSIENT: Clip JSON API returned non-JSON response") from e
+
+    clip_url = resp_json.get("clipUrl")
     if not clip_url:
-        raise RuntimeError(f"No clipUrl returned: {resp.text}")
+        raise RuntimeError(f"NON_TRANSIENT: No clipUrl returned. Response: {resp_json}")
 
-    r = requests.get(clip_url, stream=True)
+    try:
+        r = requests.get(clip_url, stream=True, timeout=REQUEST_TIMEOUT_SEC)
+        r.raise_for_status()
+    except requests.RequestException as e:
+        raise RuntimeError(f"Transient error downloading MP4 from clipUrl: {type(e).__name__}: {e}") from e
+
     with open(out_path, "wb") as f:
         for chunk in r.iter_content(chunk_size=8192):
             if chunk:
@@ -71,7 +110,7 @@ def main():
     clip_times_pattern = generate_clip_start_times()
     local_tz = pytz.timezone(LOCATION["timezone"])
 
-    for delta in range(0, 5):  # today + prior 4 days
+    for delta in range(0, DAY_LOOKBACK_DAYS):
         date = today - timedelta(days=delta)
         date_str = date.strftime("%Y-%m-%d")
         day_folder = OUT_DIR / date_str
@@ -102,6 +141,9 @@ def main():
                     download_clip(start_ms, end_ms, clip_file)
                 except Exception as e:
                     print(f"⚠️ Failed: {date_str} {time_str}: {e}")
+                # Single-attempt mode with pacing to reduce request bursts.
+                delay = max(REQUEST_BASE_DELAY_SEC + random.uniform(0.0, REQUEST_JITTER_SEC), 0.0)
+                time_mod.sleep(delay)
 
             # next clip ≥ 1 hour after previous
             next_target = clip_dt + timedelta(hours=1)

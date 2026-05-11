@@ -14,7 +14,7 @@ import os
 import csv
 import torch
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from ultralytics import YOLO
 
@@ -48,6 +48,15 @@ NUM_TILES    = 4
 CSV_HEADER = ["date", "time_local", "filename", "surfer_count", "confidence_avg"]
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+# Detection scope controls:
+#   DETECT_MODE=recent (default) -> only process recent crops
+#   DETECT_MODE=all             -> process all unprocessed crops
+#   DETECT_RECENT_DAYS=7        -> window for recent mode
+#   DETECT_START_DATE=YYYY-MM-DD -> optional manual backfill lower bound
+DETECT_MODE = os.environ.get("DETECT_MODE", "recent").strip().lower()
+DETECT_RECENT_DAYS = int(os.environ.get("DETECT_RECENT_DAYS", "7"))
+DETECT_START_DATE = os.environ.get("DETECT_START_DATE", "").strip()
 
 
 def load_model():
@@ -149,24 +158,60 @@ def append_row(csv_path, row):
         writer.writerow(row)
 
 
+def parse_crop_datetime(img_path):
+    try:
+        return datetime.strptime(img_path.stem, "crop%Y-%m-%d_%H-%M-%S")
+    except ValueError:
+        return None
+
+
+def in_detection_scope(img_path):
+    if DETECT_MODE == "all":
+        return True
+
+    dt = parse_crop_datetime(img_path)
+    if dt is None:
+        return False
+
+    if DETECT_START_DATE:
+        try:
+            start_date = datetime.strptime(DETECT_START_DATE, "%Y-%m-%d").date()
+        except ValueError:
+            raise ValueError("DETECT_START_DATE must be YYYY-MM-DD")
+        return dt.date() >= start_date
+
+    cutoff_date = (datetime.now() - timedelta(days=max(DETECT_RECENT_DAYS - 1, 0))).date()
+    return dt.date() >= cutoff_date
+
+
 def main():
     model = load_model()
     existing = load_existing(PREDS_CSV)
     processed_files = {r["filename"] for r in existing}
 
     crop_files = sorted(CROPS_DIR.glob("crop*.jpg"))
-    new_files  = [p for p in crop_files if p.name not in processed_files]
+    scoped_files = [p for p in crop_files if in_detection_scope(p)]
+    new_files = [p for p in scoped_files if p.name not in processed_files]
 
     if not new_files:
         print("No new crop images to process.")
         return
+
+    if DETECT_MODE == "all":
+        print(f"Detection scope: all crops. Candidates={len(scoped_files)}")
+    elif DETECT_START_DATE:
+        print(f"Detection scope: crops from {DETECT_START_DATE} onward. Candidates={len(scoped_files)}")
+    else:
+        print(f"Detection scope: last {DETECT_RECENT_DAYS} day(s). Candidates={len(scoped_files)}")
 
     print(f"Processing {len(new_files)} new image(s)...")
 
     for img_path in new_files:
         # filename format: cropYYYY-MM-DD_HH-MM-SS.jpg
         try:
-            dt = datetime.strptime(img_path.stem, "crop%Y-%m-%d_%H-%M-%S")
+            dt = parse_crop_datetime(img_path)
+            if dt is None:
+                raise ValueError("Cannot parse crop timestamp")
             date_str = dt.strftime("%Y-%m-%d")
             time_str = dt.strftime("%H:%M")
         except ValueError:
