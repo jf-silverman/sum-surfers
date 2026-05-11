@@ -32,8 +32,8 @@ pip install \
     astral \
     pytz \
     opencv-python-headless \
-    ultralytics \
-    torch torchvision --index-url https://download.pytorch.org/whl/cpu
+    ultralytics
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 # ↑ CPU-only torch is ~500 MB smaller and fast enough for 14 frames/day.
 # For GPU inference swap the last two lines with:
 #   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
