@@ -66,7 +66,7 @@ def download_clip(start_ms, end_ms, out_path):
     print(f"💾 Saved {out_path.name}")
 
 def main():
-    OUT_DIR.mkdir(exist_ok=True)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
     today = datetime.now().date()
     clip_times_pattern = generate_clip_start_times()
     local_tz = pytz.timezone(LOCATION["timezone"])
