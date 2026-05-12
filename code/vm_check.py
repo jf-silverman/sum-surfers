@@ -3,11 +3,11 @@
 vm_check.py — VM-side pre-detection helper.
 
 Prints two space-separated integers to stdout:
-  <new_crop_count> <days_since_last_local_run>
+    <new_crop_count> <days_since_last_local_success>
 
   new_crop_count         : crops in CROPS_DIR not yet in predictions.csv
-  days_since_last_local_run : calendar days since .last_local_run was written
-                             (-1 if the file does not exist)
+    days_since_last_local_success : calendar days since .last_local_success was
+                                                                    written (-1 if no marker is found)
 
 Exit codes:
   0 — new crops found; caller should run detection
@@ -22,7 +22,8 @@ from pathlib import Path
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CROPS_DIR = _PROJECT_ROOT / "data" / "j_shore_cam" / "surf_crops"
 PREDS_CSV = _PROJECT_ROOT / "data" / "predictions.csv"
-LAST_LOCAL_RUN = _PROJECT_ROOT / "data" / ".last_local_run"
+LAST_LOCAL_SUCCESS = _PROJECT_ROOT / "data" / ".last_local_success"
+LEGACY_LAST_LOCAL_RUN = _PROJECT_ROOT / "data" / ".last_local_run"
 
 
 def count_new_crops() -> int:
@@ -41,10 +42,13 @@ def count_new_crops() -> int:
     return len(new)
 
 
-def days_since_last_local_run() -> int:
-    if not LAST_LOCAL_RUN.exists():
+def days_since_last_local_success() -> int:
+    marker = LAST_LOCAL_SUCCESS
+    if not marker.exists():
+        marker = LEGACY_LAST_LOCAL_RUN
+    if not marker.exists():
         return -1
-    raw = LAST_LOCAL_RUN.read_text().strip().rstrip("Z")
+    raw = marker.read_text().strip().rstrip("Z")
     try:
         last = datetime.fromisoformat(raw).replace(tzinfo=timezone.utc)
         return max(0, (datetime.now(timezone.utc) - last).days)
@@ -54,6 +58,6 @@ def days_since_last_local_run() -> int:
 
 if __name__ == "__main__":
     new = count_new_crops()
-    days = days_since_last_local_run()
+    days = days_since_last_local_success()
     print(f"{new} {days}")
     sys.exit(0 if new > 0 else 1)

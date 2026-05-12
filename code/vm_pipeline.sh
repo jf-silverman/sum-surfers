@@ -11,14 +11,17 @@
 #   From Cloud Scheduler startup script (backup reminder):
 #     bash code/vm_pipeline.sh
 #     If no new crops are found AND it has been >= REMINDER_THRESHOLD_DAYS since
-#     the last local pipeline run, sends a reminder email, then shuts down.
+#     the last successful local pipeline run, sends a reminder email, then
+#     shuts down.
 #     If new crops are found, runs detection and shuts down.
 #
 # Cloud Scheduler startup-script metadata value:
 #   cd /home/surfer/sum-surfers && source .venv/bin/activate && bash code/vm_pipeline.sh
 #
 # Environment variables (from .env on VM):
-#   SMTP_USER, SMTP_APP_PASSWORD, EMAIL_TO   — for outgoing email
+#   GMAIL_FROM, EMAIL_TO                     — email routing
+#   GMAIL_OAUTH_CLIENT_SECRET_PATH           — OAuth client secret JSON path
+#   GMAIL_OAUTH_TOKEN_PATH                   — OAuth token JSON path
 #   VM_DATA_LIMIT_GB                         — storage warning threshold (default 50)
 #   REMINDER_THRESHOLD_DAYS                  — min days before sending a reminder (default 4)
 #   DETECT_MODE, DETECT_RECENT_DAYS          — passed through to detect_surfers.py
@@ -60,7 +63,7 @@ DAYS_SINCE=$(echo "$CHECK_OUT" | awk '{print $2}')
 NEW_COUNT="${NEW_COUNT:-0}"
 DAYS_SINCE="${DAYS_SINCE:--1}"
 
-log "New unprocessed crops: $NEW_COUNT  |  Days since last local run: $DAYS_SINCE"
+log "New unprocessed crops: $NEW_COUNT  |  Days since last successful local run: $DAYS_SINCE"
 
 # ── Branch: no new crops → maybe send reminder ────────────────────────────────
 if [[ "$NEW_COUNT" -eq 0 ]]; then
@@ -70,12 +73,12 @@ if [[ "$NEW_COUNT" -eq 0 ]]; then
         DAYS_MSG="unknown (no timestamp found)"
         [[ "$DAYS_SINCE" -ge 0 ]] && DAYS_MSG="$DAYS_SINCE day(s)"
 
-        log "Sending reminder email (days since last run: $DAYS_MSG)..."
+        log "Sending reminder email (days since last successful run: $DAYS_MSG)..."
         "$PYTHON" code/send_email.py \
             --subject "sum-surfers: no new crops — please run local pipeline" \
             --body "The surf detector VM found no new crops to process.
 
-Days since last local pipeline run: ${DAYS_MSG}.
+    Days since last successful local pipeline run: ${DAYS_MSG}.
 
 Your laptop may not have run its scheduled job. Please turn it on and run:
 
@@ -85,7 +88,7 @@ from the sum-surfers project directory, or wait for the next cron cycle." \
         && log "Reminder email sent." \
         || log "WARNING: could not send reminder email."
     else
-        log "No new crops but last run was recent (${DAYS_SINCE}d ago) — no reminder needed."
+        log "No new crops but last successful run was recent (${DAYS_SINCE}d ago) — no reminder needed."
     fi
 
 # ── Branch: new crops found → run detection ───────────────────────────────────
