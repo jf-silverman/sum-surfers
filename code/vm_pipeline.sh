@@ -19,9 +19,7 @@
 #   cd /home/surfer/sum-surfers && source .venv/bin/activate && bash code/vm_pipeline.sh
 #
 # Environment variables (from .env on VM):
-#   GMAIL_FROM, EMAIL_TO                     — email routing
-#   GMAIL_OAUTH_CLIENT_SECRET_PATH           — OAuth client secret JSON path
-#   GMAIL_OAUTH_TOKEN_PATH                   — OAuth token JSON path
+#   SMTP_USER, SMTP_APP_PASSWORD, EMAIL_TO   — outgoing email config
 #   VM_DATA_LIMIT_GB                         — storage warning threshold (default 50)
 #   REMINDER_THRESHOLD_DAYS                  — min days before sending a reminder (default 4)
 #   DETECT_MODE, DETECT_RECENT_DAYS          — passed through to detect_surfers.py

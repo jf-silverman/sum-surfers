@@ -99,7 +99,8 @@ Also add the reminder/storage vars to **the VM's `.env`** (SSH in and edit it):
 ```bash
 gcloud compute ssh surf-detector --zone=us-west2-a -- \
   "cat >> ~/sum-surfers/.env" << 'EOF'
-GMAIL_FROM=your_gmail_address@gmail.com
+SMTP_USER=your_gmail_address@gmail.com
+SMTP_APP_PASSWORD=your_16_char_app_password
 EMAIL_TO=joelfsilverman@gmail.com
 VM_DATA_LIMIT_GB=50
 REMINDER_THRESHOLD_DAYS=4
@@ -120,7 +121,8 @@ chmod +x code/local_pipeline.sh
 
 **2. Add email + GCP vars to your local `.env`** (copy from `.env.example` and fill in):
 ```
-GMAIL_FROM=your_gmail_address@gmail.com
+SMTP_USER=your_gmail_address@gmail.com
+SMTP_APP_PASSWORD=your_16_char_app_password
 EMAIL_TO=joelfsilverman@gmail.com
 CLIPS_DIR_LIMIT_GB=1.0
 GCP_PROJECT=sum-surfers-20260510-a1b2
@@ -128,46 +130,20 @@ GCP_ZONE=us-west2-a
 GCP_INSTANCE=surf-detector
 ```
 
-**3. Set up Gmail API OAuth2 (free):**
-- In Google Cloud Console, open APIs & Services → OAuth consent screen and configure it (External, test mode is fine).
-- Create OAuth client credentials of type **Desktop app**.
-- Download the client JSON to a secure local path, for example:
-  `/Users/YOUR_USERNAME/.secrets/gmail_oauth_client.json`
-- Add this to local `.env`:
-  `GMAIL_OAUTH_CLIENT_SECRET_PATH=/Users/YOUR_USERNAME/.secrets/gmail_oauth_client.json`
-- Add token path to local `.env`:
-  `GMAIL_OAUTH_TOKEN_PATH=/Users/YOUR_USERNAME/.secrets/sum_surfers_gmail_token.json`
-- Run one-time auth on your laptop:
+**3. Set up Gmail App Password (free):**
+- Make sure 2-Step Verification is enabled on your Google account.
+- Go to <https://myaccount.google.com/apppasswords>.
+- Create a new App Password (Mail + Other custom name like `sum-surfers`).
+- Put the generated 16-character password in `SMTP_APP_PASSWORD` in your local `.env` and VM `.env`.
+- Test an email send locally:
 ```bash
 cd /Users/YOUR_USERNAME/Documents/DS/sum-surfers
 source .venv/bin/activate  # if you use the project venv locally
-python code/send_email.py --init-oauth
-```
-- Test an email send locally:
-```bash
-python code/send_email.py --subject "sum-surfers oauth test" --body "OAuth is working"
+source .env
+python code/send_email.py --subject "sum-surfers smtp test" --body "SMTP App Password is working"
 ```
 
-**4. Copy OAuth files to the VM and set VM paths:**
-```bash
-gcloud compute scp \
-  /Users/YOUR_USERNAME/.secrets/gmail_oauth_client.json \
-  surf-detector:~/sum-surfers/.secrets/gmail_oauth_client.json \
-  --zone=us-west2-a
-
-gcloud compute scp \
-  /Users/YOUR_USERNAME/.secrets/sum_surfers_gmail_token.json \
-  surf-detector:~/sum-surfers/.secrets/sum_surfers_gmail_token.json \
-  --zone=us-west2-a
-
-gcloud compute ssh surf-detector --zone=us-west2-a -- \
-  "cat >> ~/sum-surfers/.env" << 'EOF'
-GMAIL_OAUTH_CLIENT_SECRET_PATH=/home/surfer/sum-surfers/.secrets/gmail_oauth_client.json
-GMAIL_OAUTH_TOKEN_PATH=/home/surfer/sum-surfers/.secrets/sum_surfers_gmail_token.json
-EOF
-```
-
-**5. Edit your crontab:**
+**4. Edit your crontab:**
 ```bash
 crontab -e
 ```
@@ -179,7 +155,7 @@ Add this line (adjust the path and time as needed; 06:00 daily every 3 days):
 > **macOS note:** cron requires Full Disk Access.  Go to
 > System Settings → Privacy & Security → Full Disk Access and add `/usr/sbin/cron`.
 
-**6. Test a manual run:**
+**5. Test a manual run:**
 ```bash
 bash code/local_pipeline.sh
 ```

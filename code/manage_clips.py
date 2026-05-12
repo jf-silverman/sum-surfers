@@ -8,9 +8,9 @@ Modes:
 
 Environment variables (read from .env or shell):
   CLIPS_DIR_LIMIT_GB   Storage limit in GB before warning (default: 1.0)
-  SMTP_USER            For email warnings in --check mode
-  SMTP_APP_PASSWORD    For email warnings in --check mode
-  EMAIL_TO             Recipient (default: SMTP_USER)
+    SMTP_USER            Gmail sender address for warning emails
+    SMTP_APP_PASSWORD    Gmail App Password for warning emails
+    EMAIL_TO             Recipient (default: SMTP_USER)
 """
 
 import argparse

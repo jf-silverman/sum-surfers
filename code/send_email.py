@@ -3,7 +3,7 @@
 send_email.py — Send a plain-text email via Gmail SMTP.
 
 Credentials are read from environment variables (never hardcoded):
-  SMTP_USER          Gmail address used to send  (e.g. you@gmail.com)
+  SMTP_USER          Gmail address used to send (e.g. you@gmail.com)
   SMTP_APP_PASSWORD  Gmail App Password (not your regular password)
   EMAIL_TO           Recipient address (defaults to SMTP_USER if unset)
 
@@ -56,9 +56,9 @@ if __name__ == "__main__":
     try:
         send_email(args.subject, args.body)
         print("Email sent.")
-    except EnvironmentError as e:
-        print(f"Configuration error: {e}", file=sys.stderr)
-        sys.exit(1)
     except smtplib.SMTPException as e:
         print(f"SMTP error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except EnvironmentError as e:
+        print(f"Configuration error: {e}", file=sys.stderr)
         sys.exit(1)
