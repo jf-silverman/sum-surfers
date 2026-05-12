@@ -6,6 +6,24 @@ The pipeline runs on a small GCP Compute Engine VM that wakes up at 20:00 PT eve
 downloads clips, extracts frames, runs YOLOv8 inference, and then shuts itself down.
 Each run takes about ~10 minutes. At spot pricing, compute cost is very low.
 
+**Current architecture (hybrid):**
+Surfline blocks GCP egress IPs, so clips must be downloaded from your laptop.
+
+```
+Laptop (cron, every 3 days)          GCP VM (Cloud Scheduler, every 3 days)
+  1. get_clips.py                      ↓ starts on schedule (backup reminder)
+  2. get_cropped_frame.py              vm_pipeline.sh checks for new crops
+  3. Start VM                          → if none: emails reminder
+  4. Upload crops to VM                → if found: runs detection
+  5. SSH → vm_pipeline.sh              (rare; laptop usually triggers this)
+  6. Pull predictions.csv back
+  7. Stop VM
+```
+
+The VM's Cloud Scheduler job is a **backup reminder only** — it emails you if
+the laptop cron job hasn't run recently. Normally the laptop triggers the VM
+directly via SSH and pulls predictions before shutting the VM down.
+
 ---
 
 ## Step 1 — Install and authenticate the gcloud CLI (on your Mac)
@@ -77,12 +95,75 @@ cd ~/sum-surfers
 bash run_pipeline.sh
 ```
 
+Also add the new email/reminder env vars to **the VM's `.env`** (SSH in and edit it):
+```bash
+gcloud compute ssh surf-detector --zone=us-west2-a -- \
+  "cat >> ~/sum-surfers/.env" << 'EOF'
+SMTP_USER=your_gmail_address@gmail.com
+SMTP_APP_PASSWORD=your_16_char_app_password
+EMAIL_TO=joelfsilverman@gmail.com
+VM_DATA_LIMIT_GB=50
+REMINDER_THRESHOLD_DAYS=4
+EOF
+```
+
+---
+
+## Step 4b — Set up the local cron job (on your Mac)
+
+The local cron job pulls clips, crops frames, uploads to the VM, runs detection,
+and pulls predictions back — all in one command.
+
+**1. Make the script executable:**
+```bash
+chmod +x code/local_pipeline.sh
+```
+
+**2. Add email + GCP vars to your local `.env`** (copy from `.env.example` and fill in):
+```
+SMTP_USER=your_gmail_address@gmail.com
+SMTP_APP_PASSWORD=your_16_char_app_password
+EMAIL_TO=joelfsilverman@gmail.com
+CLIPS_DIR_LIMIT_GB=1.0
+GCP_PROJECT=sum-surfers-20260510-a1b2
+GCP_ZONE=us-west2-a
+GCP_INSTANCE=surf-detector
+```
+
+**3. Get your Gmail App Password:**
+- Go to <https://myaccount.google.com/apppasswords>
+- Create a new App Password (requires 2-Step Verification to be enabled)
+- Paste the 16-character password as `SMTP_APP_PASSWORD` in your `.env`
+
+**4. Edit your crontab:**
+```bash
+crontab -e
+```
+Add this line (adjust the path and time as needed; 06:00 daily every 3 days):
+```
+0 6 */3 * * /Users/YOUR_USERNAME/Documents/DS/sum-surfers/code/local_pipeline.sh >> /Users/YOUR_USERNAME/Documents/DS/sum-surfers/data/local_pipeline.log 2>&1
+```
+
+> **macOS note:** cron requires Full Disk Access.  Go to
+> System Settings → Privacy & Security → Full Disk Access and add `/usr/sbin/cron`.
+
+**5. Test a manual run:**
+```bash
+bash code/local_pipeline.sh
+```
+
 ---
 
 ## Step 5 — Auto-start with Cloud Scheduler + Cloud Functions
 
 GCP has no native "start a VM on schedule" feature, but this two-resource pattern
 is the standard approach.
+
+> **Role of Cloud Scheduler in the hybrid setup:** The scheduler is a *backup*
+> reminder mechanism. It starts the VM every 3 days; `vm_pipeline.sh` runs,
+> finds no new crops (if your laptop ran on schedule), and shuts back down
+> silently. If your laptop *missed* its cron job (≥ 4 days since last run),
+> the VM emails you a reminder instead.
 
 ### 5a — Enable APIs
 
@@ -147,6 +228,18 @@ gcloud scheduler jobs create http start-surf-detector-every-3-days \
 The VM starts at 19:55, cron fires `run_pipeline.sh` at 20:00, the pipeline
 finishes ~20:10, and `sudo shutdown -h now` turns the VM off.
 
+The VM's **startup script** (set once via the Cloud Console or gcloud) should call
+`vm_pipeline.sh` so it acts as the backup reminder check:
+```bash
+# Set the VM startup script (run once from your Mac)
+gcloud compute instances add-metadata surf-detector \
+  --zone=us-west2-a \
+  --metadata=startup-script='#!/bin/bash
+cd /home/surfer/sum-surfers
+source .venv/bin/activate
+bash code/vm_pipeline.sh >> /var/log/surfers.log 2>&1'
+```
+
 ---
 
 ## Step 6 — Retrieve predictions from the VM (optional)
@@ -163,6 +256,9 @@ gcloud compute scp \
 # OR — sync to a GCS bucket (add this to run_pipeline.sh before shutdown)
 # gsutil cp "$PROJECT_DIR/data/predictions.csv" gs://YOUR_BUCKET/predictions.csv
 ```
+
+> **In the hybrid setup, `local_pipeline.sh` does this automatically** (Step 8 of
+> the local script). You only need the command above for one-off manual syncs.
 
 ---
 
