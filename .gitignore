@@ -4,6 +4,9 @@ data/not_needed_in_repo
 # Secrets — never commit
 .env
 
+# Local project notes for Claude Code
+CLAUDE.md
+
 # OS files
 .DS_Store
 __MACOSX/
