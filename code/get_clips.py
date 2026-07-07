@@ -32,6 +32,20 @@ LOCATION = dict(
 
 BASE_URL = f"https://services.surfline.com/cameras/{CAMERA_ID}/clip?accessToken={ACCESS_TOKEN}"
 
+# Browser-like headers required to pass Cloudflare's bot check on services.surfline.com
+# (plain requests without these get a Cloudflare 403 challenge page regardless of token validity).
+REQUEST_HEADERS = {
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Content-Type": "application/json",
+    "Origin": "https://www.surfline.com",
+    "Referer": "https://www.surfline.com/",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-site",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+}
+
 
 def _is_transient_response(status_code, body_text):
     if status_code in {429, 500, 502, 503, 504}:
@@ -67,10 +81,9 @@ def find_nearest_clip_window(target_dt, clip_times):
 def download_clip(start_ms, end_ms, out_path):
     """Two-step API: request clip JSON, then download MP4"""
     payload = {"startTimestampInMs": start_ms, "endTimestampInMs": end_ms}
-    headers = {"Content-Type": "application/json"}
 
     try:
-        resp = requests.post(BASE_URL, headers=headers, json=payload, timeout=REQUEST_TIMEOUT_SEC)
+        resp = requests.post(BASE_URL, headers=REQUEST_HEADERS, json=payload, timeout=REQUEST_TIMEOUT_SEC)
     except requests.RequestException as e:
         raise RuntimeError(f"Transient network error requesting clip JSON: {type(e).__name__}: {e}") from e
 
