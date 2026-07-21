@@ -124,7 +124,7 @@ chmod +x code/local_pipeline.sh
 SMTP_USER=your_gmail_address@gmail.com
 SMTP_APP_PASSWORD=your_16_char_app_password
 EMAIL_TO=joelfsilverman@gmail.com
-CLIPS_DIR_LIMIT_GB=1.0
+CLIPS_DIR_LIMIT_GB=2.0
 GCP_PROJECT=sum-surfers-20260510-a1b2
 GCP_ZONE=us-west2-a
 GCP_INSTANCE=surf-detector
