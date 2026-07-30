@@ -17,7 +17,8 @@ Runs entirely on a local machine via cron — no cloud VM involved.
 
 - `code/local_pipeline.sh`
   - The entry point. Downloads clips, extracts crops, checks local clip
-    storage, runs detection, records a success timestamp.
+    storage, runs detection, pulls Surfline predictors, records a success
+    timestamp.
 - `code/get_clips.py`
   - Downloads clips between sunrise-30 minutes and sunset+30 minutes.
   - Uses the nearest Surfline clip windows and can backfill up to the previous 5 days.
@@ -25,6 +26,12 @@ Runs entirely on a local machine via cron — no cloud VM involved.
   - Reads downloaded clips and saves cropped JPG frames.
 - `code/detect_surfers.py`
   - Runs YOLO on 4 horizontal overlapping tiles and writes counts.
+- `code/get_surf_predictors.py`
+  - Pulls weather, condition rating, tide, and primary-swell/wave data for
+    Jack's from Surfline's public forecast API and appends to
+    `data/surfline_predictors.csv`, matched to `predictions.csv` rows by
+    filename. Forward-looking only (today + tomorrow) — no historical
+    backfill yet.
 - `code/manage_clips.py`
   - Emails a warning if local clip storage exceeds `CLIPS_DIR_LIMIT_GB`.
 - `code/send_email.py`
@@ -75,6 +82,7 @@ Optional:
 - Clips: `data/not_needed_in_repo/surf_clips`
 - Crops: `data/j_shore_cam/surf_crops`
 - Predictions: `data/predictions.csv`
+- Surfline predictors (weather/rating/tide/swell for Jack's): `data/surfline_predictors.csv`
 - Model weights default:
   `data/model_out/20251013/train/runs/detect/train13/weights/best.pt`
 

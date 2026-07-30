@@ -6,7 +6,8 @@
 #   2. Extracts crop frames locally
 #   3. Checks local clips storage (emails warning if > CLIPS_DIR_LIMIT_GB)
 #   4. Runs YOLOv8 detection locally, appending to data/predictions.csv
-#   5. Records success timestamp (data/.last_local_success)
+#   5. Pulls Jack's weather/rating/tide/swell predictors from Surfline
+#   6. Records success timestamp (data/.last_local_success)
 #
 # Runs entirely locally — no GCP VM involved (detection runs on CPU either
 # way, so there was no benefit to running it in the cloud).
@@ -54,29 +55,34 @@ log "=== Local pipeline starting ==="
 cd "$PROJECT_ROOT"
 
 # ── Step 1: Download clips ────────────────────────────────────────────────────
-log "Step 1/5 — Downloading Surfline clips..."
+log "Step 1/6 — Downloading Surfline clips..."
 "$PYTHON" code/get_clips.py
 log "Step 1 done."
 
 # ── Step 2: Extract crop frames ───────────────────────────────────────────────
-log "Step 2/5 — Extracting crop frames..."
+log "Step 2/6 — Extracting crop frames..."
 "$PYTHON" code/get_cropped_frame.py
 log "Step 2 done."
 
 # ── Step 3: Check local clips storage ────────────────────────────────────────
 # Emails a warning if clips folder exceeds CLIPS_DIR_LIMIT_GB; never fails the pipeline.
-log "Step 3/5 — Checking clips storage..."
+log "Step 3/6 — Checking clips storage..."
 "$PYTHON" code/manage_clips.py --check || true
 log "Step 3 done."
 
 # ── Step 4: Run detection locally ────────────────────────────────────────────
-log "Step 4/5 — Running YOLOv8 detection locally..."
+log "Step 4/6 — Running YOLOv8 detection locally..."
 "$PYTHON" code/detect_surfers.py
 log "Step 4 done."
 
-# ── Step 5: Record success timestamp locally ─────────────────────────────────
+# ── Step 5: Pull Surfline predictors (weather/rating/tide/swell) for Jack's ──
+log "Step 5/6 — Pulling Surfline predictors for Jack's..."
+"$PYTHON" code/get_surf_predictors.py
+log "Step 5 done."
+
+# ── Step 6: Record success timestamp locally ─────────────────────────────────
 LAST_SUCCESS_FILE="$PROJECT_ROOT/data/.last_local_success"
 date -u +"%Y-%m-%dT%H:%M:%SZ" > "$LAST_SUCCESS_FILE"
-log "Step 5/5 — Local success timestamp recorded: $(cat "$LAST_SUCCESS_FILE")"
+log "Step 6/6 — Local success timestamp recorded: $(cat "$LAST_SUCCESS_FILE")"
 
 log "=== Local pipeline complete ==="
