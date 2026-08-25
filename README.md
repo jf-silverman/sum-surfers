@@ -8,10 +8,15 @@ This project downloads short clips around daylight hours, extracts a cropped fra
 
 1. Pulls Surfline clips into dated folders.
 2. Extracts one ROI frame from each clip.
-3. Runs tiled YOLOv8 inference and deduplicates boxes across tile boundaries.
-4. Appends predictions to `data/predictions.csv`.
+3. Checks each frame's image quality (brightness/blur) and skips detection
+   on frames too dark or too foggy/blurred to reliably count.
+4. Runs tiled YOLOv8 inference and deduplicates boxes across tile boundaries.
+5. Appends predictions to `data/predictions.csv`.
 
-Runs entirely on a local machine via cron — no cloud VM involved.
+Runs entirely on a local machine via cron — no cloud VM involved. See
+`HOW_IT_WORKS.md` for a full walkthrough of the detection pipeline and a
+glossary of terms, and `PROJECT_HISTORY.md` for how it was built and
+tuned over time.
 
 ## Pipeline Scripts
 
@@ -25,7 +30,10 @@ Runs entirely on a local machine via cron — no cloud VM involved.
 - `code/get_cropped_frame.py`
   - Reads downloaded clips and saves cropped JPG frames.
 - `code/detect_surfers.py`
-  - Runs YOLO on 4 horizontal overlapping tiles and writes counts.
+  - Checks each frame's brightness/blur before running detection, skipping
+    frames too dark or too foggy to reliably count (see `HOW_IT_WORKS.md`).
+  - Runs YOLO on 4 horizontal overlapping tiles, deduplicates boxes, filters
+    out known static false positives, and writes counts.
 - `code/get_surf_predictors.py`
   - Pulls weather, condition rating, tide, and primary-swell/wave data for
     Jack's from Surfline's public forecast API and appends to
@@ -81,7 +89,10 @@ Optional:
 
 - Clips: `data/not_needed_in_repo/surf_clips`
 - Crops: `data/j_shore_cam/surf_crops`
-- Predictions: `data/predictions.csv`
+- Predictions: `data/predictions.csv` — one row per crop:
+  `date, time_local, filename, surfer_count, confidence_avg, quality_ok,
+  quality_reason, brightness, lap_var`. `surfer_count`/`confidence_avg` are
+  left blank when `quality_ok` is `False` (detection was skipped).
 - Surfline predictors (weather/rating/tide/swell for Jack's): `data/surfline_predictors.csv`
 - Model weights default:
   `data/model_out/20251013/train/runs/detect/train13/weights/best.pt`
