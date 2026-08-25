@@ -9,6 +9,8 @@ deeper architecture notes.
 | Path | Purpose |
 |---|---|
 | `README.md` | Setup and usage instructions. |
+| `HOW_IT_WORKS.md` | Plain-language walkthrough of the detection pipeline (capture → crop → quality gate → tile → detect → filter → count), plus a glossary of CV/ML terms used across this repo. |
+| `PROJECT_HISTORY.md` | Chronological record of how the project was built and tuned, plus an "Open engineering leads" section for unresolved findings. |
 | `CLAUDE.md` | Local-only architecture notes for Claude Code (gitignored, never committed). |
 | `PROJECT_FILES.md` | This file. |
 | `.env` | Secrets and config (gitignored). Copy from `.env.example`. |
@@ -22,7 +24,7 @@ deeper architecture notes.
 | `local_pipeline.sh` | Entry point, run via cron. Chains all six steps below and records a success timestamp. |
 | `get_clips.py` | Downloads Surfline clips for the camera between sunrise-30min and sunset+30min; backfills up to `CLIP_LOOKBACK_DAYS`. |
 | `get_cropped_frame.py` | Extracts one ROI-cropped frame per downloaded clip. |
-| `detect_surfers.py` | Runs tiled YOLOv8 inference on each crop, de-duplicates boxes via NMS, appends counts to `data/predictions.csv`. |
+| `detect_surfers.py` | Checks each crop's image quality (brightness + Laplacian variance) before detection, skipping frames too dark/foggy to reliably count; runs tiled YOLOv8 inference on the rest, de-duplicates boxes via NMS, filters out known static false positives (tree bough, flag), and appends results to `data/predictions.csv`. |
 | `get_surf_predictors.py` | Pulls weather, condition rating, tide, and swell data for Jack's from Surfline's forecast API; appends to `data/surfline_predictors.csv`. Forward-looking only — no historical backfill. |
 | `manage_clips.py` | Local clip-storage manager. `--check` (used by cron) emails a warning past `CLIPS_DIR_LIMIT_GB`; interactive mode offers deletion by age. |
 | `send_email.py` | Shared Gmail SMTP + App Password sender used for storage-warning emails. |
@@ -34,7 +36,9 @@ deeper architecture notes.
 
 | Path | Purpose |
 |---|---|
-| `predictions.csv` | Main dataset: one row per crop with `date, time_local, filename, surfer_count, confidence_avg`. |
+| `predictions.csv` | Main dataset: one row per crop with `date, time_local, filename, surfer_count, confidence_avg, quality_ok, quality_reason, brightness, lap_var`. `surfer_count`/`confidence_avg` are blank when `quality_ok` is `False` (detection was skipped — see `HOW_IT_WORKS.md`). Not tracked in git. |
+| `fog_review/` | Scratch review artifacts from the 2026-08 model-performance review (annotated image batches + CSVs used to hand-label usable/unusable frames and derive the image-quality gate's thresholds). Not tracked in git — see `PROJECT_HISTORY.md` for what each batch found. |
+| `model_review_50/` | The original 50-image manual spot-check (`review_counts.csv`) that kicked off the 2026-08 model-performance review. Not tracked in git. |
 | `surfline_predictors.csv` | Weather/rating/tide/swell predictors per `predictions.csv` row (matched by filename), from `get_surf_predictors.py`. |
 | `j_shore_cam/surf_crops/` | Cropped JPG frames produced by `get_cropped_frame.py` — the images `detect_surfers.py` runs inference on. |
 | `not_needed_in_repo/surf_clips/` | Raw downloaded video clips from `get_clips.py`. Gitignored — not needed in the repo, only locally for cropping. |
