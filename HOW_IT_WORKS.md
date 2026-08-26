@@ -116,6 +116,25 @@ counted:
   (their **IoU** — see glossary), NMS treats them as duplicates of the
   same object and keeps only the higher-confidence one.
 
+## Predictors: weather, tide, swell, wind, energy, consistency
+
+Separate from detection, `code/get_surf_predictors.py` pulls conditions
+data for Jack's from Surfline's public forecast API
+(`services.surfline.com/kbyg/spots/forecasts/*`) and writes it to
+`data/surfline_predictors.csv`, matched to `predictions.csv` rows by
+filename/nearest hour. This is forward-looking only (today + tomorrow) —
+it runs on every scheduled pipeline execution and just accumulates
+whatever "today" happens to be each time.
+
+For **historical** dates, the same endpoints accept a `start=YYYY-MM-DD`
+parameter, but require an authenticated, premium Surfline session (an
+`x-auth-accesstoken` header) — anonymous requests are capped at
+yesterday. `code/backfill_historical_predictors.py` is a separate,
+manually-run script (not part of the scheduled pipeline) that uses this
+to backfill predictors for existing `predictions.csv` rows. See that
+script's docstring for usage, and `PROJECT_HISTORY.md` for how the
+mechanism was discovered.
+
 ## Known limitations (short version)
 
 Fog, lens condensation, and low light all degrade the model's ability to

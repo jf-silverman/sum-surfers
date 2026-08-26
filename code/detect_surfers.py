@@ -73,7 +73,7 @@ QUALITY_LAPVAR_THRESH = 12.7       # Laplacian variance (blur/detail); below -> 
 
 CSV_HEADER = [
     "date", "time_local", "filename", "surfer_count", "confidence_avg",
-    "quality_ok", "quality_reason", "brightness", "lap_var",
+    "quality_ok", "quality_reason", "brightness", "lap_var", "human_count",
 ]
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"

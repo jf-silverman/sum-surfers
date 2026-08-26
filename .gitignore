@@ -4,6 +4,8 @@ archive/data/not_needed_in_repo
 
 # Secrets — never commit
 .env
+*.har
+data/external/
 
 # Local project notes for Claude Code
 CLAUDE.md

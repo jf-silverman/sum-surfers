@@ -35,11 +35,15 @@ tuned over time.
   - Runs YOLO on 4 horizontal overlapping tiles, deduplicates boxes, filters
     out known static false positives, and writes counts.
 - `code/get_surf_predictors.py`
-  - Pulls weather, condition rating, tide, and primary-swell/wave data for
-    Jack's from Surfline's public forecast API and appends to
+  - Pulls weather, rating, tide, swell, wind, wave-energy, and consistency
+    data for Jack's from Surfline's public forecast API and appends to
     `data/surfline_predictors.csv`, matched to `predictions.csv` rows by
-    filename. Forward-looking only (today + tomorrow) — no historical
-    backfill yet.
+    filename. Forward-looking only (today + tomorrow).
+- `code/backfill_historical_predictors.py`
+  - Manual, one-off script (not run by `local_pipeline.sh`) that backfills
+    the same predictor fields for past dates, using Surfline's historical
+    API with a personal account session token. See the script's docstring
+    for usage and safety notes before running it.
 - `code/manage_clips.py`
   - Emails a warning if local clip storage exceeds `CLIPS_DIR_LIMIT_GB`.
 - `code/send_email.py`
@@ -84,6 +88,8 @@ Optional:
 - `SMTP_USER` / `SMTP_APP_PASSWORD` / `EMAIL_TO` (Gmail App Password, for storage-warning emails)
 - `CLIPS_DIR_LIMIT_GB` (local clip storage warning threshold, default 2.0)
 - `DETECT_MODE` / `DETECT_RECENT_DAYS` / `DETECT_START_DATE` (detection scope)
+- `SURFLINE_HISTORICAL_TOKEN` (only for `backfill_historical_predictors.py`,
+  never read by the scheduled pipeline — see that script's docstring)
 
 ## Data Locations
 
@@ -91,9 +97,11 @@ Optional:
 - Crops: `data/j_shore_cam/surf_crops`
 - Predictions: `data/predictions.csv` — one row per crop:
   `date, time_local, filename, surfer_count, confidence_avg, quality_ok,
-  quality_reason, brightness, lap_var`. `surfer_count`/`confidence_avg` are
-  left blank when `quality_ok` is `False` (detection was skipped).
-- Surfline predictors (weather/rating/tide/swell for Jack's): `data/surfline_predictors.csv`
+  quality_reason, brightness, lap_var, human_count`. `surfer_count`/
+  `confidence_avg` are left blank when `quality_ok` is `False` (detection
+  was skipped). `human_count` is filled in manually over time.
+- Surfline predictors (weather/rating/tide/swell/wind/energy/consistency
+  for Jack's): `data/surfline_predictors.csv`
 - Model weights default:
   `data/model_out/20251013/train/runs/detect/train13/weights/best.pt`
 

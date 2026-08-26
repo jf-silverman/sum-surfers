@@ -296,9 +296,107 @@ well as it was at first."
   tuning, per the "keep but exclude from scoring" plan, rather than
   deleted or estimated.
 
-**Current state:** the tree/flag exclusion masks and the image-quality
-gate are both implemented in `code/detect_surfers.py` (uncommitted as of
-this writing). The CLAHE+sharpen enhancement pipeline and engineering
-leads #1-4 above are investigated but not yet implemented. Lead #6
-(per-quadrant partial-fog policy) has data and a reviewer-confirmed
-direction but isn't coded yet.
+**State as of the image-quality-gate implementation:** the tree/flag
+exclusion masks and the image-quality gate are both implemented in
+`code/detect_surfers.py`. The CLAHE+sharpen enhancement pipeline and
+engineering leads #1-4 above are investigated but not yet implemented.
+Lead #6 (per-quadrant partial-fog policy) has data and a
+reviewer-confirmed direction but isn't coded yet.
+
+### `predictions.csv` retroactive quality backfill + human_count column (2026-08-25)
+
+- Backfilled `quality_ok`/`quality_reason`/`brightness`/`lap_var` for all
+  1238 pre-existing rows (all crop files were still on disk, so this only
+  needed the cheap brightness/`lap_var` computation, no model
+  re-inference). Result: **1085 quality_ok=True, 153 quality_ok=False**
+  (129 `dark_or_night`, 24 `foggy_or_blurred`). Existing `surfer_count`
+  values were left untouched even on flagged rows — non-destructive, just
+  makes the flag available for filtering.
+- Added a `human_count` column (blank, for the user to fill in manually
+  over time as a running accuracy check) to both `predictions.csv` and
+  `detect_surfers.py`'s `CSV_HEADER`.
+
+### Naive baseline check: "predict surfer count at 7:10am tomorrow" (2026-08-25)
+
+Asked directly by the user. Answer: **we don't have a real predictive
+model** — everything built so far is detection *on an existing image*,
+not a forecast from time/weather/tide alone. As a naive baseline, pulled
+102 historical quality-ok rows within 40 minutes of 07:10 local time:
+median 3.5, mean 6.9, **stdev 8.3** (nearly as large as the mean) — even
+restricting to the same weekday only 8 points, ranging 0-14. Conclusion:
+time-of-day alone is a weak predictor; real forecasting would need
+swell/tide/weather features, which motivated scoping a real prediction
+model next.
+
+### Surfer-count prediction model — scoping (2026-08-25)
+
+Proposed a 4-phase plan (feature set from `surfline_predictors.csv` +
+Poisson/negative-binomial regression given surfer counts are non-negative
+and skewed, k-fold CV, then a script pulling tomorrow's forecast through
+the fitted model). **Immediately blocked**: `surfline_predictors.csv` had
+only 59 rows across 4 dates at the time (2026-08-04 to 2026-08-18) —
+`get_surf_predictors.py` is forward-looking only and doesn't backfill, so
+each scheduled pipeline run just adds whatever "today" happened to be,
+patchily. Decided Phase 0 (historical predictor backfill) had to come
+first — with it, ~1085 quality-ok counted frames become usable for
+training instead of ~54.
+
+### Historical predictor backfill — endpoint discovered via user-provided HAR (2026-08-25)
+
+Earlier automated attempts (fetch/XHR monkey-patching on the live page)
+found nothing — the historical view's data fetch wasn't visible that way.
+The user captured a HAR file (full network trace, not just fetch/XHR)
+while using the site's own "Historical" toggle, which resolved it:
+
+- **Mechanism**: the exact same `services.surfline.com/kbyg/spots/forecasts/*`
+  endpoints already in use accept a `start=YYYY-MM-DD` query parameter.
+  Anonymous requests are rejected for any `start` before yesterday
+  ("Parameters out of bounds" / "start parameter limited to today or
+  yesterday for non-premium users"). With an `x-auth-accesstoken` header
+  from the user's logged-in, premium browser session, historical dates
+  (tested back to 2025-10-15, the start of the whole dataset) return real
+  data. Confirmed via a live `requests` call using the token extracted
+  from the HAR.
+- Also discovered from the same HAR: three previously-unused endpoints —
+  `wind` (speed/direction/directionType/gust), `energy`
+  (offshore/nearshore wave energy), and `consistency` (nested under
+  `consistency.waveCount`, confirmed by direct testing since it didn't
+  refire in the HAR capture itself). All three folded into the predictor
+  schema per user request.
+- **Security handling**: the token is the user's real account credential,
+  not a public key. It was read from the user-provided HAR file (which
+  the user sent specifically for this purpose), used for one verification
+  call, and the temp file holding it was deleted immediately after — never
+  printed, logged, or persisted by Claude. `*.har` and `data/external/`
+  added to `.gitignore` as a safety net. The two raw HAR files remain on
+  disk at `data/external/` (containing the real token) — flagged to the
+  user as something to review/delete once no longer needed.
+
+### `code/get_surf_predictors.py` refactor + `code/backfill_historical_predictors.py` (2026-08-25)
+
+- Refactored `get_surf_predictors.py` so the field-extraction logic
+  (`merge_into_by_hour`) is a pure function separate from the network
+  fetch, shared by both the live (forward-looking, no-auth) script and
+  the new historical backfill script — avoids duplicating the
+  per-endpoint parsing logic.
+- Extended `CSV_HEADER` from 14 to 21 columns: added `wind_speed_mph`,
+  `wind_direction_deg`, `wind_direction_type`, `wind_gust_mph`,
+  `energy_offshore_kj`, `energy_nearshore_kj`, `consistency_wave_count`.
+  `data/surfline_predictors.csv` migrated (59 existing rows preserved,
+  new columns blank for them, same additive-migration approach as the
+  `predictions.csv` quality-gate migration).
+- New `code/backfill_historical_predictors.py` (explicitly **not** part
+  of the scheduled pipeline, same convention as `backfill_tide.py`):
+  CLI-driven (`--start`/`--end` date range, `--token`/env var/interactive
+  prompt, `--min-pause`/`--max-pause` jitter bounds defaulting to 3-35s
+  per the user's explicit bot-avoidance request, `--dry-run`). Chunks the
+  requested range into ≤14-day windows (margin below the ~16-17 days
+  observed working in the site's own historical requests) to minimize
+  total request count, matches only against `predictions.csv` rows not
+  already covered in the output CSV (safe to run repeatedly/incrementally
+  — "a couple dates at a time," per the user's stated usage pattern), and
+  writes into the same `data/surfline_predictors.csv` the live script
+  uses. Verified end-to-end via `--dry-run` (correct chunking, correct
+  target-row matching, correct already-covered skipping, correct
+  future-date rejection) — the live-request path is unverified pending
+  the user running it with a real token.
