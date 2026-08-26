@@ -8,19 +8,25 @@ in `PROJECT_HISTORY.md`.
 
 1. **Capture**: `code/get_clips.py` downloads short video clips from the
    Surfline camera.
-2. **Frame + crop**: `code/get_cropped_frame.py` grabs one frame per clip
-   and crops it down to a fixed region of interest (ROI) — a wide, short
-   strip of the ocean, `1280×180` pixels.
+2. **Frame + crop**: `code/get_cropped_frame.py` grabs **three** frames per
+   clip — a primary frame at 2.5s in, plus two "side" frames 1.5s before
+   and after it — and crops each down to a fixed region of interest (ROI):
+   a wide, short strip of the ocean, `1280×180` pixels. Three frames exist
+   because counts on the *same* clip vary meaningfully second to second
+   (occlusion by whitewater, a surfer paddling behind another) — see
+   "Multi-frame count averaging" below.
 3. **Image-quality gate**: before running the (expensive) model at all,
-   each crop is checked for whether it's even usable — see "Image-quality
-   gate" below. Frames that fail skip detection entirely; `surfer_count`
-   is left blank for them in `data/predictions.csv` rather than guessed.
+   the primary crop is checked for whether it's even usable — see
+   "Image-quality gate" below. Frames that fail skip detection entirely
+   (for all three frames); `surfer_count` is left blank for them in
+   `data/predictions.csv` rather than guessed.
 4. **Tiling**: that strip is an unusual shape for an object-detection model
    (very wide, very short), and surfers are small relative to the whole
-   frame. Rather than feed the model the whole strip at once, it's split
-   into **4 overlapping horizontal tiles** (376×180px each, 20% overlap),
-   matching how the training data was tiled. Smaller, more "normal-shaped"
-   tiles make small, distant surfers easier for the model to find.
+   frame. Rather than feed the model the whole strip at once, each of the
+   three frames is split into **4 overlapping horizontal tiles** (376×180px
+   each, 20% overlap), matching how the training data was tiled. Smaller,
+   more "normal-shaped" tiles make small, distant surfers easier for the
+   model to find.
 5. **Detection**: each tile is run through the trained **YOLOv8** model
    separately, producing a list of candidate boxes, each with a
    **confidence score**.
@@ -33,9 +39,46 @@ in `PROJECT_HISTORY.md`.
    reliably trigger false detections. A small coordinate-based filter drops
    boxes that land in those specific zones — see `code/detect_surfers.py`
    and `PROJECT_HISTORY.md` for exactly how those zones were derived.
-8. **Count**: whatever boxes survive all of the above become that frame's
-   surfer count, appended to `data/predictions.csv` along with the average
-   confidence across the kept boxes.
+8. **Count + average**: steps 4-7 run independently on all three frames,
+   giving three per-frame counts. The row's `surfer_count` is the mean of
+   the three (rounded), and `confidence_avg` is the mean of their average
+   confidences — appended to `data/predictions.csv` along with the raw
+   per-frame counts, mean, and standard deviation (see below).
+
+## Multi-frame count averaging
+
+A single instant of video is a noisy sample of "how many surfers are out
+there" — a surfer can be briefly hidden behind whitewater, mid-paddle
+behind another surfer, or just outside a tile boundary in one specific
+frame. Testing on real clips confirmed this: counts on the *same* ~6-second
+clip varied by up to 7 surfers across frames just 1.5-3 seconds apart (see
+`PROJECT_HISTORY.md`, 2026-08-25 entry, for the actual numbers).
+
+To reduce that noise, `code/get_cropped_frame.py` extracts three frames per
+clip instead of one (primary + two side frames), and `code/detect_surfers.py`
+runs detection on all three (`run_inference_multi()`), averaging the
+results. `predictions.csv` stores the full detail, not just the average:
+
+- `frame_count_1` / `frame_count_2` / `frame_count_3` — the three raw
+  per-frame counts, in chronological order (frame 2 is always the original
+  2.5s primary frame, so this stays comparable to how counts were computed
+  before this change).
+- `frame_count_mean` / `frame_count_stdev` — the average (what
+  `surfer_count` is rounded from) and how much the three frames disagreed.
+  A high stdev is itself a signal: it flags a scene that's ambiguous or
+  changing fast (overlapping surfers, choppy conditions), similar in spirit
+  to how `lap_var` flags an unreliable *image* rather than an unreliable
+  *count*.
+
+**Historical backfill**: for existing `predictions.csv` rows where the raw
+clip is still on disk, `code/backfill_multiframe_counts.py` fills in the
+`frame_count_*` columns without touching the original `surfer_count`/
+`confidence_avg` — those were already referenced by prior manual review
+work, so they're left as-is; the new columns are purely additive. Rows
+whose clip has since been deleted (per the clip-storage cleanup policy)
+simply never get `frame_count_*` populated — `run_inference_multi()` falls
+back to single-frame behavior automatically when side frames aren't
+available, so nothing breaks, it just can't be improved retroactively.
 
 ## Image-quality gate
 

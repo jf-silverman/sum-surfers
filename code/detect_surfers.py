@@ -74,6 +74,7 @@ QUALITY_LAPVAR_THRESH = 12.7       # Laplacian variance (blur/detail); below -> 
 CSV_HEADER = [
     "date", "time_local", "filename", "surfer_count", "confidence_avg",
     "quality_ok", "quality_reason", "brightness", "lap_var", "human_count",
+    "frame_count_1", "frame_count_2", "frame_count_3", "frame_count_mean", "frame_count_stdev",
 ]
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -187,6 +188,58 @@ def run_inference(model, img_path):
     return count, round(avg_conf, 4)
 
 
+def side_frame_paths(primary_img_path):
+    """
+    (side1, side2) paths for a primary crop, matching get_cropped_frame.py's
+    naming (<base>_side1.jpg at FRAME_TIME_SEC-offset, <base>_side2.jpg at
+    FRAME_TIME_SEC+offset). Returns paths whether or not the files exist —
+    callers check existence themselves (older crops predating multi-frame
+    extraction won't have them).
+    """
+    stem = primary_img_path.stem
+    parent = primary_img_path.parent
+    return parent / f"{stem}_side1.jpg", parent / f"{stem}_side2.jpg"
+
+
+def run_inference_multi(model, primary_img_path):
+    """
+    Runs detection on the primary frame plus its two side frames (if
+    present) and returns a dict with per-frame counts/confidences plus the
+    mean/stdev used as the row's primary surfer_count/confidence_avg. Falls
+    back to primary-frame-only if side frames aren't on disk (e.g. crops
+    from before multi-frame extraction existed, or a clip that's since been
+    deleted) — same single-frame behavior as before in that case.
+    """
+    import statistics
+
+    side1_path, side2_path = side_frame_paths(primary_img_path)
+    frame_paths = [side1_path, primary_img_path, side2_path]  # chronological order
+    available = [p for p in frame_paths if p.exists()]
+
+    counts, confs = [], []
+    for p in frame_paths:
+        if not p.exists():
+            counts.append(None)
+            confs.append(None)
+            continue
+        count, avg_conf = run_inference(model, p)
+        counts.append(count)
+        confs.append(avg_conf)
+
+    valid_counts = [c for c in counts if c is not None]
+    mean_count = statistics.mean(valid_counts)
+    stdev_count = statistics.pstdev(valid_counts) if len(valid_counts) > 1 else 0.0
+    valid_confs = [c for c in confs if c is not None]
+    mean_conf = statistics.mean(valid_confs) if valid_confs else 0.0
+
+    return {
+        "frame_count_1": counts[0], "frame_count_2": counts[1], "frame_count_3": counts[2],
+        "frame_count_mean": round(mean_count, 2), "frame_count_stdev": round(stdev_count, 2),
+        "surfer_count": round(mean_count), "confidence_avg": round(mean_conf, 4),
+        "n_frames_used": len(valid_counts),
+    }
+
+
 def compute_image_quality(img_path):
     """
     Returns (quality_ok, reason, brightness, lap_var). Cheap (no model
@@ -260,7 +313,10 @@ def main():
     existing = load_existing(PREDS_CSV)
     processed_files = {r["filename"] for r in existing}
 
-    crop_files = sorted(CROPS_DIR.glob("crop*.jpg"))
+    # Exclude the side-frame crops (crop<ts>_side1.jpg / _side2.jpg) — those
+    # are inputs to run_inference_multi() for the matching primary crop, not
+    # independent images to process/log their own predictions.csv row.
+    crop_files = sorted(p for p in CROPS_DIR.glob("crop*.jpg") if "_side" not in p.stem)
     scoped_files = [p for p in crop_files if in_detection_scope(p)]
     new_files = [p for p in scoped_files if p.name not in processed_files]
 
@@ -306,20 +362,30 @@ def main():
             continue
 
         try:
-            count, avg_conf = run_inference(model, img_path)
-            print(f"  {img_path.name}  →  {count} surfer(s)  (conf avg={avg_conf})")
+            result = run_inference_multi(model, img_path)
+            print(f"  {img_path.name}  →  {result['surfer_count']} surfer(s)  "
+                  f"(frames={result['frame_count_1']},{result['frame_count_2']},{result['frame_count_3']}  "
+                  f"mean={result['frame_count_mean']} stdev={result['frame_count_stdev']}  "
+                  f"n_frames_used={result['n_frames_used']})")
         except Exception as e:
             print(f"  ERROR {img_path.name}: {e}")
-            count, avg_conf = -1, 0.0
+            result = {
+                "surfer_count": -1, "confidence_avg": 0.0,
+                "frame_count_1": "", "frame_count_2": "", "frame_count_3": "",
+                "frame_count_mean": "", "frame_count_stdev": "",
+            }
 
         append_row(PREDS_CSV, {
             "date":          date_str,
             "time_local":    time_str,
             "filename":      img_path.name,
-            "surfer_count":  count,
-            "confidence_avg": avg_conf,
+            "surfer_count":  result["surfer_count"],
+            "confidence_avg": result["confidence_avg"],
             "quality_ok": True, "quality_reason": "ok",
             "brightness": round(brightness, 1), "lap_var": round(lap_var, 1),
+            "frame_count_1": result["frame_count_1"], "frame_count_2": result["frame_count_2"],
+            "frame_count_3": result["frame_count_3"], "frame_count_mean": result["frame_count_mean"],
+            "frame_count_stdev": result["frame_count_stdev"],
         })
 
     print(f"\nDone. Results appended to {PREDS_CSV}")

@@ -23,13 +23,14 @@ deeper architecture notes.
 |---|---|
 | `local_pipeline.sh` | Entry point, run via cron. Chains all six steps below and records a success timestamp. |
 | `get_clips.py` | Downloads Surfline clips for the camera between sunrise-30min and sunset+30min; backfills up to `CLIP_LOOKBACK_DAYS`. |
-| `get_cropped_frame.py` | Extracts one ROI-cropped frame per downloaded clip. |
-| `detect_surfers.py` | Checks each crop's image quality (brightness + Laplacian variance) before detection, skipping frames too dark/foggy to reliably count; runs tiled YOLOv8 inference on the rest, de-duplicates boxes via NMS, filters out known static false positives (tree bough, flag), and appends results to `data/predictions.csv`. |
+| `get_cropped_frame.py` | Extracts 3 ROI-cropped frames per downloaded clip (a primary frame at 2.5s, plus 2 "side" frames 1.5s before/after) for multi-frame count averaging — see `HOW_IT_WORKS.md`. |
+| `detect_surfers.py` | Checks each crop's image quality (brightness + Laplacian variance) before detection, skipping frames too dark/foggy to reliably count; runs tiled YOLOv8 inference on all 3 frames, de-duplicates boxes via NMS, filters out known static false positives (tree bough, flag), averages the 3 per-frame counts, and appends results to `data/predictions.csv`. |
 | `get_surf_predictors.py` | Pulls weather, rating, tide, swell, wind, wave-energy, and consistency data for Jack's from Surfline's forecast API; appends to `data/surfline_predictors.csv`. Forward-looking only (today + tomorrow), runs every scheduled pipeline execution. |
 | `manage_clips.py` | Local clip-storage manager. `--check` (used by cron) emails a warning past `CLIPS_DIR_LIMIT_GB`; interactive mode offers deletion by age. |
 | `send_email.py` | Shared Gmail SMTP + App Password sender used for storage-warning emails. |
 | `backfill_tide.py` | One-off (not part of the scheduled pipeline): estimated historical tide height via NOAA hi/lo + cosine interpolation, before the Surfline tide endpoint was found. Its output (`tide_backfill.csv`) has been archived; kept here for reference. |
 | `backfill_historical_predictors.py` | One-off, manually-run (not part of the scheduled pipeline): backfills the same predictor fields as `get_surf_predictors.py` for past dates in `predictions.csv`, using Surfline's `start=YYYY-MM-DD` param and a personal, premium-account session token (never committed — see the script's own docstring). Jittered pauses between requests to avoid bot detection; run a `--dry-run` first to preview. |
+| `backfill_multiframe_counts.py` | One-off, manually-run: for `predictions.csv` rows whose raw clip is still on disk, extracts any missing side frames and fills in `frame_count_*` columns — never touches the original `surfer_count`/`confidence_avg`. Local/compute-only (no network, no rate limits). |
 | `detect_surfers_v2.ipynb` | Earlier notebook version of the detection logic, superseded by `detect_surfers.py`. Kept for reference. |
 | `__pycache__/` | Python bytecode cache. Gitignored, regenerated automatically. |
 
@@ -37,12 +38,12 @@ deeper architecture notes.
 
 | Path | Purpose |
 |---|---|
-| `predictions.csv` | Main dataset: one row per crop with `date, time_local, filename, surfer_count, confidence_avg, quality_ok, quality_reason, brightness, lap_var, human_count`. `surfer_count`/`confidence_avg` are blank when `quality_ok` is `False` (detection was skipped — see `HOW_IT_WORKS.md`). `human_count` is manually filled in over time as an accuracy check. Not tracked in git. |
+| `predictions.csv` | Main dataset: one row per crop with `date, time_local, filename, surfer_count, confidence_avg, quality_ok, quality_reason, brightness, lap_var, human_count, frame_count_1, frame_count_2, frame_count_3, frame_count_mean, frame_count_stdev`. `surfer_count`/`confidence_avg` are blank when `quality_ok` is `False` (detection was skipped). `human_count` is manually filled in over time. `frame_count_*` hold the 3 per-frame counts multi-frame averaging is based on — see `HOW_IT_WORKS.md`. Not tracked in git. |
 | `fog_review/` | Scratch review artifacts from the 2026-08 model-performance review (annotated image batches + CSVs used to hand-label usable/unusable frames and derive the image-quality gate's thresholds). Not tracked in git — see `PROJECT_HISTORY.md` for what each batch found. |
 | `model_review_50/` | The original 50-image manual spot-check (`review_counts.csv`) that kicked off the 2026-08 model-performance review. Not tracked in git. |
 | `surfline_predictors.csv` | Weather/rating/tide/swell/wind/energy/consistency predictors per `predictions.csv` row (matched by filename), from `get_surf_predictors.py` (forward-looking, ongoing) and `backfill_historical_predictors.py` (past dates, manual). |
 | `external/` | **Gitignored, contains sensitive data.** HAR files used to discover the historical-predictor API mechanism — contain a real Surfline session auth token. Not tracked in git; review/delete when no longer needed. |
-| `j_shore_cam/surf_crops/` | Cropped JPG frames produced by `get_cropped_frame.py` — the images `detect_surfers.py` runs inference on. |
+| `j_shore_cam/surf_crops/` | Cropped JPG frames produced by `get_cropped_frame.py` — 3 per clip (unsuffixed primary + `_side1`/`_side2`), the images `detect_surfers.py` runs inference on. |
 | `not_needed_in_repo/surf_clips/` | Raw downloaded video clips from `get_clips.py`. Gitignored — not needed in the repo, only locally for cropping. |
 | `model_out/20251013/` | Trained YOLOv8 weights and training/validation run logs. `train/runs/detect/train13/weights/best.pt` is the weights path `detect_surfers.py` uses by default. |
 | `cvat_out_coco/` | CVAT annotation export (COCO format) used to train the current model — `splits/` is the untiled train/val/test split, `splits_tiled/` matches the 4-tile training setup. Same commit date as `model_out/20251013`. |

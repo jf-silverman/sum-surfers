@@ -2,16 +2,19 @@
 
 Automated surfer counting from Surfline clips.
 
-This project downloads short clips around daylight hours, extracts a cropped frame per clip, runs YOLOv8 inference on tiled images, and stores per-frame surfer counts.
+This project downloads short clips around daylight hours, extracts 3 cropped frames per clip (~1.5-3s apart), runs YOLOv8 inference on tiled images, and stores per-clip surfer counts averaged across those frames.
 
 ## What This Repo Does
 
 1. Pulls Surfline clips into dated folders.
-2. Extracts one ROI frame from each clip.
-3. Checks each frame's image quality (brightness/blur) and skips detection
-   on frames too dark or too foggy/blurred to reliably count.
-4. Runs tiled YOLOv8 inference and deduplicates boxes across tile boundaries.
-5. Appends predictions to `data/predictions.csv`.
+2. Extracts 3 ROI frames from each clip (a primary frame + 2 "side" frames a
+   few seconds apart).
+3. Checks the primary frame's image quality (brightness/blur) and skips
+   detection on frames too dark or too foggy/blurred to reliably count.
+4. Runs tiled YOLOv8 inference on all 3 frames and deduplicates boxes across
+   tile boundaries.
+5. Averages the 3 per-frame counts and appends the result (plus the raw
+   per-frame data) to `data/predictions.csv`.
 
 Runs entirely on a local machine via cron — no cloud VM involved. See
 `HOW_IT_WORKS.md` for a full walkthrough of the detection pipeline and a
@@ -28,12 +31,19 @@ tuned over time.
   - Downloads clips between sunrise-30 minutes and sunset+30 minutes.
   - Uses the nearest Surfline clip windows and can backfill up to the previous 5 days.
 - `code/get_cropped_frame.py`
-  - Reads downloaded clips and saves cropped JPG frames.
+  - Reads downloaded clips and saves 3 cropped JPG frames each (primary +
+    2 side frames), for multi-frame count averaging.
 - `code/detect_surfers.py`
-  - Checks each frame's brightness/blur before running detection, skipping
-    frames too dark or too foggy to reliably count (see `HOW_IT_WORKS.md`).
-  - Runs YOLO on 4 horizontal overlapping tiles, deduplicates boxes, filters
-    out known static false positives, and writes counts.
+  - Checks the primary frame's brightness/blur before running detection,
+    skipping all 3 frames if it's too dark or too foggy to reliably count
+    (see `HOW_IT_WORKS.md`).
+  - Runs YOLO on 4 horizontal overlapping tiles per frame, deduplicates
+    boxes, filters out known static false positives, averages the 3
+    per-frame counts, and writes the result plus raw per-frame data.
+- `code/backfill_multiframe_counts.py`
+  - Manual, one-off script that backfills `frame_count_*` for existing
+    `predictions.csv` rows whose raw clip is still on disk — never touches
+    the original `surfer_count`/`confidence_avg`.
 - `code/get_surf_predictors.py`
   - Pulls weather, rating, tide, swell, wind, wave-energy, and consistency
     data for Jack's from Surfline's public forecast API and appends to
@@ -95,11 +105,14 @@ Optional:
 
 - Clips: `data/not_needed_in_repo/surf_clips`
 - Crops: `data/j_shore_cam/surf_crops`
-- Predictions: `data/predictions.csv` — one row per crop:
+- Predictions: `data/predictions.csv` — one row per clip:
   `date, time_local, filename, surfer_count, confidence_avg, quality_ok,
-  quality_reason, brightness, lap_var, human_count`. `surfer_count`/
-  `confidence_avg` are left blank when `quality_ok` is `False` (detection
-  was skipped). `human_count` is filled in manually over time.
+  quality_reason, brightness, lap_var, human_count, frame_count_1,
+  frame_count_2, frame_count_3, frame_count_mean, frame_count_stdev`.
+  `surfer_count`/`confidence_avg` are left blank when `quality_ok` is
+  `False` (detection was skipped). `human_count` is filled in manually
+  over time. `frame_count_*` are the 3 raw per-frame counts and their
+  mean/stdev that `surfer_count` is averaged from.
 - Surfline predictors (weather/rating/tide/swell/wind/energy/consistency
   for Jack's): `data/surfline_predictors.csv`
 - Model weights default:

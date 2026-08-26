@@ -400,3 +400,82 @@ while using the site's own "Historical" toggle, which resolved it:
   target-row matching, correct already-covered skipping, correct
   future-date rejection) — the live-request path is unverified pending
   the user running it with a real token.
+
+### Historical predictor backfill — first live runs (2026-08-25)
+
+User ran `backfill_historical_predictors.py` for real with a token pasted
+into `.env` (via `source .env` before running). Two runs: 2025-10-15 to
+2025-10-16 (28 rows, single chunk, 7 requests, all matched, 0 unmatched),
+then 2025-10-11 to 2025-10-19 (70 rows, single chunk covering the gap plus
+the already-done dates, which were correctly skipped). `surfline_predictors.csv`
+grew from 59 → 88 → 158 rows. 74 of 85 total dates still need backfilling;
+user's stated plan is ~5-10 dates per day until it's fully covered.
+
+### Multi-frame count averaging (2026-08-25)
+
+User proposed averaging 3 counts from frames 1-3 seconds apart within the
+same clip, to reduce per-frame noise (occlusion, mid-paddle surfers). Idea
+was validated empirically **before** building anything: extracted 3 frames
+(1.5s/3.0s/4.5s) from 6 real high-count clips and ran detection on each —
+confirmed real, meaningful variance (stdev 0.8-3.3 per clip, one clip
+swinging from 58 to 65 across just 3 seconds). This matches the general
+project preference (validate against real data before committing to a
+pipeline change) and the standing CV-research-literature-check preference,
+though here the validation was empirical rather than literature-based.
+
+**Scope discovery mid-build**: user pointed out `data/not_needed_in_repo/surf_clips`
+still held far more raw clips than assumed — 1322 `clip.mp4` files across
+90 distinct dates (1.8GB), covering **57 of the 85** `predictions.csv`
+dates (not just the last few weeks). This meant multi-frame averaging
+could be backfilled onto most of the existing dataset, not just applied
+going forward — a much bigger scope than initially planned. Asked the user
+directly how the backfilled multi-frame data should relate to the
+already-published `surfer_count` values (since those had been referenced
+by the manual review batches): chose **additive columns, original
+`surfer_count` left untouched** — non-destructive, so prior review work
+stays valid.
+
+**Implementation**:
+- `code/get_cropped_frame.py` — extracts 2 additional "side" frames per
+  clip (`FRAME_TIME_SEC ± SIDE_FRAME_OFFSET_SEC` = 1.0s and 4.0s, alongside
+  the unchanged 2.5s primary), named `<base>_side1.jpg`/`_side2.jpg`.
+  Primary-frame filename/timing is untouched — every quality-gate
+  threshold, review batch, and visualization built around that single
+  image all keep working without modification.
+- `code/detect_surfers.py` — new `side_frame_paths()`/`run_inference_multi()`:
+  runs detection on all 3 frames (chronological order: side1, primary,
+  side2 → `frame_count_1/2/3`), computes mean/stdev, and sets
+  `surfer_count`/`confidence_avg` from the mean going forward. Falls back
+  gracefully to single-frame behavior when side frames aren't on disk
+  (verified identical output to the old `run_inference()` in that case).
+  `CSV_HEADER` extended with `frame_count_1/2/3`, `frame_count_mean`,
+  `frame_count_stdev`; `predictions.csv` migrated (1238 rows preserved,
+  new columns blank). Also fixed a latent bug caught during this change:
+  the crop-file glob (`crop*.jpg`) would have matched the new `_side*.jpg`
+  files and tried to process them as independent primary crops — excluded
+  explicitly.
+- New `code/backfill_multiframe_counts.py` (not part of the scheduled
+  pipeline): for rows with `quality_ok=True`, no existing `frame_count_mean`,
+  and a clip still on disk, extracts any missing side frames and runs
+  `run_inference_multi()`, writing only the new columns — `surfer_count`/
+  `confidence_avg` never touched. Writes progress incrementally (every 25
+  rows) so a long run can be interrupted safely.
+- **Verification**: tested the primary/side naming convention matches
+  between the two scripts (exact match confirmed); tested graceful
+  single-frame fallback (identical to old behavior); ran a real 16-row
+  backfill for 2026-08-16 and confirmed zero rows' `surfer_count`/
+  `confidence_avg` changed; ran `get_cropped_frame.py` for real, which
+  extracted side frames for essentially all 1322 clips still on disk in
+  one pass (2634 side-frame files); ran the real `detect_surfers.py`
+  `main()` end-to-end on 84 previously-unprocessed crops from
+  2026-07-03 onward — quality gate, multi-frame detection, and CSV writing
+  all confirmed working together, with real per-frame variance visible in
+  the output (e.g. `frames=58,56,61` on one image) and zero pre-existing
+  rows altered.
+
+**State**: multi-frame averaging is live for all new detection going
+forward. The 57-date historical backfill (extraction is already
+essentially done pipeline-wide; only the detection/aggregation step
+remains) has not been run in bulk yet — `backfill_multiframe_counts.py`
+is ready and verified on a small sample, but the full run across all
+covered dates is still pending.
