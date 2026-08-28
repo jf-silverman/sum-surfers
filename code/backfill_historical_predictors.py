@@ -111,6 +111,11 @@ def load_targets(start_date, end_date, already_done):
     return targets
 
 
+class RequestDenied(Exception):
+    """Raised on a 400/429 response — signals the caller to stop the whole run
+    rather than continue hammering an endpoint that's actively denying requests."""
+
+
 def fetch_chunk(chunk_start, span_days, token, min_pause, max_pause):
     headers = {**sp.REQUEST_HEADERS, "x-auth-accesstoken": token}
     responses = {}
@@ -126,14 +131,9 @@ def fetch_chunk(chunk_start, span_days, token, min_pause, max_pause):
                 params=params, headers=headers, timeout=20,
             )
             if r.status_code == 400:
-                print(f"    [{path}] 400: {r.text[:150]} (likely token expired/invalid, or not premium)")
-                responses[path] = []
-                continue
+                raise RequestDenied(f"[{path}] 400: {r.text[:150]} (likely token expired/invalid, or not premium)")
             if r.status_code == 429:
-                print(f"    [{path}] 429 rate-limited — backing off 60s and skipping this endpoint for this chunk")
-                time.sleep(60)
-                responses[path] = []
-                continue
+                raise RequestDenied(f"[{path}] 429 rate-limited")
             r.raise_for_status()
             responses[path] = r.json()["data"][path]
             print(f"    [{path}] ok, {len(responses[path])} record(s)")
@@ -187,9 +187,16 @@ def main():
         return
 
     by_hour = {}
+    denied = False
     for i, (chunk_start, chunk_days) in enumerate(chunks, start=1):
         print(f"\nChunk {i}/{len(chunks)}: start={chunk_start} days={chunk_days}")
-        responses = fetch_chunk(chunk_start, chunk_days, token, args.min_pause, args.max_pause)
+        try:
+            responses = fetch_chunk(chunk_start, chunk_days, token, args.min_pause, args.max_pause)
+        except RequestDenied as e:
+            print(f"\nSTOPPING: request denied — {e}")
+            print(f"Stopped after {i - 1}/{len(chunks)} chunk(s) completed. Writing whatever was fetched before the denial.")
+            denied = True
+            break
         sp.merge_into_by_hour(by_hour, **responses)
 
     written = 0
@@ -205,6 +212,8 @@ def main():
         written += 1
 
     print(f"\nDone. Wrote {written} row(s) to {out_csv} ({unmatched} target row(s) had no matching hour in the fetched data).")
+    if denied:
+        print("Run was stopped early due to a denied request — re-run later (fresh token if needed) to pick up the rest.")
 
 
 if __name__ == "__main__":

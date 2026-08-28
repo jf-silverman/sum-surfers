@@ -34,10 +34,23 @@ def extract_frame_at(video_path, time_sec, output_path):
         raise RuntimeError(f"Cannot get FPS for {video_path}")
     frame_num = int(time_sec * fps)
 
-    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
-    ret, frame = cap.read()
-    if not ret or frame is None:
-        raise RuntimeError(f"Failed to read frame {frame_num} from {video_path}")
+    # Deliberately NOT using cap.set(CAP_PROP_POS_FRAMES, ...) to seek — on these
+    # clips it's unreliable in a way that isn't just "fails on far frames": a
+    # fresh capture can fail to seek to a mid-stream frame at all, and adding a
+    # single warm-up read (which fixes seeking to LATER frames) then breaks
+    # seeking to EARLIER/low frame numbers instead (position reads back as a
+    # nonsensical -5.0/-4.0, and it silently re-returns the warm-up frame).
+    # Sequential .read() is reliable for every frame in every clip tested
+    # (confirmed empirically) and these clips are short (~150 frames), so
+    # reading forward to the target frame is the robust choice here, not a
+    # performance-motivated shortcut.
+    frame = None
+    for i in range(frame_num + 1):
+        ret, candidate = cap.read()
+        if not ret:
+            raise RuntimeError(f"Failed to read frame {frame_num} from {video_path} "
+                                f"(clip ended at frame {i})")
+        frame = candidate
 
     # Crop ROI (y, y+h, x, x+w)
     crop = frame[ROI_Y:ROI_Y + ROI_H, ROI_X:ROI_X + ROI_W]

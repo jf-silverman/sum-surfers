@@ -54,10 +54,41 @@ tuned over time.
     the same predictor fields for past dates, using Surfline's historical
     API with a personal account session token. See the script's docstring
     for usage and safety notes before running it.
+- `code/backfill_predictors_from_har.py`
+  - Manual, one-off script: an alternative to the token-based backfill,
+    parsing HAR files exported from clicking through Surfline's own
+    Historical view instead of making live requests. Cannot get
+    `weather_condition`/`temperature_f`/`pressure_mb`/`consistency_wave_count`
+    (the Historical view never fetches those) — see the script's docstring.
 - `code/manage_clips.py`
   - Emails a warning if local clip storage exceeds `CLIPS_DIR_LIMIT_GB`.
 - `code/send_email.py`
   - Shared Gmail SMTP sender used for storage warnings.
+
+## Surfer Count Prediction Model
+
+A separate modeling pipeline on top of `predictions.csv` +
+`surfline_predictors.csv`, built in three phases (see `PROJECT_HISTORY.md`
+for the full story, including two real bugs found and fixed along the way):
+
+- `code/build_training_features.py` — joins predictions (target) with
+  predictors (features) for `quality_ok=True` rows, adds derived
+  time-of-day/day-of-week/month features. Writes `data/training_features.csv`.
+- `code/fit_surfer_count_model.py` — fits and compares Poisson GLM,
+  negative-binomial GLM, and gradient-boosted trees (the best performer,
+  ~6 surfer MAE), plus GBT quantile-regression prediction intervals.
+- `code/predict_surf_count.py` — pulls live tomorrow's forecast and outputs
+  a prediction with an 80% range:
+    ```bash
+    python code/predict_surf_count.py                          # tomorrow, default hours
+    python code/predict_surf_count.py --date 2026-08-28 --hours 07:10,12:00
+    ```
+- `code/demo_predictions.py` — shows N random held-out predictions
+  alongside the actual count and conditions, for eyeballing model behavior.
+
+Honest caveat: held-out MAE is ~6 surfers on a typical count of ~15, and
+the reported 80% prediction interval is empirically closer to a 65%
+interval — treat outputs as directional estimates, not precise counts.
 
 ## Schedule
 
@@ -81,6 +112,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install requests astral pytz opencv-python-headless ultralytics torch torchvision
+pip install pandas numpy statsmodels scikit-learn  # for the surfer-count prediction model
 cp .env.example .env
 bash code/local_pipeline.sh
 ```

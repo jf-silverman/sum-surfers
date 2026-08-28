@@ -479,3 +479,319 @@ essentially done pipeline-wide; only the detection/aggregation step
 remains) has not been run in bulk yet — `backfill_multiframe_counts.py`
 is ready and verified on a small sample, but the full run across all
 covered dates is still pending.
+
+### Historical predictor backfill — completed via HAR clicking + token script (2026-08-26 to 2026-08-27)
+
+The 85-date historical predictor gap (weather/rating/tide/swell/wind/
+energy/consistency) identified earlier is now fully closed —
+`data/surfline_predictors.csv` has a matching row for every
+`predictions.csv` row, zero remaining gap, verified by direct diff.
+
+- New `code/backfill_predictors_from_har.py`: an alternative to the
+  token-based script — parses HAR files exported from clicking through
+  the site's own Historical view instead of making live requests itself.
+  Key design points, discovered/decided this session:
+  - The site's Historical view calls a **different endpoint set** than
+    the live forecast script: `rating`, `surf`, `swells`, `wind`,
+    `energy`, `tides` (plus unused `sunlight`/`spectra`/`regions-
+    conditions`) — never `weather` or `consistency`. `surf`+`swells`
+    together carry the same fields the live `wave` endpoint returns in
+    one response, so they're combined by timestamp into a synthetic
+    `wave` record before reuse `get_surf_predictors.py`'s
+    `merge_into_by_hour()`.
+  - Each request the site makes returns a multi-day window (~16 days)
+    even for a single-day view, but Joel's insight was that only the
+    day matching the request's own `start=` param is genuine day-of
+    data — later days in that window are effectively a several-days-out
+    forecast despite the whole response being labeled "historical". The
+    script filters every response down to just that one day
+    (`filter_to_offset(..., offset_days=0)`), meaning one HAR click
+    covers exactly one date, not sixteen.
+  - Added a narrow, explicit fallback: if a target date has no day-of
+    data in any HAR, the script falls back to that date's 1-day-out
+    record from an adjacent request (`offset_days=1`) rather than being
+    skipped — used for exactly one date (2025-11-21, clicked as 11-20)
+    where the exact date wasn't directly clickable. Every fallback-
+    sourced row is reported by name, both in `--dry-run` and the real
+    write, so it's never silent.
+  - Caught and fixed a real bug during use: `combine_surf_and_swells`
+    initially only iterated `surf` records, silently dropping valid
+    `swells` data whenever a request's `surf` call was missing (observed
+    for the 2025-11-21 request) — fixed to union timestamps from both
+    lists.
+  - **Known permanent gap of this method**: `weather_condition`/
+    `temperature_f`/`pressure_mb`/`consistency_wave_count` are
+    structurally unavailable — the Historical view just never fetches
+    them, no matter what's clicked.
+- Workflow hiccups worked through live: an empty 0-entry HAR export
+  (log cleared before capture), a HAR missing most of its intended date
+  range (DevTools "Preserve log" was off, so page reloads during retry
+  wiped earlier captures — fixed by turning it on), and real 429
+  rate-limit responses from Surfline's own site under repeated
+  clicking (confirmed via HAR status-code inspection, not guessed) —
+  Preserve Log being on meant the retries survived in the file anyway.
+- **Filling the weather/consistency gap for HAR-sourced dates**: rather
+  than accept the permanent gap, removed the 389 partial rows (29
+  dates) that had come from HAR captures, then re-ran
+  `backfill_historical_predictors.py` — which uses the personal-token
+  API and does return weather/consistency — in 9 chunks, each ≤10 days
+  (one full day-of request per date, `--chunk-days 1`), covering
+  2025-10-20 to 2025-10-30, 2025-11-21 to 2025-11-25, 2025-11-30 to
+  2025-12-07, and 5 scattered single-day gaps in 2026-07/08. All 9
+  chunks completed with zero denials.
+- `code/backfill_historical_predictors.py` also hardened this session:
+  a 400 or 429 response now raises `RequestDenied` and aborts the
+  entire run immediately (writing whatever was fetched before the
+  denial), rather than the old behavior of backing off 60s and quietly
+  continuing — per Joel's explicit instruction to stop on denial rather
+  than keep hammering a rate-limited endpoint.
+- Also fixed: `code/get_clips.py` clip-download failures were silently
+  accumulating 401s for days before being noticed (the `SURFLINE_
+  ACCESS_TOKEN` had gone stale). Added a distinct `AuthError` exception
+  (raised only for HTTP 401, separate from other/transient failures)
+  and `send_auth_failure_email()`, matching `manage_clips.py`'s
+  existing storage-warning email pattern — `local_pipeline.sh` will now
+  email automatically any time a scheduled run hits an invalid/expired
+  token, with no separate monitoring needed. Verified live (16 real
+  401s triggered a real email send).
+- Also added a self-reverting one-off clip-duration override
+  (`data/.clip_duration_override` in `get_clips.py`'s `resolve_clip_
+  duration()`): if present, its contents (an integer, seconds) are used
+  for that run only and the file is deleted immediately on read — so
+  even a crash mid-run can't leave the override silently active for a
+  future run. Used once for a real one-off: a 60-second-clip
+  experiment (vs. the standard 5s) to investigate whether longer clips
+  would help with frame-edge/wave-occlusion count variability Joel
+  observed; confirmed both 60s and 30s clip requests work against
+  Surfline's API (actual returned duration ~2s longer than requested,
+  same overshoot pattern as the standard 5s clips) before setting the
+  override for a real scheduled cron run.
+
+### Surfer-count prediction model — Phase 1 (feature table) and Phase 2 (model fitting) built (2026-08-27)
+
+Continuing the Phase 0-3 modeling plan scoped 2026-08-25 (Phase 0,
+predictor backfill, is now done — see above).
+
+- **Phase 1** — new `code/build_training_features.py`: joins
+  `predictions.csv` (target `surfer_count`) with `surfer_predictors.csv`
+  on `filename`, restricted to `quality_ok=True` rows, adds
+  `hour_local`/`day_of_week`/`is_weekend`/`month` derived from the
+  timestamp. Writes `data/training_features.csv` (not lossy — every
+  matched row is kept even with some blank predictor fields; dropping/
+  imputing is left as a Phase 2 decision). After the predictor backfill
+  above closed the gap, this produced 1160 rows with only 15 (1.3%,
+  all 2026-07-23) still missing `energy_offshore/nearshore_kj`.
+- **Phase 2** — new `code/fit_surfer_count_model.py`, comparing three
+  model families on an 80/20 held-out split (916 train / 229 test):
+  - Poisson GLM: confirmed badly overdispersed (Pearson chi2/df_resid
+    = 8.65, should be ~1.0), AIC 11175.
+  - Negative binomial GLM (statsmodels' MLE-based `NegativeBinomial`,
+    not the GLM family's fixed-alpha=1.0 default, which a convergence
+    warning flagged as not actually estimating the dispersion
+    parameter — refit properly with a Poisson-warm-started BFGS
+    optimizer after standardizing the raw-scale numeric features, which
+    fixed a real non-convergence): alpha=0.747, AIC 6574 (much better
+    than Poisson, confirming overdispersion was real) — but held-out
+    MAE (~9) barely moved vs. Poisson. Cyclical features (hour, month,
+    wind/swell direction) are sin/cos-encoded rather than raw degrees.
+  - Gradient-boosted trees (`sklearn.HistGradientBoostingRegressor`,
+    Poisson loss): clear winner on held-out accuracy — MAE 6.34 vs ~9
+    for both GLMs (~30% better), RMSE 9.07 vs ~12. Permutation
+    importance: `tide_ft` dominates, followed by time-of-day, wave
+    energy (which wasn't significant in the GLM), `is_weekend`.
+  - Honest takeaway across all three: MAE 6-9 against a mean count of
+    ~15 is a real, usable baseline but not precise — useful for
+    directional/relative predictions, not an exact headcount.
+- **Uncertainty bands** (in lieu of a full Bayesian refit, after
+  discussing the tradeoff with Joel): 80% prediction intervals via GBT
+  quantile regression (separate 10th/50th/90th percentile models).
+  **Caught and fixed a real bug during this**: the 10th-percentile
+  model, with the same hyperparameters as the point model
+  (`l2_regularization=1.0`), collapsed to predicting a constant 0 for
+  *every single row* on both train and test data — because ~11% of all
+  rows are `surfer_count==0`, "always predict 0" already nearly
+  minimizes the pinball loss at that quantile, and L2 regularization on
+  leaf values pushed the fit the rest of the way into that trivial
+  optimum instead of learning real feature-dependent splits. This
+  degenerate model still *looked* well-calibrated in aggregate (~82%
+  coverage against an 80% target) because a lower bound that's always 0
+  can never exclude anything from below — Joel caught this by noticing
+  all 5 rows in a demo table had a lower bound of exactly 0, which
+  prompted the investigation. Fix: `l2_regularization=0.0` and
+  shallower trees (`max_depth=3`) for the quantile models specifically
+  (point/median/upper models weren't affected). After the fix, true
+  empirical coverage is honestly lower — 66.8% for a nominal 80%
+  interval (both tails individually miss more than their 10% target) —
+  and pushing to a wider 90% interval (5th/95th) doesn't help: the
+  5th-percentile model collapses to constant 0 again regardless of
+  tuning, meaning there just isn't enough learnable signal below the
+  10th percentile given how zero-inflated this ~1145-row dataset is.
+  **`[0.1, 0.9]` with the corrected hyperparameters is the honest
+  ceiling for this dataset's size**, not the originally-reported 80%.
+- New `code/demo_predictions.py`: shows N random held-out predictions
+  (point + 80% range) alongside the actual count and main predictor
+  conditions, for eyeballing rather than only trusting aggregate
+  metrics — this is what surfaced the quantile-collapse bug above.
+- **Caveat found, then corrected same day**: initially reported (based on
+  a stale assumption, not verified) that only 91 of 1160 rows (7.8%) had
+  multi-frame data available, because "most older clips have since been
+  deleted by storage cleanup." Joel caught this was wrong by pointing
+  directly at `data/not_needed_in_repo/surf_clips` — clips going back to
+  2025-10-11 (and 2025-11-02 onward) were still on disk. Running
+  `backfill_multiframe_counts.py --start 2025-10-11 --end 2026-08-27` for
+  real (rather than assuming the earlier small-sample run was
+  representative) backfilled `frame_count_*` for 756 more rows in well
+  under a minute (verified zero non-`frame_count_*` columns changed via
+  before/after diff), bringing multi-frame availability to 847/1160
+  (73%).
+- **Second bug found in the same investigation**: even after that
+  backfill, refitting produced byte-identical results to before — because
+  `backfill_multiframe_counts.py` deliberately never overwrites
+  `surfer_count` itself (the earlier non-destructive design decision),
+  so `build_training_features.py` was still reading the stale
+  single-frame `surfer_count` as the modeling target for all 1160 rows,
+  including the 756 just backfilled. Confirmed 471 rows where
+  `surfer_count` disagreed with `round(frame_count_mean)`. Fixed
+  `build_training_features.py`'s `build_row()` to prefer
+  `round(frame_count_mean)` over `surfer_count` wherever multi-frame data
+  exists (added `resolve_target_count()` + a new `used_multiframe` output
+  column so it's visible per-row which convention was used), matching
+  the same rounding convention `detect_surfers.py`'s live
+  `run_inference_multi()` uses.
+- **Refit on the actually-corrected target**: GBT RMSE improved 9.07 →
+  8.85 (~2.4%), MAE 6.34 → 6.21 — a modest, genuine improvement,
+  consistent with the earlier (2026-08-26) small-sample validation
+  finding that multi-frame averaging gives a real but not dramatic
+  accuracy gain. The GLMs barely moved (Poisson/NegBin MAE ~9 either
+  way). Quantile-interval coverage similarly unchanged (~65-67%,
+  consistent with the honest-ceiling finding above). Remaining 313 rows
+  (27%) genuinely have no clip left on disk (or hit the rare unreadable-
+  frame decoder issue) and still use the single-frame count.
+
+**State**: Phase 0-2 of the modeling plan are done. Phase 3 (a small
+script that pulls tomorrow's forecast and outputs a live prediction) is
+covered further down this file, after two data-integrity bugs found and
+fixed the same day (`extract_frame_at()`'s seek bug and the `side2`
+mispositioning it caused).
+
+### `extract_frame_at()` seek bug — root-caused and fixed; median-of-5 tested (2026-08-27)
+
+Joel proposed extracting 5 frames per clip and taking the median instead
+of averaging 3, as a way to be less swayed by single-frame outliers
+(occlusion, false positives). Testing this on the same 43-clip
+`model_review_50` review batch used earlier surfaced a much bigger,
+previously-misdiagnosed bug in `code/get_cropped_frame.py`'s
+`extract_frame_at()`:
+
+- **Not clip corruption, not "near the tail"** (as earlier entries in
+  this file assumed for isolated failures like `2026-07-27_19-56` and
+  `2026-08-16_18-17`) — it's that `cv2.VideoCapture.set(CAP_PROP_POS_
+  FRAMES, ...)` is fundamentally unreliable on these clips when called
+  on a freshly-opened capture. 41 of 43 clips failed outright trying to
+  seek to a mid-clip frame (t=4.5s) that should have been well within
+  a normal ~6.2s/155-frame clip.
+- First fix attempt (add a single warm-up `.read()` before seeking)
+  fixed seeking to *later* frames but broke seeking to *earlier* ones —
+  confirmed via `cap.get(CAP_PROP_POS_FRAMES)` reporting a nonsensical
+  `-5.0`/`-4.0` position and silently re-returning the warm-up frame
+  for low frame numbers, verified by diffing extracted images
+  (`t=0.5`/`1.5`/`2.5` came back byte-for-byte identical).
+- **Actual fix**: stopped using `.set()` to seek at all. Sequential
+  `.read()` calls were confirmed 100% reliable for every frame in every
+  clip tested, so `extract_frame_at()` now reads forward from frame 0 to
+  the target frame index rather than seeking. Verified: 0 failures
+  across all 43 clips × 5 frame positions (previously 41/43 failed at
+  just one position), and consecutive extracted frames show real,
+  consistent pixel differences (~14/255 mean abs diff) instead of the
+  duplicate-frame artifact the broken warm-up fix produced. Performance
+  cost is negligible (~0.2s for 3 frames per clip).
+- **The actual median-of-5 vs mean-of-3 question, answered on corrected
+  data**: no meaningful difference. MAE 1.235 (mean-of-3) vs 1.244
+  (median-of-5) vs 1.239 (mean-of-5), excluding the same 2 known
+  gross-miscount outliers from the earlier multi-frame validation;
+  per-row, median-of-5 improved 18/41, worsened 16/41, tied 7/41 vs.
+  mean-of-3 — essentially a coin flip. **Not adopted** — no accuracy
+  case for the added extraction/inference cost (5 frames vs 3 per
+  clip). The real value of this investigation was finding and fixing
+  the seek bug, which affects every frame extraction in the pipeline
+  going forward, not just this specific idea.
+
+### `side2` frames were universally mispositioned — root-caused, fixed, models refit (2026-08-27)
+
+Joel asked a direct follow-up to the seek-bug discovery above: "does that
+mean a lot of our 3 shots per clip were closer than 1.5 seconds apart?"
+Checking properly (rather than assuming) revealed something worse than
+"closer" — the **original** `extract_frame_at()` (before any fix today,
+plain `cap.set(CAP_PROP_POS_FRAMES, N)` on a fresh capture, no warm-up)
+had been silently mispositioning `side2` (intended t=4.0s, frame~100) for
+its entire history, not failing loudly.
+
+- Verified via full-clip pixel-diff scan (same technique used earlier in
+  this session to try to anchor the CVAT test set): every sampled
+  `_side2.jpg` actually matched frame 150 (t=6.00s) instead of the
+  intended frame 100 — **30/30 in a random sample, 0/30 landed anywhere
+  near the intended position.** Universal, not intermittent. `primary`
+  and `side1` were unaffected (0 mismatches in the same sample) — the
+  bug is specific to seek targets past whatever internal threshold this
+  clip encoding has, which frame 100 apparently crosses and frame ~62
+  (primary) doesn't.
+- This meant `frame_count_3`, `frame_count_mean`, `frame_count_stdev`,
+  and (via `build_training_features.py`'s `resolve_target_count()`) the
+  "multi-frame-corrected" `surfer_count` used as the modeling target for
+  all 847 multi-frame rows were computed from a wrong side2 value for
+  the entire history of the multi-frame system (since 2026-08-25) — this
+  includes the original small-sample validation, the full 756-row
+  backfill, and today's earlier "corrected" model refit.
+- **Fix**: re-extract `side2` for all 847 affected rows using the
+  already-fixed sequential-read `extract_frame_at()`, re-run
+  `run_inference_multi()`, and overwrite `frame_count_1/2/3/mean/stdev`
+  (a genuine correction, unlike `backfill_multiframe_counts.py`'s
+  fill-blanks-only behavior) — `surfer_count`/`confidence_avg` still
+  never touched. Ran as a temporary one-off script, deleted after use.
+  Verified: 847/847 fixed, 0 errors; re-checked the same two previously-
+  confirmed-corrupted files, both now land at frame 100 (t=4.00s)
+  exactly; confirmed zero non-`frame_count_*` columns changed via
+  before/after diff.
+- **Rebuilt `training_features.csv` and refit all models on the
+  genuinely-correct data.** The honestly surprising result: barely
+  moved. GBT MAE 6.21→6.15, RMSE 8.85→8.79; GLM MAE ~9 either way;
+  quantile coverage 65.5%→65.1%. A systematically-wrong third frame
+  value gets diluted by averaging into `frame_count_mean` (1 of 3
+  values) and further diluted across 916 training rows — so the bug was
+  real and worth fixing for data integrity (the raw `_side2.jpg` images
+  and per-frame values were genuinely wrong, and would keep corrupting
+  any future row-level analysis), but it did not meaningfully change any
+  of the model-comparison conclusions reported earlier today.
+
+### Median-of-5 re-tested on corrected data, then Phase 3 (live prediction script) built (2026-08-27)
+
+- Re-ran the median-of-5 vs. mean-of-3 comparison a third time, now that
+  `side2` is genuinely fixed everywhere (the first median-of-5 test used
+  the seek-bug-broken extraction; the second used the sequential-read
+  fix but unknowingly reused already-on-disk, still-corrupted `side2`
+  files as its `mean3` baseline via `run_inference_multi()`'s
+  file-exists-skip logic). Same conclusion as before, now on trustworthy
+  data both ways: MAE 1.244 identical for mean-of-3 and median-of-5
+  (mean-of-5 marginally best at 1.239, negligible); per-row 14
+  improved/13 worsened/14 tied vs. mean-of-3 — a coin flip. **Confirmed
+  not adopted.**
+- **Phase 3**: new `code/predict_surf_count.py` — pulls live
+  forward-looking predictors via `get_surf_predictors.py`'s
+  `build_predictor_map()` (today+tomorrow, no auth token needed), trains
+  fresh "production" GBT point + 10th/90th-quantile models on *all* of
+  `training_features.csv` (not the 80/20 split used for validation —
+  that already confirmed generalization; production wants every
+  available row), builds a matching feature row for each requested
+  time (same cyclical encoding, same weather-category collapsing —
+  falls back to `OTHER` for a live weather condition not seen in
+  training, e.g. `LIGHT_RAIN` — same train-set standardization), and
+  prints a prediction with an 80% range plus the underlying conditions
+  for transparency. Verified live: correctly fetched tomorrow's
+  forecast, produced sane predictions for the default 4 daylight hours,
+  correctly snapped `--hours 07:10` to the 07:00 forecast bucket
+  (answering the original "what would we predict at 7:10am tomorrow"
+  question from 2026-08-25), and gracefully reported "no forecast data
+  available" for a date outside the live 2-day window rather than
+  erroring.
+
+**State**: Phases 0-3 of the modeling plan are all done.
