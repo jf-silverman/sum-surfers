@@ -107,8 +107,8 @@ for the full story, including two real bugs found and fixed along the way):
   overlaid), auto-committed to the top of this README. Run via its own
   daily cron entry, independent of the twice-weekly clip pipeline.
 
-Honest caveat: held-out MAE is ~6 surfers on a typical count of ~15, and
-the reported 80% prediction interval is empirically closer to a 65%
+Caveat: held-out MAE is ~6 surfers on a typical count of ~15, and the
+reported 80% prediction interval is empirically closer to a 65%
 interval — treat outputs as directional estimates, not precise counts.
 
 ## Schedule
@@ -116,7 +116,7 @@ interval — treat outputs as directional estimates, not precise counts.
 Clip collection + detection runs twice a week via cron (Tue/Thu):
 
 ```cron
-0 19 * * 2,4 caffeinate -i /path/to/sum-surfers/code/local_pipeline.sh >> /path/to/sum-surfers/data/local_pipeline.log 2>&1
+28 18 * * 2,4 caffeinate -i /path/to/sum-surfers/code/local_pipeline.sh >> /path/to/sum-surfers/data/local_pipeline.log 2>&1
 ```
 
 `caffeinate -i` keeps the laptop awake for the run; if the laptop is asleep or off at the scheduled time, the run is skipped.
