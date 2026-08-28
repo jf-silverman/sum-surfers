@@ -872,3 +872,11 @@ the point estimate is always inside any range that contains it, at a
 small accuracy cost (MAE ~6.96 vs ~6.15). The mean-based Poisson point
 model and its `HistGradientBoostingRegressor`/`POINT_KWARGS` import are
 now dead code in `predict_surf_count.py`, removed.
+
+Joel then asked to keep the mean-based estimate around rather than drop
+it entirely, specifically so mean-vs-median divergence stays visible as
+a forward-looking diagnostic while more data accumulates and models keep
+improving. Re-added: `predict_surf_count.py` now trains both models
+(median as the primary, range-consistent point estimate; mean as a
+second value shown alongside it) and auto-flags any hour where they
+diverge by more than 25% ("check for growing skew").

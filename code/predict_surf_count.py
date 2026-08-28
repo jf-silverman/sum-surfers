@@ -25,6 +25,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import HistGradientBoostingRegressor
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import get_surf_predictors as sp  # noqa: E402
@@ -32,6 +33,8 @@ from fit_surfer_count_model import load_and_prepare, fit_quantile_model_robust  
 from build_training_features import simplify_weather_condition  # noqa: E402
 
 DEFAULT_HOURS = ["07:00", "10:00", "13:00", "16:00"]
+
+MEAN_KWARGS = dict(max_iter=300, learning_rate=0.05, max_depth=4, l2_regularization=1.0, random_state=42)
 
 
 def parse_args():
@@ -42,20 +45,23 @@ def parse_args():
 
 
 def train_production_models(X, y, weather_categories):
-    """Fit 10th/50th/90th quantile GBT models on ALL rows. The center estimate is
-    the MEDIAN model, not a separately-trained mean-based (Poisson loss) model —
-    using the mean would sometimes fall outside its own 80% range for a skewed
-    target like this one (right-skewed count data: the mean sits above the median,
-    pulled up by the long right tail of crowded days). The median is guaranteed to
-    fall inside a range that contains it, at a small cost in point accuracy vs. the
-    mean model (~6.96 vs ~6.15 MAE — see fit_surfer_count_model.py). All three use
-    fit_quantile_model_robust() — see its docstring for why a fixed hyperparameter
-    combo isn't safe here (silent collapse to a near-constant prediction, observed
-    twice on this dataset already)."""
+    """Fit 10th/50th/90th quantile GBT models plus a separate mean-based (Poisson
+    loss) model, on ALL rows. The MEDIAN model is the range-consistent point
+    estimate shown first — it's guaranteed to fall inside its own 80% range, which
+    a mean-based estimate isn't for a skewed target like this one (right-skewed
+    count data: the mean sits above the median, pulled up by the long right tail of
+    crowded days). The MEAN model is kept and reported alongside it (not dropped)
+    specifically so mean-vs-median divergence stays visible as a diagnostic — worth
+    tracking as the dataset grows and models keep improving; a growing gap would
+    signal increasing skew, a shrinking gap would signal it's easing. Quantile
+    models use fit_quantile_model_robust() — see its docstring for why a fixed
+    hyperparameter combo isn't safe here (silent collapse to a near-constant
+    prediction, observed twice on this dataset already)."""
     lower_model, _ = fit_quantile_model_robust(X, y, 0.1)
     median_model, _ = fit_quantile_model_robust(X, y, 0.5)
     upper_model, _ = fit_quantile_model_robust(X, y, 0.9)
-    return median_model, lower_model, upper_model
+    mean_model = HistGradientBoostingRegressor(loss="poisson", **MEAN_KWARGS).fit(X, y)
+    return median_model, lower_model, upper_model, mean_model
 
 
 def build_feature_row(target_dt, predictors, numeric_cols, weather_categories, train_mean, train_std, template_columns):
@@ -120,7 +126,7 @@ def main():
     X_std = X.copy()
     X_std[numeric_cols] = (X_std[numeric_cols] - train_mean) / train_std
 
-    median_model, lower_model, upper_model = train_production_models(X_std, y, weather_categories)
+    median_model, lower_model, upper_model, mean_model = train_production_models(X_std, y, weather_categories)
 
     print(f"\n=== Surfer count prediction for {target_date} ===\n")
     for hh_mm in hours:
@@ -140,6 +146,7 @@ def main():
         lower_pred = max(0.0, float(lower_model.predict(feat_row)[0]))
         point_pred = max(lower_pred, float(median_model.predict(feat_row)[0]))
         upper_pred = max(point_pred, float(upper_model.predict(feat_row)[0]))
+        mean_pred = max(0.0, float(mean_model.predict(feat_row)[0]))
 
         conditions = (
             f"rating={predictors.get('rating_key','?')} tide={predictors.get('tide_ft','?')}ft "
@@ -147,16 +154,24 @@ def main():
             f"swell={predictors.get('primary_swell_height_ft','?')}ft@{predictors.get('primary_swell_period_s','?')}s "
             f"wind={predictors.get('wind_speed_mph','?')}mph {predictors.get('weather_condition','?')}"
         )
-        print(f"{hh_mm}: ~{point_pred:.0f} surfers [median] (80% range: {lower_pred:.0f}-{upper_pred:.0f})")
+        divergence_flag = ""
+        if point_pred > 0:
+            pct_diff = (mean_pred - point_pred) / point_pred
+            if abs(pct_diff) > 0.25:
+                divergence_flag = f"  [mean/median diverge {pct_diff:+.0%} — check for growing skew]"
+        print(f"{hh_mm}: ~{point_pred:.0f} surfers [median] (80% range: {lower_pred:.0f}-{upper_pred:.0f})  "
+              f"mean-based: ~{mean_pred:.0f}{divergence_flag}")
         print(f"        conditions: {conditions}")
 
-    print(f"\nNote: the point estimate above is the MEDIAN model, not the more accurate but "
-          f"separately-fit mean-based model (~6.96 vs ~6.15 held-out MAE) — using the median "
-          f"guarantees it always falls inside its own range, which a mean-based estimate isn't "
-          f"guaranteed to do for this right-skewed target. The 80% range's true empirical "
-          f"coverage varies by dataset snapshot — check fit_surfer_count_model.py's latest "
-          f"output rather than trusting a fixed number here. Treat all of this as a directional "
-          f"estimate, not a precise count.")
+    print(f"\nNote: the primary point estimate is the MEDIAN model — guaranteed to fall inside "
+          f"its own range, which a mean-based estimate isn't for this right-skewed target. The "
+          f"mean-based estimate (~6.15 MAE vs ~6.96 for median — see fit_surfer_count_model.py) "
+          f"is shown alongside it as a diagnostic: watch for the two drifting apart over time as "
+          f"more data comes in and models improve, which would signal changing skew in the "
+          f"underlying crowd-size distribution. The 80% range's true empirical coverage varies by "
+          f"dataset snapshot — check fit_surfer_count_model.py's latest output rather than "
+          f"trusting a fixed number here. Treat all of this as a directional estimate, not a "
+          f"precise count.")
 
 
 if __name__ == "__main__":
