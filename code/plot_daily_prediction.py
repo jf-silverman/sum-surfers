@@ -228,6 +228,61 @@ def main():
     fig.savefig(out_path, dpi=150)
     print(f"Saved to {out_path}")
 
+    # Stable, git-tracked path for the README embed — overwritten daily rather than
+    # accumulating a new tracked file every day (the dated file above stays local/
+    # untracked, matching the rest of data/'s convention).
+    latest_path = CHARTS_DIR / "latest.png"
+    fig.savefig(latest_path, dpi=150)
+
+    write_range_table(d, target_date, CHARTS_DIR / "latest_table.md")
+    update_readme(target_date)
+
+
+def write_range_table(d, target_date, out_path):
+    """Markdown table of hour -> 33% range only (no median — see PROJECT_HISTORY.md,
+    Joel asked for the range without the point estimate for the README table)."""
+    lines = [
+        f"**Predicted surfer count — {target_date.strftime('%A, %B %d, %Y')}** "
+        f"(33% range around the median)\n",
+        "| Time | Range |",
+        "|---|---|",
+    ]
+    for _, row in d.iterrows():
+        lines.append(f"| {row['hour'].strftime('%-I:%M %p')} | {row['q335']:.0f}–{row['q665']:.0f} |")
+    out_path.write_text("\n".join(lines) + "\n")
+
+
+README_START_MARKER = "<!-- DAILY_CHART_START -->"
+README_END_MARKER = "<!-- DAILY_CHART_END -->"
+
+
+def update_readme(target_date):
+    """Replaces the marked section of README.md with the latest chart + range table.
+    Idempotent — safe to run daily; only the content between the markers changes."""
+    readme_path = _PROJECT_ROOT / "README.md"
+    readme = readme_path.read_text()
+    if README_START_MARKER not in readme or README_END_MARKER not in readme:
+        print(f"WARNING: README.md markers not found — skipping README update. "
+              f"Add {README_START_MARKER} / {README_END_MARKER} to enable this.")
+        return
+
+    table_md = (CHARTS_DIR / "latest_table.md").read_text()
+    generated_at = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+    section = (
+        f"{README_START_MARKER}\n"
+        f"## Today's Surfer Count Prediction\n\n"
+        f"_Last updated: {generated_at}_\n\n"
+        f"![Latest daily prediction chart](data/charts/latest.png)\n\n"
+        f"{table_md}\n"
+        f"{README_END_MARKER}"
+    )
+
+    before, _, rest = readme.partition(README_START_MARKER)
+    _, _, after = rest.partition(README_END_MARKER)
+    new_readme = before + section + after
+    readme_path.write_text(new_readme)
+    print("Updated README.md daily chart section.")
+
 
 if __name__ == "__main__":
     main()

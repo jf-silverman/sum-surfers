@@ -998,3 +998,33 @@ historical gap is a separate, unconfirmed question.
     kept, but now only for the separate "has the model ever trained on
     this hour at all" extrapolation flag, not for deciding which hours
     to show.
+
+### Daily chart posted to GitHub README (2026-08-28)
+
+Joel asked for the daily chart to be visible somewhere prominent on
+GitHub, plus an hourly range table (33% range, no median). Since
+`data/` has been untracked-by-convention all along, making the chart
+show up on GitHub's rendered README required actually committing it —
+asked Joel to confirm the automation model before building it (auto-
+commit-and-push daily via cron vs. generate-locally-push-manually); he
+chose full automation.
+
+- `plot_daily_prediction.py` now also writes `data/charts/latest.png`
+  (a single, git-tracked, daily-overwritten file — not a new file
+  every day, to avoid unbounded repo growth from daily binary commits)
+  and `data/charts/latest_table.md` (hour → 33% range only, per Joel's
+  "no median needed"), then rewrites the marked section of `README.md`
+  between `<!-- DAILY_CHART_START -->`/`<!-- DAILY_CHART_END -->`
+  (idempotent, safe to run daily) with the embedded image + table +
+  a timestamp.
+- `daily_chart.sh` now stages exactly those 3 files after generation,
+  commits only if something actually changed (`git diff --cached
+  --quiet` check — avoids empty commits when the numbers happen to
+  round to the same table twice), and pushes to `origin/main`. Git/
+  network failures are logged but explicitly non-fatal — a failed
+  push must never be treated as the whole daily chart job failing,
+  since the chart itself already generated successfully by that point.
+  Commit messages are prefixed `Automated:` to distinguish unattended
+  cron commits from real interactive session work in the git log.
+- Verified live: ran the real commit+push once to confirm the whole
+  chain works before trusting it to the unattended 7pm cron job.

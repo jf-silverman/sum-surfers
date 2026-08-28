@@ -40,4 +40,24 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 log "=== Daily chart generation starting ==="
 cd "$PROJECT_ROOT"
 "$PYTHON" code/plot_daily_prediction.py
+
+# Auto-commit + push the updated chart/table/README — approved by Joel 2026-08-28
+# specifically so the latest chart is visible on GitHub without a manual step.
+# Non-fatal: a git/network failure here must never be treated as the whole daily
+# chart job failing (the chart itself already generated fine above).
+git add data/charts/latest.png data/charts/latest_table.md README.md 2>&1 || true
+if git diff --cached --quiet; then
+    log "No changes to commit (chart/table/README identical to last run)."
+else
+    if git commit -m "Automated: update daily surfer count chart ($(date '+%Y-%m-%d'))" 2>&1; then
+        if git push origin main 2>&1; then
+            log "Pushed updated daily chart to origin/main."
+        else
+            log "WARNING: git push failed — chart committed locally but not pushed. Push manually when convenient."
+        fi
+    else
+        log "WARNING: git commit failed — chart generated but not committed."
+    fi
+fi
+
 log "=== Daily chart generation complete ==="
