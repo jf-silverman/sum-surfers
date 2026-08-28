@@ -28,7 +28,9 @@ tuned over time.
     storage, runs detection, pulls Surfline predictors, records a success
     timestamp.
 - `code/get_clips.py`
-  - Downloads clips between sunrise-30 minutes and sunset+30 minutes.
+  - Downloads clips between real dawn and dusk (civil twilight) — Surfline's
+    own live light forecast for today, astral (corrected camera coordinates)
+    for backfill days.
   - Uses the nearest Surfline clip windows and can backfill up to the previous 5 days.
 - `code/get_cropped_frame.py`
   - Reads downloaded clips and saves 3 cropped JPG frames each (primary +

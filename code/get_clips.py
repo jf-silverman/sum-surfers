@@ -28,13 +28,18 @@ REQUEST_TIMEOUT_SEC = float(os.environ.get("CLIP_REQUEST_TIMEOUT_SEC", "20"))
 REQUEST_BASE_DELAY_SEC = float(os.environ.get("CLIP_REQUEST_DELAY_SEC", "0.35"))
 REQUEST_JITTER_SEC = float(os.environ.get("CLIP_REQUEST_JITTER_SEC", "0.25"))
 
-# Camera location for sunrise/sunset
+# Camera location — Pleasure Point, Santa Cruz, CA (confirmed 2026-08-28 via web
+# search; the previous hardcoded coordinates, 33.790/-118.486, were wrong — that's
+# Southern California, ~340 miles off. The error was silent because timezone
+# (America/Los_Angeles) happened to be correct either way, and the resulting
+# sunrise/sunset were plausible-looking, just off by ~15-25 minutes depending on
+# season — enough to silently truncate real evening/morning clip collection.
 LOCATION = dict(
-    name="SurfCam",
+    name="PleasurePoint",
     region="CA",
     timezone="America/Los_Angeles",
-    latitude=33.790,
-    longitude=-118.486,
+    latitude=36.9577,
+    longitude=-121.9688,
 )
 # --------------------------------
 
@@ -156,6 +161,49 @@ def send_auth_failure_email(auth_failure_count):
         print(f"Could not send auth-failure warning email: {exc}")
 
 
+def get_light_window(date, local_tz):
+    """Returns (first_light, last_light) datetimes for the clip-collection window.
+
+    Prefers Surfline's own `sunlight` forecast endpoint (dawn/dusk = civil twilight,
+    the standard "usable light" boundary) for TODAY specifically — it's free/no-token
+    for the live forward-looking window, and it's literally the same source Surfline
+    itself uses, so it can't drift from the real spot the way an independently
+    computed astronomical estimate could. Falls back to astral (using this file's
+    LOCATION, now corrected to Pleasure Point's real coordinates — confirmed via web
+    search 2026-08-28 to match Surfline's own dawn/dusk within 1-2 minutes) for any
+    date astral can't reach live (i.e. everything in DAY_LOOKBACK_DAYS's backfill
+    window, which is in the past and would otherwise need a premium session token —
+    see backfill_historical_predictors.py) or if the live fetch fails for any reason
+    (network issue, API change, etc. — this must never block the whole clip run).
+
+    Previously this used sunrise-30min/sunset+30min as a stand-in for first/last
+    light — a flawed heuristic on two counts: it assumed a fixed 30-minute margin
+    is always right (real dusk is ~25 min later than that at summer solstice for
+    this location), and it inherited whatever error was in the hardcoded
+    coordinates. dawn/dusk (civil twilight) is the actual concept wanted here.
+    """
+    loc = LocationInfo(**LOCATION)
+    astral_result = sun(loc.observer, date=date, tzinfo=local_tz)
+    astral_window = (astral_result["dawn"], astral_result["dusk"])
+
+    if date != datetime.now(local_tz).date():
+        return astral_window
+
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import get_surf_predictors as sp  # noqa: PLC0415
+
+        params = {"spotId": sp.SPOT_ID, "days": "1", "intervalHours": "1"}
+        resp = sp.fetch("sunlight", params)
+        day = resp[0]
+        dawn = datetime.fromtimestamp(day["dawn"], tz=pytz.utc).astimezone(local_tz)
+        dusk = datetime.fromtimestamp(day["dusk"], tz=pytz.utc).astimezone(local_tz)
+        return dawn, dusk
+    except Exception as e:
+        print(f"  WARNING: live Surfline sunlight fetch failed ({e}), falling back to astral")
+        return astral_window
+
+
 def resolve_clip_duration():
     """Returns the clip duration (seconds) to use for this run. Consumes (deletes)
     CLIP_DURATION_OVERRIDE_FILE immediately if present, so the override is truly
@@ -189,17 +237,10 @@ def main():
         day_folder = OUT_DIR / date_str
         day_folder.mkdir(parents=True, exist_ok=True)
 
-        # sunrise/sunset
-        loc = LocationInfo(**LOCATION)
-        s = sun(loc.observer, date=date, tzinfo=local_tz)
-        sunrise = s["sunrise"]
-        sunset = s["sunset"]
+        first_light, last_light = get_light_window(date, local_tz)
+        clip_dt = find_nearest_clip_window(first_light, clip_times_pattern)
 
-        # first clip: includes 30 min before sunrise
-        first_target = sunrise - timedelta(minutes=30)
-        clip_dt = find_nearest_clip_window(first_target, clip_times_pattern)
-
-        while clip_dt <= sunset + timedelta(minutes=30):
+        while clip_dt <= last_light:
             time_str = clip_dt.strftime("%H_%M")
             clip_folder = day_folder / time_str
             clip_folder.mkdir(exist_ok=True)

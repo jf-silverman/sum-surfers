@@ -880,3 +880,66 @@ improving. Re-added: `predict_surf_count.py` now trains both models
 (median as the primary, range-consistent point estimate; mean as a
 second value shown alongside it) and auto-flags any hour where they
 diverge by more than 25% ("check for growing skew").
+
+### Camera coordinates were wrong; clip window used sunset+30min instead of real dusk (2026-08-28)
+
+Extending the demo chart's x-axis to show a night hour on both ends
+(previous entry) surfaced a much bigger issue when Joel questioned it:
+he pointed out the camera runs 24/7 (the sunrise/sunset window is a
+pipeline *download* decision, not a camera limitation) and that "last
+light" isn't reliably 30 minutes after sunset — Surfline provides real
+first/last light times we weren't using.
+
+- **`get_clips.py`'s hardcoded camera coordinates were wrong**: 33.790,
+  -118.486 (Southern California) instead of the real spot, Pleasure
+  Point in Santa Cruz. Confirmed via web search: Pleasure Point is
+  36.9577°N, -121.9688°W — about 340 miles off. This had been silently
+  wrong the whole project (masked because the timezone,
+  America/Los_Angeles, happened to be correct either way, and the
+  resulting sunrise/sunset times were still plausible-looking, just
+  off).
+- **Verified against Surfline's own live data**: fetched the `sunlight`
+  forecast endpoint (dawn/rise/set/dusk, confirmed free/no-token for
+  live near-term dates) for this spot at summer solstice — real sunset
+  is 8:31pm, vs. 8:07pm from the old (wrong-coordinate) astral
+  calculation, a 24-minute error. Real dusk (true last light) is 9:02pm
+  — 25 minutes past the old sunset+30min cutoff (8:37pm) even before
+  accounting for the coordinate error. Combined, the pipeline had been
+  missing up to ~49 minutes of genuinely usable evening light near
+  solstice, worse than either problem alone.
+- **Fix**: corrected `LOCATION` to Pleasure Point's real coordinates,
+  and replaced the sunrise-30min/sunset+30min heuristic with actual
+  dawn/dusk (civil twilight — the standard "usable light" boundary).
+  New `get_light_window()`: for *today* specifically, tries Surfline's
+  live `sunlight` fetch first (same spot Surfline itself forecasts for,
+  so it can't drift from the real location) and falls back to astral
+  (now using the corrected coordinates) on any failure; for backfill/
+  lookback days (which are in the past, so the live anonymous endpoint
+  can't reach them without the premium historical token — see
+  `backfill_historical_predictors.py`) it goes straight to astral. Per
+  Joel's explicit direction: astral first if it provides real first/
+  last light, web search for the real coordinates rather than guessing,
+  Surfline for the live/forward case specifically.
+  - Verified astral's dawn/dusk (civil twilight, using the corrected
+    coordinates) matches Surfline's own real dawn/dusk within 1-2
+    minutes at solstice — good enough to trust for backfill without
+    needing the historical token at all for this purpose.
+- **Verified live**: ran `get_clips.py` for real (today only, mid-morning
+  so only early-morning clips had actually happened yet — later-hour
+  404s were expected "not recorded yet", not new failures). Clips
+  correctly started at 6:08am (matching the real ~6:10am dawn) and
+  extended through 7:38pm, well past the old (wrong) ~7:54pm cutoff and
+  reaching toward the corrected 8:11pm dusk.
+- **Model impact**: the model's previously-observed 5am-8pm trained hour
+  ceiling was an artifact of this bug, not a true camera/location limit
+  — real dusk-session data has just never been collected. The 9pm
+  extrapolation-flagged chart point from the previous entry reflects a
+  genuinely missing collection window, not an permanently unreachable
+  one; it should start getting real training support as new data
+  accumulates under the corrected window.
+
+**Not yet done**: whether Surfline's clip archive can still serve the
+previously-missed evening/morning minutes for *already-collected* past
+dates (a retroactive backfill) hasn't been tested — clip retention
+limits are unknown. Going forward, collection is fixed; recovering the
+historical gap is a separate, unconfirmed question.
