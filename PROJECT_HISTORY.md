@@ -848,3 +848,27 @@ FOG (fog+mist, kept distinct per Joel's request despite staying sparse,
   best-calibrated lower tail seen all session: 10.3% below-lower miss
   rate against a 10% target (previously 15-42% off in every prior
   attempt).
+
+### Point estimate switched from mean to median — fixes it sometimes falling outside its own range (2026-08-28)
+
+Built an ad hoc chart (in the scratchpad, not committed) showing today's
+hourly predictions with 33%/66% CI bands, requested by Joel to visualize
+`predict_surf_count.py`'s output. He noticed the point estimate sometimes
+fell *outside* the 33% band and asked why.
+
+Root cause: the point estimate came from a separately-trained Poisson-loss
+GBT (which targets something close to the conditional *mean*), while the
+bands came from independently-trained quantile-loss GBTs. Nothing ties a
+mean-focused model to a median-centered band — for a right-skewed target
+like surfer counts (heavy overdispersion, confirmed early in Phase 2), the
+mean sits above the median, so it's expected (not a bug) for it to drift
+outside a narrow band like 33% at some hours. Roughly half the hours in
+the demo chart showed this.
+
+Fix, applied to both the chart and the actual `predict_surf_count.py`
+script (`train_production_models()`): use the **median** quantile model as
+the point estimate instead of the separate mean-based model. Guarantees
+the point estimate is always inside any range that contains it, at a
+small accuracy cost (MAE ~6.96 vs ~6.15). The mean-based Poisson point
+model and its `HistGradientBoostingRegressor`/`POINT_KWARGS` import are
+now dead code in `predict_surf_count.py`, removed.
