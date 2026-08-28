@@ -10,6 +10,12 @@ data/external/
 # Local project notes for Claude Code
 CLAUDE.md
 
+# Working notes — not part of the tracked project history (still in git
+# history from before they were split out/gitignored, that's fine)
+feature_ideas.md
+bugs.md
+misc_notes.md
+
 # OS files
 .DS_Store
 __MACOSX/

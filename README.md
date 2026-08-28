@@ -113,20 +113,11 @@ interval — treat outputs as directional estimates, not precise counts.
 
 ## Schedule
 
-Clip collection + detection runs twice a week via cron (Tue/Thu):
-
-```cron
-28 18 * * 2,4 caffeinate -i /path/to/sum-surfers/code/local_pipeline.sh >> /path/to/sum-surfers/data/local_pipeline.log 2>&1
-```
-
-`caffeinate -i` keeps the laptop awake for the run; if the laptop is asleep or off at the scheduled time, the run is skipped.
-
-The daily prediction chart runs separately, once a day (doesn't need new
-clips, just the live forecast + existing model):
-
-```cron
-0 19 * * * /path/to/sum-surfers/code/daily_chart.sh >> /path/to/sum-surfers/data/daily_chart.log 2>&1
-```
+`code/local_pipeline.sh` (clip collection + detection) and
+`code/daily_chart.sh` (the daily prediction chart) each run automatically on
+their own recurring schedule on the machine hosting the pipeline —
+`local_pipeline.sh` a couple times a week, `daily_chart.sh` once a day.
+Both are safe to run manually any time; see each script for details.
 
 ## Local Setup
 
@@ -178,12 +169,3 @@ Optional:
 - Model weights default:
   `data/model_out/20251013/train/runs/detect/train13/weights/best.pt`
 
-## Notes
-
-- `.env` is ignored by git and should never be committed.
-- macOS: cron requires Full Disk Access for `/usr/sbin/cron`, **and** for the
-  actual Python interpreter binary your `.venv` resolves to (two separate
-  grants under System Settings → Privacy & Security → Full Disk Access).
-- This project previously ran on a GCP VM (and briefly a hybrid laptop+VM
-  split). That's gone as of 2026-07-24 — detection ran on CPU either way, so
-  the cloud hop added cost with no benefit.

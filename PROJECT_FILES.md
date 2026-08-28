@@ -10,7 +10,10 @@ deeper architecture notes.
 |---|---|
 | `README.md` | Setup and usage instructions. |
 | `HOW_IT_WORKS.md` | Plain-language walkthrough of the detection pipeline (capture → crop → quality gate → tile → detect → filter → count), plus a glossary of CV/ML terms used across this repo. |
-| `PROJECT_HISTORY.md` | Chronological record of how the project was built and tuned, plus an "Open engineering leads" section for unresolved findings. |
+| `PROJECT_HISTORY.md` | Chronological record of how the project was built and tuned. |
+| `bugs.md` | Known defects/false-positive-prone behaviors and their open/resolved status (gitignored — split out of `PROJECT_HISTORY.md`'s old "Open engineering leads" section 2026-08-28; still recoverable from repo history). |
+| `feature_ideas.md` | Enhancements/possible future work that aren't bugs (gitignored — same split as `bugs.md`). |
+| `misc_notes.md` | Small operational notes (env/cron/GCP-history caveats), split out of `README.md`'s old "Notes" section (gitignored, 2026-08-28). |
 | `CLAUDE.md` | Local-only architecture notes for Claude Code (gitignored, never committed). |
 | `PROJECT_FILES.md` | This file. |
 | `.env` | Secrets and config (gitignored). Copy from `.env.example`. |

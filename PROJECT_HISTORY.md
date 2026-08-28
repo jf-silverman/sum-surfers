@@ -4,55 +4,6 @@ A chronological record of how this project was built and how the model's
 real-world performance has been investigated. See `README.md` for how to
 run things and `PROJECT_FILES.md` for what every file is.
 
-## Open engineering leads
-
-Findings from the 2026-08 model review that aren't implemented yet:
-
-1. **Possible duplicate/overlapping boxes.** Across several enhancement-batch
-   images, the reviewer (Joel) saw fewer visible boxes on screen than the
-   reported count implied (e.g. `08-07_06-26`: "only see two boxes" but
-   count=5; similar on `08-10_06-35` and `08-10_07-29`). Suggests near-identical
-   boxes on the same surfer aren't fully merging. Worth checking whether the
-   NMS IoU threshold (`IOU_NMS=0.45` in `code/detect_surfers.py`) needs
-   tightening.
-2. **Small non-surfer objects getting boxed.** A bird (`08-09_08-23`) and a
-   likely bird/otter (`08-10_09-17`) were detected — both smaller than a
-   typical surfer box. Surfer boxes have run roughly 10-45px wide, 10-30px
-   tall all session; a min-size (and/or aspect-ratio) filter could screen
-   these out as a cheap post-processing step, same idea as the tree-bough/flag
-   exclusion zones but based on size instead of location.
-3. **Occasional residual flag leakage.** One enhancement-batch image
-   (`08-07_06-26`) had a detection on "the flag top, which is black." The
-   flag mask is coordinate-based so contrast enhancement shouldn't move it,
-   but worth a spot check that the mask still holds on enhanced frames.
-4. **Two-step candidate-then-verify idea (bigger scope).** Reviewer's own
-   proposal: find dark, surfer-sized blobs against a smooth gray background
-   first (classical blob detection), then selectively apply a lower YOLO
-   confidence threshold only in those candidate regions, rather than
-   lowering the threshold globally. Not started — a genuine sub-project if
-   pursued.
-5. **Fog/night image flagging — implemented 2026-08-25.** See
-   "Image-quality gate implementation" below; the two-branch rule
-   (`brightness < 75.4 OR lap_var < 12.7`) is live in
-   `code/detect_surfers.py`, computed before detection runs. Known
-   remaining weak spot: "moderate fog" frames near the `lap_var` boundary
-   (roughly 13-28) are a genuinely continuous zone, not a clean cutoff —
-   see the two-branch rule's error analysis below.
-6. **Partial-fog / mixed-quadrant frames — data collected, policy decided,
-   not yet acted on algorithmically.** Splitting a frame into 4 vertical
-   quadrants and scoring each separately confirmed some "usable" frames
-   have 1-3 clearly-foggy quadrants alongside clearly-clear ones (see
-   `data/fog_review/quadrant_fog_scores.csv` and
-   `data/fog_review/quadrant_mismatch/`). Reviewer decided: **for
-   automated detection, any frame with a markedly foggy quadrant should be
-   dropped**, even if the reviewer's own manual judgment would have kept
-   it (their past labels reflect "is the visible part still countable,"
-   which the automated pipeline can't reason about the way a human can).
-   The current gate uses whole-image `lap_var` only, which matched the
-   reviewer's *historical* labels better than worst-quadrant scoring did
-   — implementing the stricter per-quadrant policy is a possible future
-   refinement, not yet built into `detect_surfers.py`.
-
 ## Chronological summary
 
 ### Initial build (Aug – Oct 2025)
@@ -298,10 +249,12 @@ well as it was at first."
 
 **State as of the image-quality-gate implementation:** the tree/flag
 exclusion masks and the image-quality gate are both implemented in
-`code/detect_surfers.py`. The CLAHE+sharpen enhancement pipeline and
-engineering leads #1-4 above are investigated but not yet implemented.
-Lead #6 (per-quadrant partial-fog policy) has data and a
-reviewer-confirmed direction but isn't coded yet.
+`code/detect_surfers.py`. The CLAHE+sharpen enhancement pipeline, the
+duplicate-box/small-object/flag-leakage findings, and the two-step
+candidate-then-verify idea are investigated but not yet implemented (see
+`bugs.md`/`feature_ideas.md`). The per-quadrant partial-fog policy has data
+and a reviewer-confirmed direction but isn't coded yet (see
+`feature_ideas.md`).
 
 ### `predictions.csv` retroactive quality backfill + human_count column (2026-08-25)
 
