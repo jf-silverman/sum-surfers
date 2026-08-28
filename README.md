@@ -28,9 +28,10 @@ _Last updated: 2026-08-28 11:01 AM_
    per-frame data) to `data/predictions.csv`.
 
 Runs entirely on a local machine via cron — no cloud VM involved. See
-`HOW_IT_WORKS.md` for a full walkthrough of the detection pipeline and a
-glossary of terms, and `PROJECT_HISTORY.md` for how it was built and
-tuned over time.
+[`HOW_IT_WORKS.md`](HOW_IT_WORKS.md) for a full walkthrough of the
+detection pipeline and a glossary of terms, [`PROJECT_HISTORY.md`](PROJECT_HISTORY.md)
+for how it was built and tuned over time, and [`PROJECT_FILES.md`](PROJECT_FILES.md)
+for a map of what every file in this repo is for.
 
 ## Pipeline Scripts
 
@@ -49,7 +50,7 @@ tuned over time.
 - `code/detect_surfers.py`
   - Checks the primary frame's brightness/blur before running detection,
     skipping all 3 frames if it's too dark or too foggy to reliably count
-    (see `HOW_IT_WORKS.md`).
+    (see [`HOW_IT_WORKS.md`](HOW_IT_WORKS.md)).
   - Runs YOLO on 4 horizontal overlapping tiles per frame, deduplicates
     boxes, filters out known static false positives, averages the 3
     per-frame counts, and writes the result plus raw per-frame data.
@@ -81,7 +82,7 @@ tuned over time.
 ## Surfer Count Prediction Model
 
 A separate modeling pipeline on top of `predictions.csv` +
-`surfline_predictors.csv`, built in three phases (see `PROJECT_HISTORY.md`
+`surfline_predictors.csv`, built in three phases (see [`PROJECT_HISTORY.md`](PROJECT_HISTORY.md)
 for the full story, including two real bugs found and fixed along the way):
 
 - `code/backfill_openmeteo_weather.py` — adds real observed historical

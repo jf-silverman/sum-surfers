@@ -252,9 +252,9 @@ exclusion masks and the image-quality gate are both implemented in
 `code/detect_surfers.py`. The CLAHE+sharpen enhancement pipeline, the
 duplicate-box/small-object/flag-leakage findings, and the two-step
 candidate-then-verify idea are investigated but not yet implemented (see
-`bugs.md`/`feature_ideas.md`). The per-quadrant partial-fog policy has data
+`bugs.md`/`model_and_feature_ideas.md`). The per-quadrant partial-fog policy has data
 and a reviewer-confirmed direction but isn't coded yet (see
-`feature_ideas.md`).
+`model_and_feature_ideas.md`).
 
 ### `predictions.csv` retroactive quality backfill + human_count column (2026-08-25)
 
@@ -1019,3 +1019,65 @@ predicted range/median for that hour overlaid.
   (e.g. no detection image yet some days), git fails the ENTIRE add and
   stages nothing, not just the missing file. Changed to add each file
   individually with its own non-fatal error handling.
+
+### Frame-timing variability study; hourly-window variability check (2026-08-27 to 2026-08-28)
+
+- Downloaded 14 real ~60-second clips (2026-08-27, one per daylight hour,
+  via a one-off `CLIP_DURATION_OVERRIDE_FILE` run) specifically to study how
+  much the detector's per-frame count varies over time within a clip.
+  `code/analyze_frame_timing.py` extracts one ROI-cropped frame per second
+  (882 frames total, all passed the production quality gate), runs the real
+  production detector on each, and writes `data/frame_variability_analysis.csv`.
+- **Lag finding**: count drift grows steadily with time separation — no
+  sharp noise floor. Mean absolute count difference: 0.91 at 1s apart, 1.40
+  at 10s, 2.10 at 30s, plateauing around 2.3-2.4 by 40-58s. Adjacent-second
+  frames are highly correlated (redundant).
+- **Averaging finding**: spacing matters far more than frame count. Today's
+  production default (3 frames, ~2-3s span) gives stdev≈1.53 vs. a clip's
+  own full-minute reference mean — barely better than a single frame
+  (1.74) and worse than the naive independent-samples bound (1.00) because
+  adjacent frames are too correlated. Spreading 5 frames across the full
+  ~58s span instead gets stdev≈0.42 (~3.6x tighter); diminishing returns
+  past k≈6 at wide span. See `data/frame_variability_analysis_summary.png`.
+  **Caveat**: this measures detector *stability*, not *accuracy* — pending
+  human validation (`data/count_review/`, 8 sets x 10 images spanning the
+  activity range, `human_count` column to fill in) before changing
+  production clip duration/frame spacing. See `model_and_feature_ideas.md`.
+- Separately, pulled 12 real back-to-back 5-minute clips covering the full
+  8-9am hour on 2026-08-28 (`code/pull_hourly_variability_clips.py`,
+  `code/analyze_hourly_variability.py`) to check within-hour variability
+  directly, using 5 frames spread across each 5-minute window (per the
+  spacing finding above). Real result: mean count rose from 20.6 (8:00) to
+  a peak of 29.4 (8:35), tapering to 20.6 by 8:55 — stdev 2.71 across the
+  hour, a swing of ~9 surfers (~35% of the mean). Given the ~0.4 noise
+  floor from the lag study, this is real crowd turnover within the hour,
+  not detector noise — a partial explanation for why the daily prediction
+  model's intervals are wide: count varies substantially within an hour,
+  not just day to day.
+
+### Surf-condition rating vs. surfer count — checked, found not predictive (2026-08-28)
+
+Joel asked whether `rating_value` (Surfline's condition rating, already a
+model feature since Phase 1) tracks surfer count, and whether it might be
+masked by multicollinearity with wave-size/energy variables instead.
+
+- `rating_value` has near-zero correlation with `surfer_count` (Pearson
+  r=0.043, p=0.148; Spearman ρ=0.025, p=0.386) and doesn't rank in the
+  GBT's top-15 permutation feature importances. Its own range is narrow
+  in this dataset (1-4, mean 2.4, std 0.54) — mostly POOR-to-FAIR.
+- Checked the multicollinearity hypothesis directly: `rating_value` **is**
+  strongly correlated with the wave/energy variables it's derived from
+  (`energy_nearshore_kj` r=0.738, `surf_max_ft` r=0.633, `surf_min_ft`
+  r=0.632, `energy_offshore_kj` r=0.651, all p<0.0001) — but those same
+  wave variables show weak, and in several cases *negative*, correlation
+  with surfer count themselves (`primary_swell_height_ft` r=-0.074 p=0.011,
+  `primary_swell_period_s` r=-0.067 p=0.022, `consistency_wave_count`
+  r=-0.111 p=0.0001, `energy_offshore_kj` r=-0.091 p=0.002;
+  `energy_nearshore_kj`/`surf_min_ft`/`surf_max_ft` not significant). So
+  there's no stronger wave-based predictor hiding behind `rating_value` —
+  the underlying wave signal itself doesn't drive crowd size positively
+  in this data. All effect sizes are small (r² well under 2%); statistical
+  significance here is mostly a large-n (1160) effect, not a strong
+  practical driver. Logged as an open question in `model_and_feature_ideas.md`
+  (possible confounders: weather, season, day-of-week not yet controlled
+  for) rather than treated as a settled causal finding.
