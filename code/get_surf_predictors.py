@@ -25,17 +25,33 @@ from a logged-in, premium Surfline session — see
 code/backfill_historical_predictors.py, which shares the extraction logic
 in this file (build_predictor_map / merge_into_by_hour / CSV_HEADER).
 
+build_predictor_map() also merges in real_temperature_f/real_humidity_pct/
+real_cloud_cover_pct/real_weather_code/real_pressure_mb from Open-Meteo's
+live forecast API (api.open-meteo.com/v1/forecast — forward-looking,
+distinct from the archive API backfill_openmeteo_weather.py uses for
+historical rows) under the same field names the trained model expects.
+Added 2026-08-28 to fix a real bug: predict_surf_count.py's live prediction
+path only ever pulled Surfline data, so these model features (trained on,
+and real_humidity_pct in particular a validated fog proxy — see
+PROJECT_HISTORY.md) were silently NaN on every live prediction. Non-fatal
+if this fetch fails — predictions just fall back to the previous NaN
+behavior for these fields, same as any other missing predictor.
+
 Usage:
     python code/get_surf_predictors.py
 """
 
 import csv
 import os
+import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from get_clips import LOCATION as CAMERA_LOCATION  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PREDS_CSV = PROJECT_ROOT / "data" / "predictions.csv"
@@ -175,6 +191,43 @@ def merge_into_by_hour(by_hour, weather=None, rating=None, tides=None, wave=None
     return by_hour
 
 
+def fetch_openmeteo_forecast(days=DAYS):
+    """Live (forward-looking) Open-Meteo forecast fetch — same fields
+    backfill_openmeteo_weather.py pulls from the archive API for historical
+    rows, so the live predictor dict and the training data use identical
+    field names/semantics. No auth needed. Raises on HTTP failure; caller
+    decides how to handle that (see build_predictor_map)."""
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        "latitude": CAMERA_LOCATION["latitude"], "longitude": CAMERA_LOCATION["longitude"],
+        "hourly": "temperature_2m,relative_humidity_2m,cloud_cover,weather_code,surface_pressure",
+        "timezone": CAMERA_LOCATION["timezone"],
+        "forecast_days": days,
+    }
+    r = requests.get(url, params=params, timeout=20)
+    r.raise_for_status()
+    return r.json()["hourly"]
+
+
+def merge_openmeteo_forecast(by_hour, hourly):
+    """Folds an Open-Meteo forecast response (as returned by
+    fetch_openmeteo_forecast) into the same {local_hour_datetime: {field:
+    value}} dict build_predictor_map() builds from Surfline data. Open-Meteo
+    already returns local wall-clock time strings when `timezone` is passed,
+    so no UTC-offset math is needed here (unlike local_hour_key(), which
+    exists because Surfline's timestamps are raw UTC epoch seconds)."""
+    for i, t in enumerate(hourly["time"]):
+        key = datetime.fromisoformat(t)
+        by_hour.setdefault(key, {})
+        temp_c = hourly["temperature_2m"][i]
+        by_hour[key]["real_temperature_f"] = round(temp_c * 9 / 5 + 32, 1) if temp_c is not None else None
+        by_hour[key]["real_humidity_pct"] = hourly["relative_humidity_2m"][i]
+        by_hour[key]["real_cloud_cover_pct"] = hourly["cloud_cover"][i]
+        by_hour[key]["real_weather_code"] = hourly["weather_code"][i]
+        by_hour[key]["real_pressure_mb"] = hourly["surface_pressure"][i]
+    return by_hour
+
+
 def build_predictor_map():
     """Live (forward-looking, today+DAYS) fetch — no auth token needed/used."""
     responses = {}
@@ -185,7 +238,15 @@ def build_predictor_map():
         except requests.exceptions.HTTPError as e:
             print(f"  WARNING: {path} fetch failed ({e}), continuing without it")
             responses[path] = []
-    return merge_into_by_hour({}, **responses)
+    by_hour = merge_into_by_hour({}, **responses)
+
+    try:
+        openmeteo_hourly = fetch_openmeteo_forecast()
+        by_hour = merge_openmeteo_forecast(by_hour, openmeteo_hourly)
+    except requests.exceptions.RequestException as e:
+        print(f"  WARNING: Open-Meteo forecast fetch failed ({e}), continuing without real_* fields")
+
+    return by_hour
 
 
 def load_rows(csv_path):

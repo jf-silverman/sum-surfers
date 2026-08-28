@@ -1081,3 +1081,64 @@ masked by multicollinearity with wave-size/energy variables instead.
   practical driver. Logged as an open question in `model_and_feature_ideas.md`
   (possible confounders: weather, season, day-of-week not yet controlled
   for) rather than treated as a settled causal finding.
+
+### Fog-forecast research: Open-Meteo forecast API vs. archive API (2026-08-28)
+
+Joel asked whether we have a working image-based fog classifier to use as
+a predictor, and suggested a non-Surfline fog forecast paired with it,
+noting Surfline itself rarely calls fog — confirmed: `weather_simple` has
+only 4 `FOG` rows out of 1160 (0.3%).
+
+- No image-derived fog predictor exists — the image-quality gate's
+  `foggy_or_blurred` flag only skips detection, it was never stored as a
+  model feature (and can't be: a skipped frame has no `surfer_count` to
+  predict). `real_humidity_pct` (Open-Meteo archive/ERA5) remains the only
+  fog-related model feature, as a continuous proxy.
+- Tested `api.open-meteo.com/v1/forecast` (forward-looking) directly
+  against Pleasure Point's coordinates and compared it field-by-field with
+  `archive-api.open-meteo.com/v1/archive` (already used for historical
+  backfill). `relative_humidity_2m`/`cloud_cover`/`weather_code`/
+  `surface_pressure` are continuous and present with real values on
+  **both** endpoints (confirmed via live requests to both) — exactly the
+  fields `real_humidity_pct` etc. are already built from, so per Joel's
+  requirement (continuous, and available on both the historic and
+  forecast side) no new boolean/class feature is needed here.
+- `visibility` (meters) also appeared in the forecast response and reads
+  as a more direct fog signal (~12,200m on foggy-looking morning hours vs.
+  45,000+m on a clear afternoon) — but a live archive-API request
+  confirmed `visibility` comes back `null` for every hour tested on that
+  endpoint (ERA5 reanalysis doesn't diagnose it). Fails the
+  both-sides-continuous requirement, so not pursued via this source.
+- **Found a real bug in the process** (now in `bugs.md`): `predict_surf_count.py`
+  never actually populates the `real_*` Open-Meteo features at live-
+  prediction time — `get_surf_predictors.py`'s forward-looking pull is
+  Surfline-only, so `build_feature_row()` silently leaves them `NaN` on
+  every real prediction (no crash, since `HistGradientBoostingRegressor`
+  handles NaN natively, but the validated fog/weather signal from training
+  goes unused at inference time). Wiring in the forecast endpoint fixes
+  this at the same time as adding genuine forward-looking fog signal — see
+  `model_and_feature_ideas.md`.
+
+### Live Open-Meteo forecast wired into predict_surf_count.py (2026-08-28)
+
+Implemented the fix from the fog-forecast research above. New
+`fetch_openmeteo_forecast()` + `merge_openmeteo_forecast()` in
+`code/get_surf_predictors.py`: fetches `api.open-meteo.com/v1/forecast`
+(same 5 fields — `temperature_2m`/`relative_humidity_2m`/`cloud_cover`/
+`weather_code`/`surface_pressure` — as `backfill_openmeteo_weather.py`'s
+archive pull) and merges the resulting `real_*` values into the same
+`{local_hour: {field: value}}` dict `build_predictor_map()` already builds
+from Surfline's endpoints, keyed identically (Open-Meteo already returns
+local wall-clock time strings when `timezone` is passed, so no UTC-offset
+math is needed the way `local_hour_key()` needs it for Surfline's raw UTC
+epoch timestamps). Coordinates imported from `get_clips.LOCATION` (not a
+third hardcoded copy, given the project's history with a coordinate bug).
+Fetch is non-fatal on failure — same as every other endpoint in this file.
+
+`build_predictor_map()` is shared by both `get_surf_predictors.main()`
+(writes `surfline_predictors.csv`) and `predict_surf_count.py` (feature
+rows) — verified the extra keys don't leak into `surfline_predictors.csv`
+(its `CSV_HEADER`/`row_from_predictors()` only pull the original Surfline
+fields, unaffected) and that `predict_surf_count.py`'s standardized
+feature row now gets real, non-NaN values for all 4 `real_*` columns
+(previously silently `NaN` on every live prediction).
