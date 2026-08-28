@@ -47,6 +47,10 @@ def load_and_prepare():
         "surf_min_ft", "surf_max_ft", "primary_swell_height_ft", "primary_swell_period_s",
         "wind_speed_mph", "wind_gust_mph", "energy_offshore_kj", "energy_nearshore_kj",
         "consistency_wave_count",
+        # Real observed historical weather (Open-Meteo archive, not a forecast — see
+        # backfill_openmeteo_weather.py). real_humidity_pct is a validated (if
+        # imperfect) proxy for the fog/blur conditions the quality gate already flags.
+        "real_temperature_f", "real_humidity_pct", "real_cloud_cover_pct", "real_pressure_mb",
     ]
     for c in numeric_cols:
         df[c] = pd.to_numeric(df[c], errors="coerce")

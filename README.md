@@ -73,6 +73,8 @@ A separate modeling pipeline on top of `predictions.csv` +
 `surfline_predictors.csv`, built in three phases (see `PROJECT_HISTORY.md`
 for the full story, including two real bugs found and fixed along the way):
 
+- `code/backfill_openmeteo_weather.py` — adds real observed historical
+  weather (Open-Meteo archive API, free/no-auth) to `data/openmeteo_weather.csv`.
 - `code/build_training_features.py` — joins predictions (target) with
   predictors (features) for `quality_ok=True` rows, adds derived
   time-of-day/day-of-week/month features. Writes `data/training_features.csv`.
@@ -87,6 +89,10 @@ for the full story, including two real bugs found and fixed along the way):
     ```
 - `code/demo_predictions.py` — shows N random held-out predictions
   alongside the actual count and conditions, for eyeballing model behavior.
+- `code/plot_daily_prediction.py` + `code/daily_chart.sh` — generates a daily
+  prediction chart to `data/charts/surfer_count_YYYY-MM-DD.png` (median +
+  33%/66% bands, tide, wave energy, weather, night shading). Run via its own
+  daily cron entry, independent of the twice-weekly clip pipeline.
 
 Honest caveat: held-out MAE is ~6 surfers on a typical count of ~15, and
 the reported 80% prediction interval is empirically closer to a 65%
@@ -94,13 +100,20 @@ interval — treat outputs as directional estimates, not precise counts.
 
 ## Schedule
 
-Runs twice a week via cron (Tue/Thu):
+Clip collection + detection runs twice a week via cron (Tue/Thu):
 
 ```cron
 0 19 * * 2,4 caffeinate -i /path/to/sum-surfers/code/local_pipeline.sh >> /path/to/sum-surfers/data/local_pipeline.log 2>&1
 ```
 
 `caffeinate -i` keeps the laptop awake for the run; if the laptop is asleep or off at the scheduled time, the run is skipped.
+
+The daily prediction chart runs separately, once a day (doesn't need new
+clips, just the live forecast + existing model):
+
+```cron
+0 19 * * * /path/to/sum-surfers/code/daily_chart.sh >> /path/to/sum-surfers/data/daily_chart.log 2>&1
+```
 
 ## Local Setup
 

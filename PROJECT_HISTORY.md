@@ -943,3 +943,58 @@ previously-missed evening/morning minutes for *already-collected* past
 dates (a retroactive backfill) hasn't been tested — clip retention
 limits are unknown. Going forward, collection is fixed; recovering the
 historical gap is a separate, unconfirmed question.
+
+### Surfline clip-archive retention tested; real weather history added; daily chart automated (2026-08-28)
+
+- **Surfline's clip archive retention confirmed**: tested real downloads
+  at ages 6-10 days back — a clean boundary at exactly 6 days (6 days
+  ago succeeds, 7+ consistently 404s). Of the last 25 collected days,
+  only 5 had a large-enough dawn/dusk-window gap to matter, and only 3
+  of those were within the 6-day retention window — recovered and
+  integrated those 3 real clips (crop+detect run for real; 1 passed the
+  quality gate, 2 correctly rejected as too dark despite technically
+  being within civil twilight). This is a small, one-time recovery, not
+  a systematic fix — separately, confirmed the **local** clip archive
+  (`data/not_needed_in_repo/surf_clips`) has zero unprocessed clips (all
+  1408 already have a matching `predictions.csv` row) — there was no
+  hidden local data to mine.
+- **New `code/backfill_openmeteo_weather.py`**: adds real observed
+  historical weather (Open-Meteo's free, no-auth archive API — ERA5
+  reanalysis, not a forecast) for every `predictions.csv` row, as a
+  separate `data/openmeteo_weather.csv` (non-destructive, doesn't touch
+  Surfline's forecast-based fields). Validated `real_humidity_pct`
+  against the 24 real `foggy_or_blurred` quality-gate rows before
+  committing to it: 87.5% mean humidity on foggy rows vs 69.8% on clear
+  rows from the same dates — a real, meaningful separation. `weather_code`
+  doesn't reliably flag fog at all (several known-foggy rows show
+  clear/mostly-clear codes — consistent with the literature on
+  coarse-grid reanalysis struggling with localized coastal marine-layer
+  fog). `build_training_features.py`/`fit_surfer_count_model.py` updated
+  to join and use the new columns. Refit result: GBT MAE 6.15→6.02,
+  RMSE 8.79→8.51 — modest, real improvement. Interesting nuance:
+  `real_cloud_cover_pct` and `real_pressure_mb` turned out to be the
+  statistically significant new features in the NegBin fit, not
+  `real_humidity_pct` despite its strong bivariate fog signal — likely
+  because humidity and cloud cover are correlated and cloud cover
+  captures more of the shared variance once both are in the model.
+- **New `code/plot_daily_prediction.py`** + **`code/daily_chart.sh`**:
+  generates the daily prediction chart (median + 33%/66% bands, tide,
+  wave-energy bars, weather-coded markers, night shading, model/detector
+  info footer) to `data/charts/surfer_count_YYYY-MM-DD.png`. Cron
+  install blocked by a sandbox permission restriction — Joel will add
+  `0 19 * * * .../code/daily_chart.sh >> .../data/daily_chart.log 2>&1`
+  himself.
+  - **Caught a real bug while listing an hourly table for Joel**: an
+    hour-range filter hardcoded to start at 5am showed a confident-
+    looking prediction for 5am on a day whose real dawn was 6:10am —
+    the model doesn't know a given day's specific dawn time, only the
+    coarse `is_night` flag (which was correctly True at 5am, but not
+    enough alone to suppress the extrapolated prediction) and cyclical
+    hour features, and hour=5 training examples mostly come from
+    summer days where 5am was already light. Fixed both the ad hoc
+    query and `plot_daily_prediction.py` to compute each day's *real*
+    dawn/dusk via `get_light_window()` and filter to that, instead of a
+    fixed hour range — the fixed `TRAINED_HOUR_MIN/MAX=5,20` constant is
+    kept, but now only for the separate "has the model ever trained on
+    this hour at all" extrapolation flag, not for deciding which hours
+    to show.

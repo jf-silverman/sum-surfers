@@ -30,6 +30,7 @@ from pathlib import Path
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PREDS_CSV = _PROJECT_ROOT / "data" / "predictions.csv"
 PREDICTORS_CSV = _PROJECT_ROOT / "data" / "surfline_predictors.csv"
+OPENMETEO_CSV = _PROJECT_ROOT / "data" / "openmeteo_weather.csv"
 DEFAULT_OUT_CSV = _PROJECT_ROOT / "data" / "training_features.csv"
 
 PREDICTOR_FEATURE_COLS = [
@@ -38,6 +39,14 @@ PREDICTOR_FEATURE_COLS = [
     "wind_speed_mph", "wind_direction_deg", "wind_gust_mph",
     "energy_offshore_kj", "energy_nearshore_kj",
     "weather_condition", "temperature_f", "pressure_mb", "consistency_wave_count",
+]
+
+# Real observed historical weather (Open-Meteo archive, not a forecast) — see
+# backfill_openmeteo_weather.py. real_humidity_pct is a validated (if imperfect)
+# proxy for the fog/blur conditions the image-quality gate already flags.
+OPENMETEO_FEATURE_COLS = [
+    "real_temperature_f", "real_humidity_pct", "real_cloud_cover_pct",
+    "real_weather_code", "real_pressure_mb",
 ]
 
 DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -76,7 +85,7 @@ OUT_HEADER = [
     "surfer_count", "used_multiframe",
     "hour_local", "day_of_week", "is_weekend", "month",
     "weather_simple", "is_night",
-] + PREDICTOR_FEATURE_COLS
+] + PREDICTOR_FEATURE_COLS + OPENMETEO_FEATURE_COLS
 
 
 def parse_args():
@@ -103,7 +112,7 @@ def resolve_target_count(pred_row):
     return int(pred_row["surfer_count"])
 
 
-def build_row(pred_row, predictor_row):
+def build_row(pred_row, predictor_row, openmeteo_row):
     dt = datetime.strptime(f"{pred_row['date']} {pred_row['time_local']}", "%Y-%m-%d %H:%M")
     weather_simple, is_night = simplify_weather_condition(predictor_row.get("weather_condition", ""))
     out = {
@@ -121,6 +130,8 @@ def build_row(pred_row, predictor_row):
     }
     for col in PREDICTOR_FEATURE_COLS:
         out[col] = predictor_row.get(col, "")
+    for col in OPENMETEO_FEATURE_COLS:
+        out[col] = (openmeteo_row or {}).get(col, "")
     return out
 
 
@@ -130,6 +141,7 @@ def main():
 
     preds = load_rows(PREDS_CSV)
     predictors_by_filename = {r["filename"]: r for r in load_rows(PREDICTORS_CSV)}
+    openmeteo_by_filename = {r["filename"]: r for r in load_rows(OPENMETEO_CSV)} if OPENMETEO_CSV.exists() else {}
 
     quality_ok = [r for r in preds if r["quality_ok"] == "True"]
     matched = [(r, predictors_by_filename[r["filename"]]) for r in quality_ok if r["filename"] in predictors_by_filename]
@@ -141,7 +153,12 @@ def main():
         print(f"WARNING: {len(unmatched)} quality_ok row(s) have no predictor match "
               f"(dates: {sorted({r['date'] for r in unmatched})})")
 
-    rows_out = [build_row(pr, pd_) for pr, pd_ in matched]
+    openmeteo_missing = sum(1 for r, _ in matched if r["filename"] not in openmeteo_by_filename)
+    if openmeteo_missing:
+        print(f"NOTE: {openmeteo_missing} row(s) have no Open-Meteo match — "
+              f"run backfill_openmeteo_weather.py to fill these in.")
+
+    rows_out = [build_row(pr, pd_, openmeteo_by_filename.get(pr["filename"])) for pr, pd_ in matched]
 
     with open(out_csv, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=OUT_HEADER)
