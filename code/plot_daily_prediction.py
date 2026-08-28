@@ -310,12 +310,13 @@ def generate_detection_image(target_date, day_predictions_df):
     # Draw boxes/labels on a copy, then alpha-blend back so they read as
     # translucent overlays rather than opaque marks on the surf photo.
     overlay = img.copy()
+    BOX_COLOR = (40, 40, 220)  # BGR — red
     for x1, y1, x2, y2, conf in boxes:
         p1, p2 = (int(x1), int(y1)), (int(x2), int(y2))
-        cv2.rectangle(overlay, p1, p2, (46, 134, 171), 2)  # BGR — matches chart's swell-blue accent
+        cv2.rectangle(overlay, p1, p2, BOX_COLOR, 2)
         label = f"{conf:.2f}"
-        cv2.putText(overlay, label, (p1[0], max(p1[1] - 5, 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (46, 134, 171), 1, cv2.LINE_AA)
-    BOX_ALPHA = 0.55
+        cv2.putText(overlay, label, (p1[0], max(p1[1] - 5, 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, BOX_COLOR, 1, cv2.LINE_AA)
+    BOX_ALPHA = 0.75
     img = cv2.addWeighted(overlay, BOX_ALPHA, img, 1 - BOX_ALPHA, 0)
 
     # Model's predicted range/median for this exact hour, if it's in the already-
