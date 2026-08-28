@@ -307,11 +307,16 @@ def generate_detection_image(target_date, day_predictions_df):
     boxes = ds.run_inference_with_boxes(model, img_path)
 
     img = cv2.imread(str(img_path))
+    # Draw boxes/labels on a copy, then alpha-blend back so they read as
+    # translucent overlays rather than opaque marks on the surf photo.
+    overlay = img.copy()
     for x1, y1, x2, y2, conf in boxes:
         p1, p2 = (int(x1), int(y1)), (int(x2), int(y2))
-        cv2.rectangle(img, p1, p2, (46, 134, 171), 2)  # BGR — matches chart's swell-blue accent
+        cv2.rectangle(overlay, p1, p2, (46, 134, 171), 2)  # BGR — matches chart's swell-blue accent
         label = f"{conf:.2f}"
-        cv2.putText(img, label, (p1[0], max(p1[1] - 5, 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (46, 134, 171), 1, cv2.LINE_AA)
+        cv2.putText(overlay, label, (p1[0], max(p1[1] - 5, 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (46, 134, 171), 1, cv2.LINE_AA)
+    BOX_ALPHA = 0.55
+    img = cv2.addWeighted(overlay, BOX_ALPHA, img, 1 - BOX_ALPHA, 0)
 
     # Model's predicted range/median for this exact hour, if it's in the already-
     # computed day_predictions_df (it normally will be, since 8am is within the
@@ -326,14 +331,19 @@ def generate_detection_image(target_date, day_predictions_df):
         pred_text = "Predicted range/median: not available for this hour"
 
     detected_text = f"Detected: {len(boxes)} surfer(s) at {row['time_local']}"
+    legend_text = (
+        f"Box = detected surfer, label = model confidence (0-1). "
+        f"Confidence threshold: {ds.CONF_THRESH:.3f} (boxes below this are dropped)."
+    )
 
     # White banner strip below the image so text never overlaps real image content.
-    banner_h = 44
+    banner_h = 62
     h, w = img.shape[:2]
     canvas = np.full((h + banner_h, w, 3), 255, dtype=np.uint8)
     canvas[:h] = img
     cv2.putText(canvas, detected_text, (8, h + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (30, 30, 30), 1, cv2.LINE_AA)
     cv2.putText(canvas, pred_text, (8, h + 36), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (30, 30, 30), 1, cv2.LINE_AA)
+    cv2.putText(canvas, legend_text, (8, h + 54), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (90, 90, 90), 1, cv2.LINE_AA)
 
     dated_path = CHARTS_DIR / f"detection_{target_date.isoformat()}.png"
     cv2.imwrite(str(dated_path), canvas)
