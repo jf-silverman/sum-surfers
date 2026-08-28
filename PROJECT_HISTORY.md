@@ -795,3 +795,56 @@ its entire history, not failing loudly.
   erroring.
 
 **State**: Phases 0-3 of the modeling plan are all done.
+
+### Simplified weather categories; found and fixed a second quantile-model collapse (2026-08-28)
+
+Joel noticed the model's raw `weather_condition` (21 distinct Surfline
+values) was being collapsed almost entirely into a generic `OTHER`
+bucket for lack of per-category sample size — including every single
+rain-related value, meaning the model had no way to learn a rain effect
+at all. Asked for a day/night boolean pulled out separately, plus 4
+merged categories: CLEAR (clear+mostly clear), CLOUDY_OVERCAST
+(cloudy+mostly cloudy+overcast), RAIN (all shower/rain/drizzle variants),
+FOG (fog+mist, kept distinct per Joel's request despite staying sparse,
+~4 rows even merged).
+
+- New `simplify_weather_condition()` in `build_training_features.py`
+  (shared/importable) strips the `NIGHT_` prefix into `is_night` and
+  maps the base condition via `WEATHER_SIMPLE_MAP`; unmapped/blank
+  values fall back to `OTHER` rather than erroring. New `weather_simple`/
+  `is_night` output columns. Result on the current dataset: CLEAR 1007,
+  CLOUDY_OVERCAST 92, **RAIN 57** (well past any reasonable threshold —
+  previously silently destroyed), FOG 4.
+- `fit_surfer_count_model.py`'s `load_and_prepare()` updated to use
+  `weather_simple`/`is_night` directly instead of the old ad hoc
+  rare-category-to-OTHER collapse; dead `MIN_CATEGORY_COUNT` constant
+  removed. `predict_surf_count.py` updated to apply the same mapping to
+  live forecast data.
+- Real payoff: `wx_RAIN` is now a **statistically significant** predictor
+  (IRR≈0.64, p≈0.01 — rain associated with ~36% fewer surfers, exactly
+  the intuitive direction) and `is_night` is highly significant
+  (IRR≈0.24, p<0.001) — signal that was previously invisible to the
+  model, now usable.
+- **Second occurrence of the quantile-model collapse bug** (first found
+  2026-08-27): refitting after this change, the lower-quantile (10th
+  percentile) GBT collapsed to a constant-0 prediction again — same
+  failure mode, but the previously-"fixed" `l2_regularization=0.0`/
+  `max_depth=3` combo no longer prevented it on the updated dataset. A
+  broader sweep showed `min_samples_leaf` is the more reliable lever
+  than l2/depth, but critically **the collapse boundary is not
+  monotonic in it either** (`min_leaf=50` can work while `75` collapses
+  again, then `100` works) — meaning no single fixed hyperparameter
+  combo can be trusted to stay safe as the dataset keeps growing.
+  **Real fix this time**: `fit_quantile_model_robust()` in
+  `fit_surfer_count_model.py` — fits with escalating
+  `min_samples_leaf` candidates and keeps the first one whose
+  *training*-set predictions actually vary (std > 0.5), raising a clear
+  `RuntimeError` instead of silently returning a trivial model if every
+  candidate collapses. `demo_predictions.py` and `predict_surf_count.py`
+  both switched to this shared function instead of their own local
+  fixed-hyperparameter quantile fits, closing the same fragility risk
+  everywhere it existed. On the current dataset this picked
+  `min_samples_leaf=150` for the lower model and produced the
+  best-calibrated lower tail seen all session: 10.3% below-lower miss
+  rate against a 10% target (previously 15-42% off in every prior
+  attempt).

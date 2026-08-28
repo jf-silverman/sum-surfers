@@ -42,10 +42,40 @@ PREDICTOR_FEATURE_COLS = [
 
 DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
+# Simplified weather scheme (2026-08-28): Surfline's raw weather_condition has 21
+# distinct values, most with under 20 occurrences — too sparse to be useful as
+# individual categories (fit_surfer_count_model.py was collapsing all of them into
+# a single generic OTHER bucket, discarding rain signal entirely). This strips the
+# NIGHT_ prefix into its own boolean (is_night) and merges the rest into 4 broader,
+# better-populated buckets: CLEAR (clear/mostly clear), CLOUDY_OVERCAST (mostly
+# cloudy/overcast/cloudy), RAIN (all shower/rain/drizzle variants), FOG (fog/mist —
+# stays its own category per Joel's request even though the merged count is still
+# small, ~3 rows; fine for a tree model, would be unstable for a GLM).
+WEATHER_SIMPLE_MAP = {
+    "CLEAR": "CLEAR", "MOSTLY_CLEAR": "CLEAR",
+    "MOSTLY_CLOUDY": "CLOUDY_OVERCAST", "OVERCAST": "CLOUDY_OVERCAST", "CLOUDY": "CLOUDY_OVERCAST",
+    "LIGHT_SHOWERS": "RAIN", "BRIEF_SHOWERS": "RAIN", "LIGHT_RAIN": "RAIN",
+    "BRIEF_SHOWERS_POSSIBLE": "RAIN", "RAIN": "RAIN", "DRIZZLE": "RAIN",
+    "FOG": "FOG", "MIST": "FOG",
+}
+
+
+def simplify_weather_condition(raw):
+    """Returns (weather_simple, is_night) from a raw Surfline weather_condition
+    string (e.g. 'NIGHT_MOSTLY_CLEAR' -> ('CLEAR', True)). Unmapped/blank values
+    return ('OTHER', is_night) as a safety net, not silently dropped."""
+    if not raw:
+        return "OTHER", False
+    is_night = raw.startswith("NIGHT_")
+    base = raw[len("NIGHT_"):] if is_night else raw
+    return WEATHER_SIMPLE_MAP.get(base, "OTHER"), is_night
+
+
 OUT_HEADER = [
     "filename", "date", "time_local",
     "surfer_count", "used_multiframe",
     "hour_local", "day_of_week", "is_weekend", "month",
+    "weather_simple", "is_night",
 ] + PREDICTOR_FEATURE_COLS
 
 
@@ -75,6 +105,7 @@ def resolve_target_count(pred_row):
 
 def build_row(pred_row, predictor_row):
     dt = datetime.strptime(f"{pred_row['date']} {pred_row['time_local']}", "%Y-%m-%d %H:%M")
+    weather_simple, is_night = simplify_weather_condition(predictor_row.get("weather_condition", ""))
     out = {
         "filename": pred_row["filename"],
         "date": pred_row["date"],
@@ -85,6 +116,8 @@ def build_row(pred_row, predictor_row):
         "day_of_week": DAY_NAMES[dt.weekday()],
         "is_weekend": dt.weekday() >= 5,
         "month": dt.month,
+        "weather_simple": weather_simple,
+        "is_night": is_night,
     }
     for col in PREDICTOR_FEATURE_COLS:
         out[col] = predictor_row.get(col, "")

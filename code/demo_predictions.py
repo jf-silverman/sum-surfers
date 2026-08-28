@@ -21,18 +21,14 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.model_selection import train_test_split
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fit_surfer_count_model import load_and_prepare, standardize  # noqa: E402
+from fit_surfer_count_model import load_and_prepare, standardize, fit_quantile_model_robust  # noqa: E402
 
 POINT_KWARGS = dict(max_iter=300, learning_rate=0.05, max_depth=4, l2_regularization=1.0, random_state=42)
-# Quantile models need l2=0.0 / shallower trees — l2=1.0 collapses the lower-quantile
-# model to a constant 0 prediction for every row (see fit_surfer_count_model.py's
-# fit_quantile_intervals docstring for the full diagnosis).
-QUANTILE_KWARGS = dict(max_iter=300, learning_rate=0.05, max_depth=3, l2_regularization=0.0, random_state=42)
 
 DISPLAY_PREDICTORS = [
     "rating_value", "tide_ft", "surf_min_ft", "surf_max_ft",
     "primary_swell_height_ft", "primary_swell_period_s",
-    "wind_speed_mph", "weather_condition", "is_weekend",
+    "wind_speed_mph", "weather_condition", "weather_simple", "is_night", "is_weekend",
 ]
 
 
@@ -53,8 +49,8 @@ def main():
     X_train, X_test = standardize(X_train, X_test, numeric_cols)
 
     point_model = HistGradientBoostingRegressor(loss="poisson", **POINT_KWARGS).fit(X_train, y_train)
-    lower_model = HistGradientBoostingRegressor(loss="quantile", quantile=0.1, **QUANTILE_KWARGS).fit(X_train, y_train)
-    upper_model = HistGradientBoostingRegressor(loss="quantile", quantile=0.9, **QUANTILE_KWARGS).fit(X_train, y_train)
+    lower_model, _ = fit_quantile_model_robust(X_train, y_train, 0.1)
+    upper_model, _ = fit_quantile_model_robust(X_train, y_train, 0.9)
 
     pred_point = np.clip(point_model.predict(X_test), 0, None)
     pred_lower = np.clip(lower_model.predict(X_test), 0, None)

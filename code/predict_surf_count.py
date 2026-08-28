@@ -29,12 +29,12 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import get_surf_predictors as sp  # noqa: E402
-from fit_surfer_count_model import load_and_prepare  # noqa: E402
+from fit_surfer_count_model import load_and_prepare, fit_quantile_model_robust  # noqa: E402
+from build_training_features import simplify_weather_condition  # noqa: E402
 
 DEFAULT_HOURS = ["07:00", "10:00", "13:00", "16:00"]
 
 POINT_KWARGS = dict(max_iter=300, learning_rate=0.05, max_depth=4, l2_regularization=1.0, random_state=42)
-QUANTILE_KWARGS = dict(max_iter=300, learning_rate=0.05, max_depth=3, l2_regularization=0.0, random_state=42)
 
 
 def parse_args():
@@ -45,10 +45,13 @@ def parse_args():
 
 
 def train_production_models(X, y, weather_categories):
-    """Fit point (Poisson loss) + 10th/90th quantile GBT models on ALL rows."""
+    """Fit point (Poisson loss) + 10th/90th quantile GBT models on ALL rows.
+    Quantile models use fit_quantile_model_robust() — see its docstring for why a
+    fixed hyperparameter combo isn't safe here (silent collapse to a near-constant
+    prediction, observed twice on this dataset already)."""
     point_model = HistGradientBoostingRegressor(loss="poisson", **POINT_KWARGS).fit(X, y)
-    lower_model = HistGradientBoostingRegressor(loss="quantile", quantile=0.1, **QUANTILE_KWARGS).fit(X, y)
-    upper_model = HistGradientBoostingRegressor(loss="quantile", quantile=0.9, **QUANTILE_KWARGS).fit(X, y)
+    lower_model, _ = fit_quantile_model_robust(X, y, 0.1)
+    upper_model, _ = fit_quantile_model_robust(X, y, 0.9)
     return point_model, lower_model, upper_model
 
 
@@ -74,12 +77,13 @@ def build_feature_row(target_dt, predictors, numeric_cols, weather_categories, t
     row["swell_dir_cos"] = np.cos(2 * np.pi * swell_dir / 360)
     row["is_weekend"] = int(target_dt.weekday() >= 5)
 
-    wx = predictors.get("weather_condition", "OTHER")
-    wx_grp = wx if wx in weather_categories else "OTHER"
+    wx_raw = predictors.get("weather_condition", "")
+    wx_simple, is_night = simplify_weather_condition(wx_raw)
+    row["is_night"] = int(is_night)
     for cat in sorted(weather_categories):
         if cat == sorted(weather_categories)[0]:
             continue  # drop_first matches training
-        row[f"wx_{cat}"] = 1.0 if wx_grp == cat else 0.0
+        row[f"wx_{cat}"] = 1.0 if wx_simple == cat else 0.0
 
     df_row = pd.DataFrame([row])
     df_row[numeric_cols] = (df_row[numeric_cols] - train_mean) / train_std
@@ -106,7 +110,7 @@ def main():
 
     print("Loading training data and fitting production models on all available rows...")
     X, y, df, numeric_cols = load_and_prepare()
-    weather_categories = set(df["weather_condition_grp"].unique())
+    weather_categories = set(df["weather_simple"].unique())
 
     train_mean = X[numeric_cols].mean()
     train_std = X[numeric_cols].std().replace(0, 1)
@@ -144,7 +148,8 @@ def main():
         print(f"        conditions: {conditions}")
 
     print(f"\nNote: this model's held-out MAE is ~6 surfers (see fit_surfer_count_model.py) "
-          f"and the 80% range is empirically closer to a 65% range (see PROJECT_HISTORY.md) — "
+          f"and the 80% range's true empirical coverage varies by dataset snapshot — "
+          f"check fit_surfer_count_model.py's latest output rather than trusting this note — "
           f"treat these as directional estimates, not precise counts.")
 
 

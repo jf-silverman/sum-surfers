@@ -38,8 +38,6 @@ from pathlib import Path
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FEATURES_CSV = _PROJECT_ROOT / "data" / "training_features.csv"
 
-MIN_CATEGORY_COUNT = 20
-
 
 def load_and_prepare():
     df = pd.read_csv(FEATURES_CSV)
@@ -68,21 +66,22 @@ def load_and_prepare():
     df["swell_dir_cos"] = np.cos(2 * np.pi * df["primary_swell_direction_deg"] / 360)
 
     df["is_weekend"] = df["is_weekend"].astype(int)
+    df["is_night"] = df["is_night"].astype(int)
 
-    # Collapse rare weather_condition categories
-    wx_counts = df["weather_condition"].value_counts()
-    rare = wx_counts[wx_counts < MIN_CATEGORY_COUNT].index
-    df["weather_condition_grp"] = df["weather_condition"].where(~df["weather_condition"].isin(rare), "OTHER")
-    print(f"weather_condition: {df['weather_condition_grp'].nunique()} categories after collapsing rare ones "
-          f"(<{MIN_CATEGORY_COUNT} occurrences) into OTHER: "
-          f"{sorted(df['weather_condition_grp'].unique())}")
-
-    wx_dummies = pd.get_dummies(df["weather_condition_grp"], prefix="wx", drop_first=True, dtype=float)
+    # weather_simple (2026-08-28): the curated 4-category scheme from
+    # build_training_features.py's simplify_weather_condition() — CLEAR/
+    # CLOUDY_OVERCAST/RAIN/FOG, with day/night pulled out separately as is_night —
+    # replaces the old approach of collapsing whatever raw categories had <20
+    # occurrences into a generic OTHER, which was silently discarding all rain
+    # signal (every individual rain-family category had well under 20 rows).
+    print(f"weather_simple categories: {sorted(df['weather_simple'].unique())} "
+          f"(counts: {df['weather_simple'].value_counts().to_dict()})")
+    wx_dummies = pd.get_dummies(df["weather_simple"], prefix="wx", drop_first=True, dtype=float)
 
     feature_cols = numeric_cols + [
         "hour_sin", "hour_cos", "month_sin", "month_cos",
         "wind_dir_sin", "wind_dir_cos", "swell_dir_sin", "swell_dir_cos",
-        "is_weekend",
+        "is_weekend", "is_night",
     ]
     X = pd.concat([df[feature_cols], wx_dummies], axis=1)
     X = sm.add_constant(X)
@@ -191,35 +190,69 @@ def fit_and_report(X_train, y_train, X_test, y_test):
     return results
 
 
+QUANTILE_BASE_KWARGS = dict(max_iter=300, learning_rate=0.05, max_depth=3, l2_regularization=0.0, random_state=42)
+# Escalating min_samples_leaf candidates for fit_quantile_model_robust(). Empirically,
+# no single fixed hyperparameter combo is safe here — see that function's docstring.
+QUANTILE_MIN_LEAF_CANDIDATES = (20, 30, 40, 50, 75, 100, 150, 200)
+QUANTILE_DEGENERATE_STD_THRESHOLD = 0.5
+
+
+def fit_quantile_model_robust(X_train, y_train, quantile, base_kwargs=None,
+                               min_leaf_candidates=QUANTILE_MIN_LEAF_CANDIDATES):
+    """Fits a quantile-loss GBT with a self-check against silent collapse to a
+    near-constant prediction — a real, repeatedly-observed failure mode for this
+    dataset's extreme (zero-inflated) quantiles, NOT something one fixed
+    hyperparameter combo can be trusted to avoid permanently.
+
+    Discovered twice now: first with l2_regularization=1.0 (fixed by l2=0.0 +
+    max_depth=3), then again after adding features (weather_simple/is_night) —
+    same l2=0.0/depth=3 combo re-collapsed on the updated dataset. Root cause:
+    with ~11% of rows at surfer_count==0, "always predict 0" already nearly
+    minimizes the pinball loss at low quantiles, so any config that doesn't push
+    hard enough on individual splits settles into that trivial optimum instead.
+    A follow-up sweep showed min_samples_leaf is the more reliable lever than
+    l2/depth, but the collapse boundary is NOT monotonic in it either (leaf=50
+    can work while leaf=75 collapses again) — so instead of hardcoding a value
+    that's only verified to work today, this fits with escalating min_samples_leaf
+    values and keeps the first one whose TRAINING predictions actually vary
+    (std > QUANTILE_DEGENERATE_STD_THRESHOLD), raising a clear error if every
+    candidate collapses rather than silently returning a trivial model that would
+    look deceptively fine in an aggregate coverage number (see below)."""
+    kwargs = dict(base_kwargs or QUANTILE_BASE_KWARGS)
+    for min_leaf in min_leaf_candidates:
+        model = HistGradientBoostingRegressor(loss="quantile", quantile=quantile,
+                                               min_samples_leaf=min_leaf, **kwargs).fit(X_train, y_train)
+        train_std = model.predict(X_train).std()
+        if train_std > QUANTILE_DEGENERATE_STD_THRESHOLD:
+            return model, min_leaf
+    raise RuntimeError(
+        f"Quantile GBT (quantile={quantile}) collapsed to a near-constant prediction "
+        f"for every min_samples_leaf candidate tried {min_leaf_candidates} — needs "
+        f"manual investigation (e.g. widen min_leaf_candidates, or the quantile may "
+        f"genuinely be unlearnable given how zero-inflated this dataset is at that "
+        f"tail — see this function's docstring). Refusing to silently return a "
+        f"trivial model."
+    )
+
+
 def fit_quantile_intervals(X_train, y_train, X_test, y_test, lower_q=0.1, upper_q=0.9):
     """80% prediction intervals via GBT quantile regression (separate models for the
     10th/50th/90th percentiles) — much lighter-weight than a full Bayesian refit, and
     gives real per-prediction uncertainty bands instead of a single point estimate.
     Reports empirical coverage AND each tail's individual miss rate (should land near
     lower_q / 1-upper_q respectively) — an aggregate coverage number alone can hide a
-    degenerate model, which is exactly what happened during development here: with
-    l2_regularization=1.0, the lower_q=0.1 model collapsed to a constant 0 prediction
-    for every single row (verified on both train and test data) because the dataset's
-    strong zero-inflation (~11% of rows are surfer_count==0) means "always predict 0"
-    already nearly minimizes the pinball loss at that quantile, and L2 regularization
-    on leaf values pushed the fit the rest of the way into that trivial optimum rather
-    than learning real feature-dependent splits. That degenerate model still LOOKED
-    well-calibrated in aggregate (~82% overall coverage against an 80% target) because
-    a lower bound that's always 0 trivially never excludes anything from below (counts
-    are never negative) — all the "coverage" was coming from the upper bound alone,
-    which means the aggregate number was not actually evidence the interval was useful.
-    Fix: l2_regularization=0.0 and shallower trees (max_depth=3) for the quantile
-    models specifically, which lets the lower-tail model actually vary with the
-    features. Note this fix does NOT work at more extreme quantiles (tried q=0.05,
-    which collapses to constant 0 again even with these settings — there's just not
-    enough learnable signal below the 10th percentile given how zero-inflated this
-    dataset is), so lower_q/upper_q defaults are kept at 0.1/0.9 rather than pushed
-    wider."""
-    quantile_kwargs = dict(max_iter=300, learning_rate=0.05, max_depth=3, l2_regularization=0.0, random_state=42)
-
-    lower_model = HistGradientBoostingRegressor(loss="quantile", quantile=lower_q, **quantile_kwargs).fit(X_train, y_train)
-    median_model = HistGradientBoostingRegressor(loss="quantile", quantile=0.5, **quantile_kwargs).fit(X_train, y_train)
-    upper_model = HistGradientBoostingRegressor(loss="quantile", quantile=upper_q, **quantile_kwargs).fit(X_train, y_train)
+    degenerate model: a lower bound that's always 0 trivially never excludes anything
+    from below (counts are never negative), so all "coverage" credit can come from the
+    upper bound alone while looking deceptively fine in aggregate. See
+    fit_quantile_model_robust()'s docstring for the full history of this failure mode
+    (found and re-found twice) and why a self-checking fit is used instead of a fixed
+    hyperparameter combo. Note extreme quantiles (tried q=0.05) aren't learnable at all
+    given how zero-inflated this dataset is, so lower_q/upper_q defaults stay at
+    0.1/0.9 rather than pushed wider."""
+    lower_model, lower_leaf = fit_quantile_model_robust(X_train, y_train, lower_q)
+    median_model, median_leaf = fit_quantile_model_robust(X_train, y_train, 0.5)
+    upper_model, upper_leaf = fit_quantile_model_robust(X_train, y_train, upper_q)
+    print(f"Quantile models converged with min_samples_leaf: lower={lower_leaf} median={median_leaf} upper={upper_leaf}")
 
     pred_lower = np.clip(lower_model.predict(X_test), 0, None)
     pred_median = np.clip(median_model.predict(X_test), 0, None)
