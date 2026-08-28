@@ -7,29 +7,11 @@ This project downloads short clips around daylight hours, extracts 3 cropped fra
 <!-- DAILY_CHART_START -->
 ## Today's Surfer Count Prediction
 
-_Last updated: 2026-08-28 10:17 AM_
+_Last updated: 2026-08-28 10:32 AM_
+
+![Latest detection review](data/charts/latest_detection.png)
 
 ![Latest daily prediction chart](data/charts/latest.png)
-
-**Predicted surfer count — Friday, August 28, 2026** (33% range around the median)
-
-| Time | Range |
-|---|---|
-| 6:00 AM | 6–17 |
-| 7:00 AM | 10–20 |
-| 8:00 AM | 13–24 |
-| 9:00 AM | 11–22 |
-| 10:00 AM | 7–14 |
-| 11:00 AM | 5–8 |
-| 12:00 PM | 0–3 |
-| 1:00 PM | 5–6 |
-| 2:00 PM | 9–16 |
-| 3:00 PM | 12–19 |
-| 4:00 PM | 13–22 |
-| 5:00 PM | 15–21 |
-| 6:00 PM | 18–26 |
-| 7:00 PM | 12–20 |
-| 8:00 PM | 8–16 |
 
 <!-- DAILY_CHART_END -->
 
@@ -119,8 +101,10 @@ for the full story, including two real bugs found and fixed along the way):
 - `code/demo_predictions.py` — shows N random held-out predictions
   alongside the actual count and conditions, for eyeballing model behavior.
 - `code/plot_daily_prediction.py` + `code/daily_chart.sh` — generates a daily
-  prediction chart to `data/charts/surfer_count_YYYY-MM-DD.png` (median +
-  33%/66% bands, tide, wave energy, weather, night shading). Run via its own
+  prediction chart (median + 33%/66% bands with a side-by-side range table,
+  tide, wave energy, weather, night shading) and a detection-review image
+  (real boxes/labels on the day's ~8am crop with the predicted range
+  overlaid), auto-committed to the top of this README. Run via its own
   daily cron entry, independent of the twice-weekly clip pipeline.
 
 Honest caveat: held-out MAE is ~6 surfers on a typical count of ~15, and

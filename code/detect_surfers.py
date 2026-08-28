@@ -188,6 +188,35 @@ def run_inference(model, img_path):
     return count, round(avg_conf, 4)
 
 
+def run_inference_with_boxes(model, img_path):
+    """Same tiling/NMS/false-positive-filtering pipeline as run_inference(), but
+    also returns the surviving boxes (global ROI coords: [x1,y1,x2,y2,conf]) instead
+    of discarding them — for drawing detection boxes on an image (e.g.
+    plot_daily_prediction.py's daily detection-review image), not used by the
+    regular counting pipeline."""
+    import shutil
+    tiles, tmp_dir = tile_image_paths(img_path)
+
+    all_boxes = []
+    for tile_idx, x_offset, tile_path in tiles:
+        results = model.predict(
+            source=str(tile_path),
+            conf=CONF_THRESH,
+            device=DEVICE,
+            verbose=False,
+        )[0]
+        for box in results.boxes:
+            x1, y1, x2, y2 = box.xyxy[0].cpu().tolist()
+            conf = float(box.conf[0].cpu())
+            all_boxes.append([x1 + x_offset, y1, x2 + x_offset, y2, conf])
+
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    kept = nms_across_tiles(all_boxes)
+    kept = filter_false_positive_zones(kept)
+    return kept
+
+
 def side_frame_paths(primary_img_path):
     """
     (side1, side2) paths for a primary crop, matching get_cropped_frame.py's

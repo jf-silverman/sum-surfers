@@ -1,14 +1,19 @@
 """
 plot_daily_prediction.py
 --------------------------
-Generates a daily surfer-count prediction chart (point estimate = median GBT
-model, 33%/66% quantile bands, tide overlay, wave-energy bars, weather-coded
-markers, night-hour shading, model/detector info footer) and saves it to
-data/charts/surfer_count_YYYY-MM-DD.png.
+Generates the daily surfer-count prediction chart (point estimate = median
+GBT model, 33%/66% quantile bands rendered as a side table, tide overlay,
+wave-energy bars, weather-coded markers, night-hour shading, model/detector
+info footer) to data/charts/surfer_count_YYYY-MM-DD.png, plus a detection-
+review image (real bounding boxes + labels on the day's ~8am crop, with the
+model's predicted range/median for that hour overlaid) to
+data/charts/latest_detection.png. Both get a stable, git-tracked "latest"
+copy and are embedded in README.md between the DAILY_CHART markers.
 
 Meant to run once per day (not tied to the twice-weekly clip-collection
-cron — this only needs the live Surfline forecast + the existing trained
-model, no new clips required).
+cron — the chart only needs the live Surfline forecast + the existing
+trained model; the detection image needs today's own clip, which the
+clip-collection cron already downloads separately).
 
 Usage:
     python code/plot_daily_prediction.py                # today
@@ -16,10 +21,12 @@ Usage:
 """
 
 import argparse
+import csv
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import cv2
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.dates as mdates
@@ -34,6 +41,7 @@ from sklearn.model_selection import train_test_split
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import get_clips as gc  # noqa: E402 — needed for get_light_window() (real dawn/dusk)
 import get_surf_predictors as sp  # noqa: E402
+import detect_surfers as ds  # noqa: E402
 from fit_surfer_count_model import load_and_prepare, fit_quantile_model_robust  # noqa: E402
 from predict_surf_count import build_feature_row, MEAN_KWARGS  # noqa: E402
 from build_training_features import simplify_weather_condition  # noqa: E402
@@ -136,7 +144,11 @@ def main():
 
     d = pd.DataFrame(records)
 
-    fig, ax = plt.subplots(figsize=(11, 6.5))
+    fig = plt.figure(figsize=(14, 6.5))
+    gs = fig.add_gridspec(1, 2, width_ratios=[3.2, 1], wspace=0.05)
+    ax = fig.add_subplot(gs[0])
+    ax_table = fig.add_subplot(gs[1])
+
     y_top = d["q83"].max() * 1.18
     ax.set_ylim(bottom=0, top=y_top)
 
@@ -213,14 +225,37 @@ def main():
     ax.set_ylabel("Predicted surfer count")
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%-I %p"))
     ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
-    fig.autofmt_xdate(rotation=0, ha="center")
+    for label in ax.get_xticklabels():
+        label.set_rotation(0)
+        label.set_ha("center")
 
     night_patch = Patch(facecolor="#2C3E50", alpha=0.08, hatch="//", edgecolor="#2C3E50", label="Night hours")
     handles1, labels1 = ax.get_legend_handles_labels()
     handles2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(handles1 + handles2 + [night_patch], labels1 + labels2 + ["Night hours"],
-              loc="upper left", ncol=2, fontsize=8.5)
+              loc="upper left", ncol=2, fontsize=8)
     ax.grid(alpha=0.25)
+
+    # Table panel: hour -> 33% range only (no median — Joel asked for range without
+    # the point estimate here), rendered as part of the same figure/image rather than
+    # a separate markdown table, so chart and table always render side by side.
+    ax_table.axis("off")
+    ax_table.set_title("33% Range", fontsize=10, pad=10)
+    cell_text = [[row["hour"].strftime("%-I:%M %p"), f"{row['q335']:.0f}–{row['q665']:.0f}"]
+                 for _, row in d.iterrows()]
+    tbl = ax_table.table(cellText=cell_text, colLabels=["Time", "Range"],
+                          cellLoc="center", loc="upper center")
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(9)
+    tbl.scale(1, 1.35)
+    for (r, c), cell in tbl.get_celld().items():
+        cell.set_edgecolor("#DDDDDD")
+        if r == 0:
+            cell.set_facecolor("#1B3B6F")
+            cell.set_text_props(color="white", weight="bold")
+        elif r % 2 == 0:
+            cell.set_facecolor("#F2F4F8")
+
     fig.tight_layout(rect=[0, 0.06, 1, 1])
 
     CHARTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -234,31 +269,87 @@ def main():
     latest_path = CHARTS_DIR / "latest.png"
     fig.savefig(latest_path, dpi=150)
 
-    write_range_table(d, target_date, CHARTS_DIR / "latest_table.md")
-    update_readme(target_date)
+    generate_detection_image(target_date, d)
+    update_readme()
 
 
-def write_range_table(d, target_date, out_path):
-    """Markdown table of hour -> 33% range only (no median — see PROJECT_HISTORY.md,
-    Joel asked for the range without the point estimate for the README table)."""
-    lines = [
-        f"**Predicted surfer count — {target_date.strftime('%A, %B %d, %Y')}** "
-        f"(33% range around the median)\n",
-        "| Time | Range |",
-        "|---|---|",
-    ]
-    for _, row in d.iterrows():
-        lines.append(f"| {row['hour'].strftime('%-I:%M %p')} | {row['q335']:.0f}–{row['q665']:.0f} |")
-    out_path.write_text("\n".join(lines) + "\n")
+def find_nearest_hour_crop(target_date, target_hour=8):
+    """Finds the predictions.csv row for target_date closest to target_hour (default
+    8am) with quality_ok=True and a crop image still on disk. Returns the row dict, or
+    None if no usable row exists for that date (e.g. the hour hasn't happened yet)."""
+    with open(ds.PREDS_CSV, newline="") as f:
+        rows = [r for r in csv.DictReader(f) if r["date"] == target_date.isoformat() and r["quality_ok"] == "True"]
+    if not rows:
+        return None
+    def hour_distance(r):
+        h, m = map(int, r["time_local"].split(":"))
+        return abs((h * 60 + m) - target_hour * 60)
+    rows.sort(key=hour_distance)
+    for r in rows:
+        if (ds.CROPS_DIR / r["filename"]).exists():
+            return r
+    return None
+
+
+def generate_detection_image(target_date, day_predictions_df):
+    """Draws real detection boxes + confidence labels on the day's ~8am crop (the
+    actual production tiling/NMS/false-positive-filter pipeline via
+    detect_surfers.run_inference_with_boxes — not a simplified re-implementation),
+    with the model's predicted range/median for that same hour overlaid as text.
+    Skipped (not an error) if today's ~8am clip hasn't been captured/processed yet."""
+    row = find_nearest_hour_crop(target_date, target_hour=8)
+    if row is None:
+        print(f"No usable ~8am crop for {target_date} yet — skipping detection image.")
+        return
+
+    img_path = ds.CROPS_DIR / row["filename"]
+    model = ds.load_model()
+    boxes = ds.run_inference_with_boxes(model, img_path)
+
+    img = cv2.imread(str(img_path))
+    for x1, y1, x2, y2, conf in boxes:
+        p1, p2 = (int(x1), int(y1)), (int(x2), int(y2))
+        cv2.rectangle(img, p1, p2, (46, 134, 171), 2)  # BGR — matches chart's swell-blue accent
+        label = f"{conf:.2f}"
+        cv2.putText(img, label, (p1[0], max(p1[1] - 5, 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (46, 134, 171), 1, cv2.LINE_AA)
+
+    # Model's predicted range/median for this exact hour, if it's in the already-
+    # computed day_predictions_df (it normally will be, since 8am is within the
+    # dawn-dusk window) — falls back to "not available" text rather than silently
+    # omitting it or computing something inconsistent from a different data source.
+    hh = int(row["time_local"].split(":")[0])
+    match = day_predictions_df[day_predictions_df["hour"].dt.hour == hh]
+    if len(match):
+        m = match.iloc[0]
+        pred_text = f"Predicted: {m['point']:.0f} (33% range {m['q335']:.0f}-{m['q665']:.0f})"
+    else:
+        pred_text = "Predicted range/median: not available for this hour"
+
+    detected_text = f"Detected: {len(boxes)} surfer(s) at {row['time_local']}"
+
+    # White banner strip below the image so text never overlaps real image content.
+    banner_h = 44
+    h, w = img.shape[:2]
+    canvas = np.full((h + banner_h, w, 3), 255, dtype=np.uint8)
+    canvas[:h] = img
+    cv2.putText(canvas, detected_text, (8, h + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (30, 30, 30), 1, cv2.LINE_AA)
+    cv2.putText(canvas, pred_text, (8, h + 36), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (30, 30, 30), 1, cv2.LINE_AA)
+
+    dated_path = CHARTS_DIR / f"detection_{target_date.isoformat()}.png"
+    cv2.imwrite(str(dated_path), canvas)
+    latest_path = CHARTS_DIR / "latest_detection.png"
+    cv2.imwrite(str(latest_path), canvas)
+    print(f"Saved detection image to {dated_path}")
 
 
 README_START_MARKER = "<!-- DAILY_CHART_START -->"
 README_END_MARKER = "<!-- DAILY_CHART_END -->"
 
 
-def update_readme(target_date):
-    """Replaces the marked section of README.md with the latest chart + range table.
-    Idempotent — safe to run daily; only the content between the markers changes."""
+def update_readme():
+    """Replaces the marked section of README.md with the latest detection image
+    (if one was generated) + chart-with-table image. Idempotent — safe to run
+    daily; only the content between the markers changes."""
     readme_path = _PROJECT_ROOT / "README.md"
     readme = readme_path.read_text()
     if README_START_MARKER not in readme or README_END_MARKER not in readme:
@@ -266,14 +357,17 @@ def update_readme(target_date):
               f"Add {README_START_MARKER} / {README_END_MARKER} to enable this.")
         return
 
-    table_md = (CHARTS_DIR / "latest_table.md").read_text()
     generated_at = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+    detection_block = ""
+    if (CHARTS_DIR / "latest_detection.png").exists():
+        detection_block = "![Latest detection review](data/charts/latest_detection.png)\n\n"
+
     section = (
         f"{README_START_MARKER}\n"
         f"## Today's Surfer Count Prediction\n\n"
         f"_Last updated: {generated_at}_\n\n"
+        f"{detection_block}"
         f"![Latest daily prediction chart](data/charts/latest.png)\n\n"
-        f"{table_md}\n"
         f"{README_END_MARKER}"
     )
 

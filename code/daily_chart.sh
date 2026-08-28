@@ -45,7 +45,12 @@ cd "$PROJECT_ROOT"
 # specifically so the latest chart is visible on GitHub without a manual step.
 # Non-fatal: a git/network failure here must never be treated as the whole daily
 # chart job failing (the chart itself already generated fine above).
-git add data/charts/latest.png data/charts/latest_table.md README.md 2>&1 || true
+# Added individually, not as one `git add a b c` — a missing pathspec (e.g. no
+# detection image yet some days) fails the ENTIRE add and blocks staging the
+# others too if done as one command; per-file `|| true` avoids that.
+git add data/charts/latest.png 2>&1 || true
+git add data/charts/latest_detection.png 2>&1 || true
+git add README.md 2>&1 || true
 if git diff --cached --quiet; then
     log "No changes to commit (chart/table/README identical to last run)."
 else

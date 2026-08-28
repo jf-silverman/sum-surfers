@@ -1028,3 +1028,41 @@ chose full automation.
   cron commits from real interactive session work in the git log.
 - Verified live: ran the real commit+push once to confirm the whole
   chain works before trusting it to the unattended 7pm cron job.
+
+### Chart+table combined side by side; daily detection-review image added (2026-08-28)
+
+Two more asks on the same daily-chart feature: render the chart and
+33%-range table side by side (table baked into the chart image itself,
+simpler than a separate markdown table Joel confirmed was fine to
+fold in), and add a detection-review image above it — the day's ~8am
+crop with real bounding boxes/confidence labels and the model's
+predicted range/median for that hour overlaid.
+
+- Chart figure restructured to a 2-panel `GridSpec` (chart : table =
+  3.2 : 1) instead of a separate `.md` table file — `write_range_table()`
+  removed, the table renders directly via `ax_table.table(...)` in the
+  same image.
+- New `detect_surfers.run_inference_with_boxes()`: identical tiling/
+  NMS/false-positive-filter pipeline as the production `run_inference()`,
+  just returns the surviving boxes instead of discarding them after
+  counting — reused, not reimplemented, so the drawn boxes are exactly
+  what the real counting pipeline sees, not a simplified stand-in.
+- New `generate_detection_image()` in `plot_daily_prediction.py`: finds
+  the day's `predictions.csv` row closest to 8am (real clip data, not
+  synthetic), draws real boxes + confidence labels via `cv2`, and
+  overlays both the actual detected count and the model's predicted
+  range/median for that same hour (pulled from the already-computed
+  daily chart data, not a separately-sourced number) in a white banner
+  strip below the image so text never overlaps real image content.
+  Skips cleanly (not an error) if today's ~8am clip hasn't been
+  captured yet when the chart runs. Saved to `data/charts/
+  latest_detection.png` (git-tracked, same daily-overwrite convention
+  as `latest.png`).
+- `update_readme()` now embeds the detection image above the chart
+  within the same marked section.
+- Fixed a real bug caught before it could break the unattended cron job:
+  `daily_chart.sh` originally did `git add fileA fileB fileC` in one
+  command — confirmed via test that if ANY one pathspec doesn't exist
+  (e.g. no detection image yet some days), git fails the ENTIRE add and
+  stages nothing, not just the missing file. Changed to add each file
+  individually with its own non-fatal error handling.
