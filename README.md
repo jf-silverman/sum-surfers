@@ -130,8 +130,7 @@ Both are safe to run manually any time; see each script for details.
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
-pip install requests astral pytz opencv-python-headless ultralytics torch torchvision
-pip install pandas numpy statsmodels scikit-learn  # for the surfer-count prediction model
+pip install -r requirements.txt
 cp .env.example .env
 bash code/local_pipeline.sh
 ```

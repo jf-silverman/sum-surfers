@@ -18,6 +18,7 @@ deeper architecture notes.
 | `PROJECT_FILES.md` | This file. |
 | `.env` | Secrets and config (gitignored). Copy from `.env.example`. |
 | `.env.example` | Template for `.env` — required and optional variables. |
+| `requirements.txt` | Pinned Python dependencies (added 2026-08-28 after a security review flagged there was previously no way to reproduce/audit the environment). Install with `pip install -r requirements.txt`. |
 | `.gitignore` | Excludes secrets, OS files, caches, large clip video, and `archive/`'s raw clips. |
 
 ## `code/` — pipeline scripts

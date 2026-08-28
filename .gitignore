@@ -2,6 +2,25 @@
 data/not_needed_in_repo
 archive/data/not_needed_in_repo
 
+# Data outputs the docs already describe as untracked-by-convention, but that
+# weren't actually covered here — a future `git add -A`/`git add .` would
+# otherwise sweep these (large binaries/CSVs, no secrets) into the repo.
+# data/charts/latest*.png stay tracked on purpose (README daily-chart embed).
+data/predictions.csv
+data/surfline_predictors.csv
+data/openmeteo_weather.csv
+data/j_shore_cam/surf_crops/
+data/fog_review/
+data/model_review_50/
+data/count_review/
+data/frame_variability_analysis.csv
+data/frame_variability_analysis_summary.png
+data/hourly_variability_analysis.csv
+data/charts/surfer_count_*.png
+data/charts/detection_*.png
+data/.last_local_success
+archive/data/tide_backfill.csv
+
 # Secrets — never commit
 .env
 *.har
