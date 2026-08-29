@@ -398,8 +398,10 @@ def update_readme(target_date, detection_capture=None):
     detection_block = ""
     if (CHARTS_DIR / "latest_detection.png").exists() and detection_capture is not None:
         capture_date, capture_time = detection_capture
+        capture_dt = datetime.strptime(f"{capture_date} {capture_time}", "%Y-%m-%d %H:%M")
+        capture_str = capture_dt.strftime("%A, %B %d, %Y, %-I:%M %p")
         detection_block = (
-            f"## Yesterday's Surfer Detection Count (Image from: {capture_date}, {capture_time})\n\n"
+            f"## A Recent Surfer Detection Count: {capture_str}\n\n"
             f"![Latest detection review](data/charts/latest_detection.png)\n\n"
         )
 
@@ -407,7 +409,7 @@ def update_readme(target_date, detection_capture=None):
     section = (
         f"{README_START_MARKER}\n"
         f"{detection_block}"
-        f"## Today's Predicted Surfer Counts ({target_date_str})\n\n"
+        f"## The Surfer Crowd Forecast for: {target_date_str}\n\n"
         f"![Latest daily prediction chart](data/charts/latest.png)\n\n"
         f"{README_END_MARKER}"
     )
