@@ -76,7 +76,7 @@ WEATHER_COLORS = {"CLEAR": "#f2c14e", "CLOUDY_OVERCAST": "#9aa0a6", "RAIN": "#4f
 WEATHER_MARKERS = {"CLEAR": "o", "CLOUDY_OVERCAST": "s", "RAIN": "^", "FOG": "D"}
 WEATHER_ABBREV = {"CLEAR": "clear", "CLOUDY_OVERCAST": "cloudy", "RAIN": "rain", "FOG": "fog"}
 
-# Dark theme — matches data/charts/one_off/weekday_weekend_*.png (aqua blue /
+# Dark theme — matches analysis/weekday_weekend_patterns/weekday_weekend_*.png (aqua blue /
 # lime green on black), with a couple of complementary colors added for the
 # extra series this chart needs (wave-energy bars, tide line, warning hatches).
 BG_COLOR = "black"

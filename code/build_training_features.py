@@ -28,9 +28,9 @@ from datetime import datetime
 from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-PREDS_CSV = _PROJECT_ROOT / "data" / "predictions.csv"
-PREDICTORS_CSV = _PROJECT_ROOT / "data" / "surfline_predictors.csv"
-OPENMETEO_CSV = _PROJECT_ROOT / "data" / "openmeteo_weather.csv"
+PREDS_CSV = _PROJECT_ROOT / "data" / "predictions" / "predictions.csv"
+PREDICTORS_CSV = _PROJECT_ROOT / "data" / "predictor_vars" / "surfline_predictors.csv"
+OPENMETEO_CSV = _PROJECT_ROOT / "data" / "predictor_vars" / "openmeteo_weather.csv"
 DEFAULT_OUT_CSV = _PROJECT_ROOT / "data" / "training_features.csv"
 
 PREDICTOR_FEATURE_COLS = [

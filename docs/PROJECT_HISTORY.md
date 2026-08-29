@@ -1193,3 +1193,50 @@ from today's own hour instead of tomorrow's.
 Also changed detection-box/label color from red to lime green (`#9de35a`,
 matching the dark theme's tide-line/wave-energy-bar color), same 0.75
 alpha-blended transparency as before.
+
+### `data/` reorganized into predictions/predictor_vars/reviews; new top-level analysis/ folder (2026-08-29)
+
+Cleaned up `data/`, which had accumulated flat CSVs and inconsistently-named
+review folders directly at its root as the project grew. New structure:
+
+- `data/predictions/predictions.csv` (was `data/predictions.csv`).
+- `data/predictor_vars/surfline_predictors.csv` and
+  `data/predictor_vars/openmeteo_weather.csv` (were both directly under
+  `data/`).
+- `data/reviews/<name>/` for every human-review dataset, one subfolder per
+  dataset with a name distinguishing it from the others (previously each
+  had its own top-level `data/` folder with an inconsistent naming
+  convention): `count_review/` → `reviews/count_60sec_var/` (renamed to
+  reflect what it's actually reviewing — the frame-timing-variability
+  60-second-clip study), `fog_review/` → `reviews/fog_quality/`,
+  `model_review_50/` → `reviews/model_spotcheck_50/`.
+- `data/training_features.csv` stays directly under `data/` — it's a
+  derived join of the predictions/predictor_vars data, not raw source
+  data itself.
+- New top-level `analysis/` folder: each one-off analysis (not part of
+  the scheduled pipeline) gets its own subfolder holding whatever mix of
+  CSVs, charts, and the script(s) that produced them, instead of the
+  previous scatter (CSVs/PNGs under `data/`, scripts under `code/`).
+  Three so far: `analysis/frame_timing_variability/` (the 2026-08-27
+  14-clip lag/averaging-window study), `analysis/hourly_variability_8to9am/`
+  (the 2026-08-28 12-clip within-hour study, both the 5-frame sparse
+  sample and the full 1-frame/second version), and
+  `analysis/weekday_weekend_patterns/` (the weekday/weekend charts
+  embedded in `README.md`).
+
+Updated every literal path in `code/` that pointed at a moved file
+(`detect_surfers.py`, `get_surf_predictors.py`, `backfill_openmeteo_weather.py`,
+`backfill_tide.py`, `build_training_features.py` — 6 path constants total)
+and fixed the moved analysis scripts' `sys.path`/`_PROJECT_ROOT`
+calculations, since they're now one directory deeper (`analysis/<name>/`
+instead of `code/`) — verified each of the four moved scripts still
+imports `detect_surfers`/`get_cropped_frame`/`get_clips` from `code/`
+correctly, and re-ran all four chart-producing scripts in place to confirm
+they regenerate identical output at their new paths. `.gitignore` updated
+to the new paths (kept as explicit per-file entries rather than
+whole-folder ignores, since the `analysis/` and `data/reviews/`
+subfolders also hold real, git-tracked `.py` scripts alongside their
+gitignored data outputs). Nothing here was previously git-tracked except
+the two `weekday_weekend_*.png` files (moved with `git mv` to preserve
+history) and `README.md`'s references to them, which were updated to the
+new `analysis/weekday_weekend_patterns/` path.

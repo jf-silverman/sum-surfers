@@ -5,7 +5,7 @@
 #   1. Downloads new Surfline clips locally
 #   2. Extracts crop frames locally
 #   3. Checks local clips storage (emails warning if > CLIPS_DIR_LIMIT_GB)
-#   4. Runs YOLOv8 detection locally, appending to data/predictions.csv
+#   4. Runs YOLOv8 detection locally, appending to data/predictions/predictions.csv
 #   5. Pulls Jack's weather/rating/tide/swell predictors from Surfline
 #   6. Records success timestamp (data/.last_local_success)
 #

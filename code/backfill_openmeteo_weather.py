@@ -34,8 +34,8 @@ from pathlib import Path
 import requests
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-PREDS_CSV = _PROJECT_ROOT / "data" / "predictions.csv"
-OUT_CSV = _PROJECT_ROOT / "data" / "openmeteo_weather.csv"
+PREDS_CSV = _PROJECT_ROOT / "data" / "predictions" / "predictions.csv"
+OUT_CSV = _PROJECT_ROOT / "data" / "predictor_vars" / "openmeteo_weather.csv"
 
 LATITUDE, LONGITUDE = 36.9577, -121.9688  # Pleasure Point, Santa Cruz (see get_clips.py)
 TIMEZONE = "America/Los_Angeles"

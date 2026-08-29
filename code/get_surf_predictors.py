@@ -3,7 +3,7 @@ get_surf_predictors.py
 -----------------------
 Pulls weather, condition rating, tide, swell/wave, wind, wave energy, and
 consistency predictors for Jack's from Surfline's public forecast API and
-appends a row to data/surfline_predictors.csv for each predictions.csv row
+appends a row to data/predictor_vars/surfline_predictors.csv for each predictions.csv row
 that doesn't have one yet (matched by filename, restricted to the same
 recent-days window detect_surfers.py uses so a fresh machine doesn't try to
 backfill history).
@@ -54,8 +54,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from get_clips import LOCATION as CAMERA_LOCATION  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-PREDS_CSV = PROJECT_ROOT / "data" / "predictions.csv"
-OUT_CSV = PROJECT_ROOT / "data" / "surfline_predictors.csv"
+PREDS_CSV = PROJECT_ROOT / "data" / "predictions" / "predictions.csv"
+OUT_CSV = PROJECT_ROOT / "data" / "predictor_vars" / "surfline_predictors.csv"
 
 SPOT_ID = "5842041f4e65fad6a770880b"  # Jack's
 

@@ -31,7 +31,7 @@ MODEL_PATH = Path(
 )
 
 CROPS_DIR    = _PROJECT_ROOT / "data" / "j_shore_cam" / "surf_crops"
-PREDS_CSV    = _PROJECT_ROOT / "data" / "predictions.csv"
+PREDS_CSV    = _PROJECT_ROOT / "data" / "predictions" / "predictions.csv"
 
 # Inference settings
 CONF_THRESH  = 0.195   # match validation threshold used in notebook
@@ -46,7 +46,7 @@ NUM_TILES    = 4
 
 # Static false-positive exclusion zones, in full-crop ROI pixel coords
 # (1280x180). Derived from a 2026-08-30 manual review (see
-# data/model_review_50/review_counts.csv) cross-checked against the
+# data/reviews/model_spotcheck_50/review_counts.csv) cross-checked against the
 # original CVAT test set to confirm neither zone clips real detections.
 #   - Tree bough (right edge): consistently isolated, low/mid confidence,
 #     always touching the tiling boundary at x=1279 — safe to always drop.

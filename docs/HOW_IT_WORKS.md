@@ -19,7 +19,7 @@ in `PROJECT_HISTORY.md`.
    the primary crop is checked for whether it's even usable — see
    "Image-quality gate" below. Frames that fail skip detection entirely
    (for all three frames); `surfer_count` is left blank for them in
-   `data/predictions.csv` rather than guessed.
+   `data/predictions/predictions.csv` rather than guessed.
 4. **Tiling**: that strip is an unusual shape for an object-detection model
    (very wide, very short), and surfers are small relative to the whole
    frame. Rather than feed the model the whole strip at once, each of the
@@ -42,7 +42,7 @@ in `PROJECT_HISTORY.md`.
 8. **Count + average**: steps 4-7 run independently on all three frames,
    giving three per-frame counts. The row's `surfer_count` is the mean of
    the three (rounded), and `confidence_avg` is the mean of their average
-   confidences — appended to `data/predictions.csv` along with the raw
+   confidences — appended to `data/predictions/predictions.csv` along with the raw
    per-frame counts, mean, and standard deviation (see below).
 
 ## Multi-frame count averaging
@@ -171,7 +171,7 @@ the threshold so it's readable without cross-referencing this doc.
 Separate from detection, `code/get_surf_predictors.py` pulls conditions
 data for Jack's from Surfline's public forecast API
 (`services.surfline.com/kbyg/spots/forecasts/*`) and writes it to
-`data/surfline_predictors.csv`, matched to `predictions.csv` rows by
+`data/predictor_vars/surfline_predictors.csv`, matched to `predictions.csv` rows by
 filename/nearest hour. This is forward-looking only (today + tomorrow) —
 it runs on every scheduled pipeline execution and just accumulates
 whatever "today" happens to be each time.
