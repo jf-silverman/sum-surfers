@@ -80,7 +80,7 @@ TEXT_COLOR = "white"
 MUTED_TEXT = "#bbbbbb"
 AQUA = "#3ab4c9"      # primary — median line / quantile bands
 LIME = "#9de35a"      # tide line
-AMBER = "#f2a950"     # wave-energy bars (complementary warm accent)
+PURPLE = "#b388ff"    # wave-energy bars (complementary accent)
 CORAL = "#ff6f61"     # out-of-training-range warning hatch/labels
 NIGHT_COLOR = "#7a7aa8"  # night-hour shading
 READABLE_NAMES = {
@@ -179,11 +179,11 @@ def main():
     energy_max = d["energy_nearshore_kj"].max()
     energy_scale = (y_top * 0.20) / energy_max if energy_max > 0 else 0
     bar_heights = d["energy_nearshore_kj"] * energy_scale
-    ax.bar(d["hour"], bar_heights, width=bar_width, color=AMBER, alpha=0.45,
+    ax.bar(d["hour"], bar_heights, width=bar_width, color=PURPLE, alpha=0.45,
            zorder=1, label="Wave energy, nearshore (kJ)")
     for x, h, val in zip(d["hour"], bar_heights, d["energy_nearshore_kj"]):
         ax.annotate(f"{val:.0f}", (x, h), textcoords="offset points", xytext=(0, 2),
-                    ha="center", fontsize=6.5, color=AMBER, rotation=90, va="bottom")
+                    ha="center", fontsize=6.5, color=PURPLE, rotation=90, va="bottom")
 
     ax.fill_between(d["hour"], d["q17"], d["q83"], color=AQUA, alpha=0.18, label="66% range")
     ax.fill_between(d["hour"], d["q335"], d["q665"], color=AQUA, alpha=0.38, label="33% range")
@@ -368,9 +368,9 @@ def generate_detection_image(target_date, day_predictions_df):
     h, w = img.shape[:2]
     canvas = np.zeros((h + banner_h, w, 3), dtype=np.uint8)
     canvas[:h] = img
-    cv2.putText(canvas, detected_text, (8, h + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-    cv2.putText(canvas, pred_text, (8, h + 36), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-    cv2.putText(canvas, legend_text, (8, h + 54), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1, cv2.LINE_AA)
+    cv2.putText(canvas, detected_text, (8, h + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (211, 211, 211), 1, cv2.LINE_AA)
+    cv2.putText(canvas, pred_text, (8, h + 36), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (211, 211, 211), 1, cv2.LINE_AA)
+    cv2.putText(canvas, legend_text, (8, h + 54), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (170, 170, 170), 1, cv2.LINE_AA)
 
     dated_path = CHARTS_DIR / f"detection_{target_date.isoformat()}.png"
     cv2.imwrite(str(dated_path), canvas)
