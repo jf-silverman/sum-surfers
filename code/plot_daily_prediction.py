@@ -295,8 +295,8 @@ def main():
     latest_path = CHARTS_DIR / "latest.png"
     fig.savefig(latest_path, dpi=150, facecolor=fig.get_facecolor())
 
-    generate_detection_image(target_date, d)
-    update_readme()
+    detection_capture = generate_detection_image(target_date, d)
+    update_readme(target_date, detection_capture)
 
 
 def find_nearest_hour_crop(target_date, target_hour=8):
@@ -326,7 +326,7 @@ def generate_detection_image(target_date, day_predictions_df):
     row = find_nearest_hour_crop(target_date, target_hour=8)
     if row is None:
         print(f"No usable ~8am crop for {target_date} yet — skipping detection image.")
-        return
+        return None
 
     img_path = ds.CROPS_DIR / row["filename"]
     model = ds.load_model()
@@ -377,13 +377,14 @@ def generate_detection_image(target_date, day_predictions_df):
     latest_path = CHARTS_DIR / "latest_detection.png"
     cv2.imwrite(str(latest_path), canvas)
     print(f"Saved detection image to {dated_path}")
+    return row["date"], row["time_local"]
 
 
 README_START_MARKER = "<!-- DAILY_CHART_START -->"
 README_END_MARKER = "<!-- DAILY_CHART_END -->"
 
 
-def update_readme():
+def update_readme(target_date, detection_capture=None):
     """Replaces the marked section of README.md with the latest detection image
     (if one was generated) + chart-with-table image. Idempotent — safe to run
     daily; only the content between the markers changes."""
@@ -394,16 +395,20 @@ def update_readme():
               f"Add {README_START_MARKER} / {README_END_MARKER} to enable this.")
         return
 
-    generated_at = datetime.now().strftime("%Y-%m-%d %I:%M %p")
     detection_block = ""
-    if (CHARTS_DIR / "latest_detection.png").exists():
-        detection_block = "![Latest detection review](data/charts/latest_detection.png)\n\n"
+    if (CHARTS_DIR / "latest_detection.png").exists() and detection_capture is not None:
+        capture_date, capture_time = detection_capture
+        detection_block = (
+            f"## Yesterday's Surfer Detection Count\n\n"
+            f"_Image from: {capture_date}, {capture_time}_\n\n"
+            f"![Latest detection review](data/charts/latest_detection.png)\n\n"
+        )
 
+    target_date_str = target_date.strftime("%A, %B %d, %Y")
     section = (
         f"{README_START_MARKER}\n"
-        f"## Today's Surfer Count Prediction\n\n"
-        f"_Last updated: {generated_at}_\n\n"
         f"{detection_block}"
+        f"## Today's Predicted Surfer Counts ({target_date_str})\n\n"
         f"![Latest daily prediction chart](data/charts/latest.png)\n\n"
         f"{README_END_MARKER}"
     )
