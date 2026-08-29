@@ -27,7 +27,7 @@ This project downloads short clips around daylight hours, extracts 3 cropped fra
 5. Averages the 3 per-frame counts and appends the result (plus the raw
    per-frame data) to `data/predictions.csv`.
 
-Runs entirely on a local machine via cron — no cloud VM involved. See
+Started project on a cloud VM, but then realized training and inference could be run locally for free for now. See
 [`HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md) for a full walkthrough of the
 detection pipeline and a glossary of terms, [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md)
 for how it was built and tuned over time, and [`PROJECT_FILES.md`](docs/PROJECT_FILES.md)
