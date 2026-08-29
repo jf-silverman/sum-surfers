@@ -61,7 +61,7 @@ CONF_THRESH_FLAG_MASK = 0.5
 # dawn/dusk, incl. streetlight-lit fog) or too low-detail (fog, lens
 # condensation, or naturally smooth/low-texture water) to reliably count.
 # Thresholds fit on 169 hand-labeled images across 4 review batches
-# (2026-08 model review — see PROJECT_HISTORY.md); a two-branch rule
+# (2026-08 model review — see docs/PROJECT_HISTORY.md); a two-branch rule
 # (brightness OR lap_var) outperformed a single linear combination of
 # features because the two failure modes pull brightness in opposite
 # directions (night = dark, fog = artificially bright). 5-fold CV

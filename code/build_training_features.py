@@ -1,7 +1,7 @@
 """
 build_training_features.py
 ---------------------------
-Phase 1 of the surfer-count modeling plan (see PROJECT_HISTORY.md, 2026-08
+Phase 1 of the surfer-count modeling plan (see docs/PROJECT_HISTORY.md, 2026-08
 "Modeling plan scoped" entry): joins predictions.csv (target: surfer_count)
 with surfline_predictors.csv (features: tide/swell/wind/energy/weather/
 rating) on filename, restricted to quality_ok=True rows (frames the

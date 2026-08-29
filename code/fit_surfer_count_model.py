@@ -1,7 +1,7 @@
 """
 fit_surfer_count_model.py
 --------------------------
-Phase 2 of the surfer-count modeling plan (see PROJECT_HISTORY.md): fits
+Phase 2 of the surfer-count modeling plan (see docs/PROJECT_HISTORY.md): fits
 Poisson and negative-binomial GLMs on data/training_features.csv (built by
 build_training_features.py) and reports which one fits better, plus honest
 out-of-sample accuracy via a held-out test split.

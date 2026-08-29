@@ -1142,3 +1142,27 @@ rows) — verified the extra keys don't leak into `surfline_predictors.csv`
 fields, unaffected) and that `predict_surf_count.py`'s standardized
 feature row now gets real, non-NaN values for all 4 `real_*` columns
 (previously silently `NaN` on every live prediction).
+
+### Fog/humidity checked as a predictor, found weak; tide and weekend/weekday confirmed as the strongest predictors (2026-08-28)
+
+Followed up on the fog-forecast work above by directly checking how
+explanatory `real_humidity_pct`/`real_cloud_cover_pct` actually are for
+`surfer_count`, using `data/training_features.csv` (n=1175, 1160 after
+dropping rows with missing numeric features):
+
+- Pearson correlation with `surfer_count`: `real_humidity_pct` r=-0.075
+  (p=0.0105), `real_cloud_cover_pct` r=-0.062 (p=0.0338) — statistically
+  significant given the sample size but small (r² well under 1%).
+  `real_temperature_f` (r=0.182) and `real_pressure_mb` (r=0.132) are
+  noticeably stronger.
+- Mean `surfer_count` by `weather_simple`: CLEAR=15.4 (n=1022),
+  CLOUDY_OVERCAST=12.1 (n=92), RAIN=8.3 (n=57), FOG=5.0 (n=4 — too few
+  rows to treat as reliable).
+- GBT (`HistGradientBoostingRegressor`) permutation importance on a held-out
+  test split: `real_humidity_pct` ranks 16th of 31 features,
+  `real_cloud_cover_pct` ranks 15th. **`tide_ft` (0.603) and `is_weekend`
+  (0.162) are the two strongest predictors by a wide margin** — the next
+  closest is `hour_cos` (0.104), then `energy_nearshore_kj` (0.087). Fog/
+  humidity/cloud cover is a real but minor signal in comparison; tide and
+  day-of-week are the actual primary drivers of surfer count at this spot
+  (Jack's, 38th St, Pleasure Point).

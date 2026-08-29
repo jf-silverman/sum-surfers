@@ -28,9 +28,9 @@ _Last updated: 2026-08-28 11:01 AM_
    per-frame data) to `data/predictions.csv`.
 
 Runs entirely on a local machine via cron — no cloud VM involved. See
-[`HOW_IT_WORKS.md`](HOW_IT_WORKS.md) for a full walkthrough of the
-detection pipeline and a glossary of terms, [`PROJECT_HISTORY.md`](PROJECT_HISTORY.md)
-for how it was built and tuned over time, and [`PROJECT_FILES.md`](PROJECT_FILES.md)
+[`HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md) for a full walkthrough of the
+detection pipeline and a glossary of terms, [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md)
+for how it was built and tuned over time, and [`PROJECT_FILES.md`](docs/PROJECT_FILES.md)
 for a map of what every file in this repo is for.
 
 ## Pipeline Scripts
@@ -50,7 +50,7 @@ for a map of what every file in this repo is for.
 - `code/detect_surfers.py`
   - Checks the primary frame's brightness/blur before running detection,
     skipping all 3 frames if it's too dark or too foggy to reliably count
-    (see [`HOW_IT_WORKS.md`](HOW_IT_WORKS.md)).
+    (see [`HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md)).
   - Runs YOLO on 4 horizontal overlapping tiles per frame, deduplicates
     boxes, filters out known static false positives, averages the 3
     per-frame counts, and writes the result plus raw per-frame data.
@@ -82,7 +82,7 @@ for a map of what every file in this repo is for.
 ## Surfer Count Prediction Model
 
 A separate modeling pipeline on top of `predictions.csv` +
-`surfline_predictors.csv`, built in three phases (see [`PROJECT_HISTORY.md`](PROJECT_HISTORY.md)
+`surfline_predictors.csv`, built in three phases (see [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md)
 for the full story, including two real bugs found and fixed along the way):
 
 - `code/backfill_openmeteo_weather.py` — adds real observed historical
@@ -115,7 +115,7 @@ interval — treat outputs as directional estimates, not precise counts.
 ### Exploratory Findings
 
 Tide and weekend/weekday are the two strongest predictors of surfer count
-at this spot (see [`PROJECT_HISTORY.md`](PROJECT_HISTORY.md) for the full
+at this spot (see [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md) for the full
 GBT permutation-importance breakdown). A closer look at the weekend effect:
 
 ![Mean surfer count by month, weekday vs weekend](data/charts/one_off/weekday_weekend_by_month_2026-08-28.png)
@@ -141,7 +141,7 @@ Both are safe to run manually any time; see each script for details.
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r docs/requirements.txt
 cp .env.example .env
 bash code/local_pipeline.sh
 ```

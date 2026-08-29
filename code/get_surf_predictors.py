@@ -33,7 +33,7 @@ historical rows) under the same field names the trained model expects.
 Added 2026-08-28 to fix a real bug: predict_surf_count.py's live prediction
 path only ever pulled Surfline data, so these model features (trained on,
 and real_humidity_pct in particular a validated fog proxy — see
-PROJECT_HISTORY.md) were silently NaN on every live prediction. Non-fatal
+docs/PROJECT_HISTORY.md) were silently NaN on every live prediction. Non-fatal
 if this fetch fails — predictions just fall back to the previous NaN
 behavior for these fields, same as any other missing predictor.
 

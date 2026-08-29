@@ -15,7 +15,7 @@ FRAME_TIME_SEC = 2.5                     # Primary frame, same as always — uns
                                           # working unchanged.
 SIDE_FRAME_OFFSET_SEC = 1.5              # Two extra frames at FRAME_TIME_SEC +/- this,
                                           # for multi-frame count averaging in
-                                          # detect_surfers.py (see PROJECT_HISTORY.md,
+                                          # detect_surfers.py (see docs/PROJECT_HISTORY.md,
                                           # 2026-08-25 entry — per-frame counts on the
                                           # same clip vary by several surfers within a
                                           # few seconds, so averaging reduces noise).

@@ -7,7 +7,7 @@ services.surfline.com/kbyg/spots/forecasts/* endpoints as
 get_surf_predictors.py, but with a `start=YYYY-MM-DD` parameter and an
 `x-auth-accesstoken` header pulled from a logged-in, premium Surfline
 session (confirmed working 2026-08-25 via a HAR capture of the site's own
-"Historical" view — see PROJECT_HISTORY.md).
+"Historical" view — see docs/PROJECT_HISTORY.md).
 
 This is NOT part of the scheduled pipeline (like backfill_tide.py) and is
 not meant to be automated:
