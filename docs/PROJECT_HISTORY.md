@@ -1166,3 +1166,30 @@ dropping rows with missing numeric features):
   humidity/cloud cover is a real but minor signal in comparison; tide and
   day-of-week are the actual primary drivers of surfer count at this spot
   (Jack's, 38th St, Pleasure Point).
+
+### Daily chart now forecasts tomorrow by default; detection image decoupled from forecast date (2026-08-28)
+
+`plot_daily_prediction.py` previously defaulted `target_date` to *today*,
+so the 7pm cron run just re-showed today's own forecast for its remaining
+hours instead of anything forward-looking. Changed the no-`--date` default
+to `today + 1 day` for the forecast chart/table, while the detection image
+still always uses today's own ~8am crop (`detection_date`, independent of
+the forecast date) — the two were previously the same `target_date`
+parameter, which meant shifting the forecast date to tomorrow would have
+broken the detection image (no crop exists yet for a future date).
+`--date` still pins both to the same explicit date, for backfill/testing.
+
+Refactored the per-hour quantile-model prediction into a shared
+`predict_for_hour()`/`predict_nearest_hour()` closure in `main()` so the
+detection image's "Predicted: ..." text is computed directly for its own
+hour via `by_hour` (which covers today+tomorrow, `DAYS=2`) rather than
+matched from the forecast chart's day-scoped DataFrame — the old matching
+logic would have silently used the wrong day's prediction once the two
+dates diverged. Verified live: forecast chart correctly shows tomorrow
+(Aug 29) with dawn/dusk computed for that date, detection image still
+shows today's (Aug 28) 7:56am crop with a "Predicted" figure now sourced
+from today's own hour instead of tomorrow's.
+
+Also changed detection-box/label color from red to lime green (`#9de35a`,
+matching the dark theme's tide-line/wave-energy-bar color), same 0.75
+alpha-blended transparency as before.

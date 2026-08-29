@@ -16,8 +16,14 @@ trained model; the detection image needs today's own clip, which the
 clip-collection cron already downloads separately).
 
 Usage:
-    python code/plot_daily_prediction.py                # today
-    python code/plot_daily_prediction.py --date 2026-08-29
+    python code/plot_daily_prediction.py                # forecast for tomorrow, detection image from today
+    python code/plot_daily_prediction.py --date 2026-08-29   # forecast + detection both pinned to one date
+
+By default (no --date) the forecast chart/table target tomorrow (so the
+evening cron run shows tomorrow's forecast, not a same-day one running out
+of remaining hours) while the detection image still uses today's own ~8am
+crop — the two dates are independent unless --date pins both to the same
+day (e.g. for backfill/testing a specific past date).
 """
 
 import argparse
@@ -102,7 +108,14 @@ def parse_args():
 
 def main():
     args = parse_args()
-    target_date = datetime.strptime(args.date, "%Y-%m-%d").date() if args.date else datetime.now().date()
+    if args.date:
+        target_date = datetime.strptime(args.date, "%Y-%m-%d").date()
+        detection_date = target_date
+    else:
+        today = datetime.now().date()
+        target_date = today + timedelta(days=1)
+        detection_date = today
+    print(f"Forecast target date: {target_date} | Detection image date: {detection_date}")
 
     X, y, df, numeric_cols = load_and_prepare()
     weather_categories = set(df["weather_simple"].unique())
@@ -125,16 +138,15 @@ def main():
 
     by_hour = sp.build_predictor_map()
     local_tz = pytz.timezone(gc.LOCATION["timezone"])
-    dawn, dusk = gc.get_light_window(target_date, local_tz)
-    print(f"Real dawn/dusk for {target_date}: {dawn.strftime('%-I:%M %p')} - {dusk.strftime('%-I:%M %p')}")
-    day_hours = sorted(hk for hk in by_hour if hk.date() == target_date and dawn.hour <= hk.hour <= dusk.hour)
-    if not day_hours:
-        print(f"No forecast data available for {target_date} (outside the live today+tomorrow window).")
-        return
 
-    records = []
-    for hk in day_hours:
-        predictors = by_hour[hk]
+    def predict_for_hour(hk):
+        """Runs the fitted quantile models for one by_hour key. Shared by the
+        chart's day loop and the detection image's own-hour lookup below, so a
+        prediction for any hour in by_hour (today OR tomorrow, since DAYS=2)
+        is always computed the same way regardless of which date it's for."""
+        predictors = by_hour.get(hk)
+        if predictors is None:
+            return None
         feat_row = build_feature_row(hk, predictors, numeric_cols, weather_categories,
                                       train_mean, train_std, X_std.columns)
         q17 = max(0.0, float(q17_model.predict(feat_row)[0]))
@@ -150,11 +162,29 @@ def main():
         tide_ft = float(predictors.get("tide_ft", 0) or 0)
         energy_nearshore_kj = float(predictors.get("energy_nearshore_kj", 0) or 0)
         in_training_range = TRAINED_HOUR_MIN <= hk.hour <= TRAINED_HOUR_MAX
-        records.append(dict(hour=hk, point=point, q17=q17, q335=q335, q665=q665, q83=q83,
-                             weather_simple=weather_simple, is_night=is_night,
-                             tide_ft=tide_ft, energy_nearshore_kj=energy_nearshore_kj,
-                             in_training_range=in_training_range))
+        return dict(hour=hk, point=point, q17=q17, q335=q335, q665=q665, q83=q83,
+                    weather_simple=weather_simple, is_night=is_night,
+                    tide_ft=tide_ft, energy_nearshore_kj=energy_nearshore_kj,
+                    in_training_range=in_training_range)
 
+    def predict_nearest_hour(date_, hour, minute):
+        """Finds the by_hour key on date_ closest to hour:minute and predicts
+        for it — used for the detection image, whose crop time (e.g. 7:56)
+        won't exactly match an on-the-hour by_hour key."""
+        candidates = [hk for hk in by_hour if hk.date() == date_]
+        if not candidates:
+            return None
+        nearest = min(candidates, key=lambda hk: abs((hk.hour * 60 + hk.minute) - (hour * 60 + minute)))
+        return predict_for_hour(nearest)
+
+    dawn, dusk = gc.get_light_window(target_date, local_tz)
+    print(f"Real dawn/dusk for {target_date}: {dawn.strftime('%-I:%M %p')} - {dusk.strftime('%-I:%M %p')}")
+    day_hours = sorted(hk for hk in by_hour if hk.date() == target_date and dawn.hour <= hk.hour <= dusk.hour)
+    if not day_hours:
+        print(f"No forecast data available for {target_date} (outside the live today+tomorrow window).")
+        return
+
+    records = [r for r in (predict_for_hour(hk) for hk in day_hours) if r is not None]
     d = pd.DataFrame(records)
 
     fig = plt.figure(figsize=(14, 6.5), facecolor=BG_COLOR)
@@ -294,7 +324,7 @@ def main():
     latest_path = CHARTS_DIR / "latest.png"
     fig.savefig(latest_path, dpi=150, facecolor=fig.get_facecolor())
 
-    detection_capture = generate_detection_image(target_date, d)
+    detection_capture = generate_detection_image(detection_date, predict_nearest_hour)
     update_readme(target_date, detection_capture)
 
 
@@ -316,15 +346,17 @@ def find_nearest_hour_crop(target_date, target_hour=8):
     return None
 
 
-def generate_detection_image(target_date, day_predictions_df):
-    """Draws real detection boxes + confidence labels on the day's ~8am crop (the
-    actual production tiling/NMS/false-positive-filter pipeline via
+def generate_detection_image(detection_date, predict_nearest_hour):
+    """Draws real detection boxes + confidence labels on detection_date's ~8am
+    crop (the actual production tiling/NMS/false-positive-filter pipeline via
     detect_surfers.run_inference_with_boxes — not a simplified re-implementation),
-    with the model's predicted range/median for that same hour overlaid as text.
-    Skipped (not an error) if today's ~8am clip hasn't been captured/processed yet."""
-    row = find_nearest_hour_crop(target_date, target_hour=8)
+    with the model's own predicted range/median for that same hour (via
+    predict_nearest_hour, independent of whatever date the forecast chart is
+    for) overlaid as text. Skipped (not an error) if detection_date's ~8am
+    clip hasn't been captured/processed yet."""
+    row = find_nearest_hour_crop(detection_date, target_hour=8)
     if row is None:
-        print(f"No usable ~8am crop for {target_date} yet — skipping detection image.")
+        print(f"No usable ~8am crop for {detection_date} yet — skipping detection image.")
         return None
 
     img_path = ds.CROPS_DIR / row["filename"]
@@ -335,7 +367,7 @@ def generate_detection_image(target_date, day_predictions_df):
     # Draw boxes/labels on a copy, then alpha-blend back so they read as
     # translucent overlays rather than opaque marks on the surf photo.
     overlay = img.copy()
-    BOX_COLOR = (40, 40, 220)  # BGR — red
+    BOX_COLOR = (90, 227, 157)  # BGR — lime green (matches LIME "#9de35a")
     for x1, y1, x2, y2, conf in boxes:
         p1, p2 = (int(x1), int(y1)), (int(x2), int(y2))
         cv2.rectangle(overlay, p1, p2, BOX_COLOR, 2)
@@ -344,15 +376,13 @@ def generate_detection_image(target_date, day_predictions_df):
     BOX_ALPHA = 0.75
     img = cv2.addWeighted(overlay, BOX_ALPHA, img, 1 - BOX_ALPHA, 0)
 
-    # Model's predicted range/median for this exact hour, if it's in the already-
-    # computed day_predictions_df (it normally will be, since 8am is within the
-    # dawn-dusk window) — falls back to "not available" text rather than silently
-    # omitting it or computing something inconsistent from a different data source.
-    hh = int(row["time_local"].split(":")[0])
-    match = day_predictions_df[day_predictions_df["hour"].dt.hour == hh]
-    if len(match):
-        m = match.iloc[0]
-        pred_text = f"Predicted: {m['point']:.0f} (33% range {m['q335']:.0f}-{m['q665']:.0f})"
+    # Model's predicted range/median for this exact hour — looked up directly
+    # (not from a chart-date-scoped table), so it's correct even when the
+    # forecast chart is for a different date (e.g. tomorrow) than this image.
+    hh, mm = map(int, row["time_local"].split(":"))
+    pred_row = predict_nearest_hour(detection_date, hh, mm)
+    if pred_row is not None:
+        pred_text = f"Predicted: {pred_row['point']:.0f} (33% range {pred_row['q335']:.0f}-{pred_row['q665']:.0f})"
     else:
         pred_text = "Predicted range/median: not available for this hour"
 
@@ -371,7 +401,7 @@ def generate_detection_image(target_date, day_predictions_df):
     cv2.putText(canvas, pred_text, (8, h + 36), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (211, 211, 211), 1, cv2.LINE_AA)
     cv2.putText(canvas, legend_text, (8, h + 54), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (170, 170, 170), 1, cv2.LINE_AA)
 
-    dated_path = CHARTS_DIR / f"detection_{target_date.isoformat()}.png"
+    dated_path = CHARTS_DIR / f"detection_{detection_date.isoformat()}.png"
     cv2.imwrite(str(dated_path), canvas)
     latest_path = CHARTS_DIR / "latest_detection.png"
     cv2.imwrite(str(latest_path), canvas)

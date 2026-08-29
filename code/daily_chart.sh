@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # daily_chart.sh — Runs once a day via cron to generate the surfer-count
-# prediction chart for the current day (data/charts/surfer_count_YYYY-MM-DD.png).
+# prediction chart for tomorrow (data/charts/surfer_count_YYYY-MM-DD.png) plus
+# a detection-review image from today's own ~8am crop.
 #
 # Independent of local_pipeline.sh's twice-weekly clip-collection cron — this
 # only needs the live Surfline forecast + the already-trained model, not new
