@@ -112,6 +112,16 @@ Caveat: held-out MAE is ~6 surfers on a typical count of ~15, and the
 reported 80% prediction interval is empirically closer to a 65%
 interval — treat outputs as directional estimates, not precise counts.
 
+### Exploratory Findings
+
+Tide and weekend/weekday are the two strongest predictors of surfer count
+at this spot (see [`PROJECT_HISTORY.md`](PROJECT_HISTORY.md) for the full
+GBT permutation-importance breakdown). A closer look at the weekend effect:
+
+![Mean surfer count by month, weekday vs weekend](data/charts/one_off/weekday_weekend_by_month_2026-08-28.png)
+
+![Distribution of daily mean surfer counts, weekday vs weekend KDE](data/charts/one_off/weekday_weekend_kde_2026-08-28.png)
+
 ## Schedule
 
 `code/local_pipeline.sh` (clip collection + detection) and
