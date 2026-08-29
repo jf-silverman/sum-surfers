@@ -66,9 +66,23 @@ DETECTOR_RECALL = 0.80618  # = sensitivity
 # dawn time, only the coarse is_night flag, so it happily extrapolated).
 TRAINED_HOUR_MIN, TRAINED_HOUR_MAX = 5, 20
 
-WEATHER_COLORS = {"CLEAR": "#DDA43A", "CLOUDY_OVERCAST": "#7F8C8D", "RAIN": "#2E86AB", "FOG": "#95A5A6"}
+WEATHER_COLORS = {"CLEAR": "#f2c14e", "CLOUDY_OVERCAST": "#9aa0a6", "RAIN": "#4fa3d1", "FOG": "#c9c9c9"}
 WEATHER_MARKERS = {"CLEAR": "o", "CLOUDY_OVERCAST": "s", "RAIN": "^", "FOG": "D"}
 WEATHER_ABBREV = {"CLEAR": "clear", "CLOUDY_OVERCAST": "cloudy", "RAIN": "rain", "FOG": "fog"}
+
+# Dark theme — matches data/charts/one_off/weekday_weekend_*.png (aqua blue /
+# lime green on black), with a couple of complementary colors added for the
+# extra series this chart needs (wave-energy bars, tide line, warning hatches).
+BG_COLOR = "black"
+AXES_BG = "#111111"
+GRID_COLOR = "#333333"
+TEXT_COLOR = "white"
+MUTED_TEXT = "#bbbbbb"
+AQUA = "#3ab4c9"      # primary — median line / quantile bands
+LIME = "#9de35a"      # tide line
+AMBER = "#f2a950"     # wave-energy bars (complementary warm accent)
+CORAL = "#ff6f61"     # out-of-training-range warning hatch/labels
+NIGHT_COLOR = "#7a7aa8"  # night-hour shading
 READABLE_NAMES = {
     "tide_ft": "Tide", "hour_cos": "Time of day", "hour_sin": "Time of day",
     "is_weekend": "Weekend", "energy_nearshore_kj": "Wave energy (nearshore)",
@@ -144,10 +158,10 @@ def main():
 
     d = pd.DataFrame(records)
 
-    fig = plt.figure(figsize=(14, 6.5))
+    fig = plt.figure(figsize=(14, 6.5), facecolor=BG_COLOR)
     gs = fig.add_gridspec(1, 2, width_ratios=[3.2, 1], wspace=0.05)
-    ax = fig.add_subplot(gs[0])
-    ax_table = fig.add_subplot(gs[1])
+    ax = fig.add_subplot(gs[0], facecolor=AXES_BG)
+    ax_table = fig.add_subplot(gs[1], facecolor=AXES_BG)
 
     y_top = d["q83"].max() * 1.18
     ax.set_ylim(bottom=0, top=y_top)
@@ -155,25 +169,25 @@ def main():
     for _, row in d.iterrows():
         if row["is_night"]:
             ax.axvspan(row["hour"] - timedelta(minutes=30), row["hour"] + timedelta(minutes=30),
-                       facecolor="#2C3E50", alpha=0.08, hatch="//", edgecolor="#2C3E50", linewidth=0, zorder=0)
+                       facecolor=NIGHT_COLOR, alpha=0.20, hatch="//", edgecolor=NIGHT_COLOR, linewidth=0, zorder=0)
     for _, row in d.iterrows():
         if not row["in_training_range"]:
             ax.axvspan(row["hour"] - timedelta(minutes=30), row["hour"] + timedelta(minutes=30),
-                       facecolor="#B0413E", alpha=0.06, hatch="xx", edgecolor="#B0413E", linewidth=0, zorder=0)
+                       facecolor=CORAL, alpha=0.12, hatch="xx", edgecolor=CORAL, linewidth=0, zorder=0)
 
     bar_width = timedelta(minutes=22, seconds=30)
     energy_max = d["energy_nearshore_kj"].max()
     energy_scale = (y_top * 0.20) / energy_max if energy_max > 0 else 0
     bar_heights = d["energy_nearshore_kj"] * energy_scale
-    ax.bar(d["hour"], bar_heights, width=bar_width, color="#C97B3D", alpha=0.35,
+    ax.bar(d["hour"], bar_heights, width=bar_width, color=AMBER, alpha=0.45,
            zorder=1, label="Wave energy, nearshore (kJ)")
     for x, h, val in zip(d["hour"], bar_heights, d["energy_nearshore_kj"]):
         ax.annotate(f"{val:.0f}", (x, h), textcoords="offset points", xytext=(0, 2),
-                    ha="center", fontsize=6.5, color="#8A5623", rotation=90, va="bottom")
+                    ha="center", fontsize=6.5, color=AMBER, rotation=90, va="bottom")
 
-    ax.fill_between(d["hour"], d["q17"], d["q83"], color="#4C72B0", alpha=0.18, label="66% range")
-    ax.fill_between(d["hour"], d["q335"], d["q665"], color="#4C72B0", alpha=0.35, label="33% range")
-    ax.plot(d["hour"], d["point"], color="#1B3B6F", linewidth=2, zorder=3, label="Median")
+    ax.fill_between(d["hour"], d["q17"], d["q83"], color=AQUA, alpha=0.18, label="66% range")
+    ax.fill_between(d["hour"], d["q335"], d["q665"], color=AQUA, alpha=0.38, label="33% range")
+    ax.plot(d["hour"], d["point"], color=AQUA, linewidth=2.5, zorder=3, label="Median")
 
     for wx in ["CLEAR", "CLOUDY_OVERCAST", "RAIN", "FOG"]:
         sub = d[d["weather_simple"] == wx]
@@ -193,7 +207,7 @@ def main():
             label += "\n(no training\ndata this hour)"
         ax.annotate(label, (row["hour"], row["point"]), textcoords="offset points",
                     xytext=(0, 10), ha="center", fontsize=8,
-                    color="#B0413E" if not row["in_training_range"] else "#333333")
+                    color=CORAL if not row["in_training_range"] else MUTED_TEXT)
 
     seen_names, predictor_lines = [], []
     for feat in top_predictors.index:
@@ -210,37 +224,45 @@ def main():
         f"Surfer detector (YOLOv8s, train13 — actual training log): "
         f"precision {DETECTOR_PRECISION:.1%}, recall {DETECTOR_RECALL:.1%}"
     )
-    fig.text(0.5, 0.01, info_text, fontsize=8, ha="center", va="bottom", color="#333333")
+    fig.text(0.5, 0.01, info_text, fontsize=8, ha="center", va="bottom", color=MUTED_TEXT)
 
     ax2 = ax.twinx()
-    ax2.plot(d["hour"], d["tide_ft"], color="#1B998B", linestyle="--", linewidth=2, zorder=2, label="Tide (ft)")
-    ax2.set_ylabel("Tide (ft)", color="#1B998B")
-    ax2.tick_params(axis="y", colors="#1B998B")
+    ax2.set_facecolor(AXES_BG)
+    ax2.plot(d["hour"], d["tide_ft"], color=LIME, linestyle="--", linewidth=2, zorder=2, label="Tide (ft)")
+    ax2.set_ylabel("Tide (ft)", color=LIME)
+    ax2.tick_params(axis="y", colors=LIME)
     tide_pad = (d["tide_ft"].max() - d["tide_ft"].min()) * 0.15 or 0.5
     ax2.set_ylim(bottom=d["tide_ft"].min() - tide_pad, top=d["tide_ft"].max() + tide_pad)
     ax2.grid(False)
+    for spine in ax2.spines.values():
+        spine.set_color(GRID_COLOR)
 
-    ax.set_title(f"Predicted surfer count — {target_date.strftime('%A, %B %d, %Y')}")
-    ax.set_xlabel("Time")
-    ax.set_ylabel("Predicted surfer count")
+    ax.set_title(f"Predicted surfer count — {target_date.strftime('%A, %B %d, %Y')}", color=TEXT_COLOR)
+    ax.set_xlabel("Time", color=TEXT_COLOR)
+    ax.set_ylabel("Predicted surfer count", color=TEXT_COLOR)
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%-I %p"))
     ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+    ax.tick_params(axis="both", colors=TEXT_COLOR)
+    for spine in ax.spines.values():
+        spine.set_color(GRID_COLOR)
     for label in ax.get_xticklabels():
         label.set_rotation(0)
         label.set_ha("center")
 
-    night_patch = Patch(facecolor="#2C3E50", alpha=0.08, hatch="//", edgecolor="#2C3E50", label="Night hours")
+    night_patch = Patch(facecolor=NIGHT_COLOR, alpha=0.20, hatch="//", edgecolor=NIGHT_COLOR, label="Night hours")
     handles1, labels1 = ax.get_legend_handles_labels()
     handles2, labels2 = ax2.get_legend_handles_labels()
-    ax.legend(handles1 + handles2 + [night_patch], labels1 + labels2 + ["Night hours"],
-              loc="upper left", ncol=2, fontsize=8)
-    ax.grid(alpha=0.25)
+    legend = ax.legend(handles1 + handles2 + [night_patch], labels1 + labels2 + ["Night hours"],
+                        loc="upper left", ncol=2, fontsize=8, facecolor=AXES_BG, edgecolor=GRID_COLOR)
+    for text in legend.get_texts():
+        text.set_color(TEXT_COLOR)
+    ax.grid(alpha=0.25, color=GRID_COLOR)
 
     # Table panel: hour -> 33% range only (no median — Joel asked for range without
     # the point estimate here), rendered as part of the same figure/image rather than
     # a separate markdown table, so chart and table always render side by side.
     ax_table.axis("off")
-    ax_table.set_title("33% Range", fontsize=10, pad=10)
+    ax_table.set_title("33% Range", fontsize=10, pad=10, color=TEXT_COLOR)
     cell_text = [[row["hour"].strftime("%-I:%M %p"), f"{row['q335']:.0f}–{row['q665']:.0f}"]
                  for _, row in d.iterrows()]
     tbl = ax_table.table(cellText=cell_text, colLabels=["Time", "Range"],
@@ -249,25 +271,29 @@ def main():
     tbl.set_fontsize(9)
     tbl.scale(1, 1.35)
     for (r, c), cell in tbl.get_celld().items():
-        cell.set_edgecolor("#DDDDDD")
+        cell.set_edgecolor(GRID_COLOR)
         if r == 0:
-            cell.set_facecolor("#1B3B6F")
-            cell.set_text_props(color="white", weight="bold")
+            cell.set_facecolor(AQUA)
+            cell.set_text_props(color="black", weight="bold")
         elif r % 2 == 0:
-            cell.set_facecolor("#F2F4F8")
+            cell.set_facecolor("#1a1a1a")
+            cell.set_text_props(color=TEXT_COLOR)
+        else:
+            cell.set_facecolor(AXES_BG)
+            cell.set_text_props(color=TEXT_COLOR)
 
     fig.tight_layout(rect=[0, 0.06, 1, 1])
 
     CHARTS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = CHARTS_DIR / f"surfer_count_{target_date.isoformat()}.png"
-    fig.savefig(out_path, dpi=150)
+    fig.savefig(out_path, dpi=150, facecolor=fig.get_facecolor())
     print(f"Saved to {out_path}")
 
     # Stable, git-tracked path for the README embed — overwritten daily rather than
     # accumulating a new tracked file every day (the dated file above stays local/
     # untracked, matching the rest of data/'s convention).
     latest_path = CHARTS_DIR / "latest.png"
-    fig.savefig(latest_path, dpi=150)
+    fig.savefig(latest_path, dpi=150, facecolor=fig.get_facecolor())
 
     generate_detection_image(target_date, d)
     update_readme()
@@ -337,14 +363,14 @@ def generate_detection_image(target_date, day_predictions_df):
         f"Confidence threshold: {ds.CONF_THRESH:.3f} (boxes below this are dropped)."
     )
 
-    # White banner strip below the image so text never overlaps real image content.
+    # Black banner strip below the image so text never overlaps real image content.
     banner_h = 62
     h, w = img.shape[:2]
-    canvas = np.full((h + banner_h, w, 3), 255, dtype=np.uint8)
+    canvas = np.zeros((h + banner_h, w, 3), dtype=np.uint8)
     canvas[:h] = img
-    cv2.putText(canvas, detected_text, (8, h + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (30, 30, 30), 1, cv2.LINE_AA)
-    cv2.putText(canvas, pred_text, (8, h + 36), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (30, 30, 30), 1, cv2.LINE_AA)
-    cv2.putText(canvas, legend_text, (8, h + 54), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (90, 90, 90), 1, cv2.LINE_AA)
+    cv2.putText(canvas, detected_text, (8, h + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+    cv2.putText(canvas, pred_text, (8, h + 36), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+    cv2.putText(canvas, legend_text, (8, h + 54), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1, cv2.LINE_AA)
 
     dated_path = CHARTS_DIR / f"detection_{target_date.isoformat()}.png"
     cv2.imwrite(str(dated_path), canvas)
