@@ -399,8 +399,7 @@ def update_readme(target_date, detection_capture=None):
     if (CHARTS_DIR / "latest_detection.png").exists() and detection_capture is not None:
         capture_date, capture_time = detection_capture
         detection_block = (
-            f"## Yesterday's Surfer Detection Count\n\n"
-            f"_Image from: {capture_date}, {capture_time}_\n\n"
+            f"## Yesterday's Surfer Detection Count (Image from: {capture_date}, {capture_time})\n\n"
             f"![Latest detection review](data/charts/latest_detection.png)\n\n"
         )
 

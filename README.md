@@ -5,9 +5,7 @@ Automated surfer counting from Surfline clips.
 This project downloads short clips around daylight hours, extracts 3 cropped frames per clip (~1.5-3s apart), runs YOLOv8 inference on tiled images, and stores per-clip surfer counts averaged across those frames.
 
 <!-- DAILY_CHART_START -->
-## Yesterday's Surfer Detection Count
-
-_Image from: 2026-08-28, 07:56_
+## Yesterday's Surfer Detection Count (Image from: 2026-08-28, 07:56)
 
 ![Latest detection review](data/charts/latest_detection.png)
 
