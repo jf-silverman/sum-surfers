@@ -1431,3 +1431,56 @@ the untried alternative (motion/optical-flow-based candidate detection,
 since whitewater moves coherently with the wave while a surfer's head
 doesn't) in `model_and_feature_ideas.md` for future consideration — not
 attempted this round.
+
+### Round 2: tested (and disproved) the smooth-water hypothesis for the two-step approach (2026-08-30)
+
+Joel's hypothesis after round 1: the two-step method failed specifically
+because it was tested against whitewater (a structural conflict with the
+smoothness gate) — it should work on undercounts in smooth, non-
+whitewater water instead. Resumed both agents against real data to test
+this directly: the earlier 50-image human spot-check
+(`data/reviews/model_spotcheck_50/review_counts.csv`) has 12 rows where
+`my_count` (human) exceeds `model_count`, two of them large and
+explicitly noted as smooth water — `crop2026-08-03_10-02-00.jpg`
+(model=3, actual=30) and `crop2026-08-09_07-29-00.jpg` (model=19,
+actual=46) — plus several explicitly-textured/prone-surfer cases used as
+negative controls.
+
+Agent B (two-step) found and fixed a real methodological bug in its own
+evaluation first: its earlier predictions ran YOLO on in-memory arrays,
+but production always predicts from a written temp JPEG file, and the
+two give meaningfully different results on some tiles (one real example:
+7 boxes from an array vs 12 from the file). Fixed by routing every
+prediction through the same file round-trip production uses; re-verified
+baseline now reproduces `review_counts.csv`'s real `model_count` almost
+exactly, and the round-1 val-set conclusion held (F1 0.820 baseline vs.
+0.769 two-step, consistent with the original finding — not affected by
+the bug).
+
+**Result on the two flagship smooth-water cases: zero new boxes from
+two-step, on both.** An ablation with the smoothness gate fully disabled
+also produced zero rescued boxes — ruling out gating as the bottleneck.
+Raw inference at conf=0.05 (vs production 0.195) barely moved box counts
+(3→4, 23→25 pre-filter): the trained model simply never proposes a
+candidate at these locations, at any confidence, confirming this isn't a
+threshold or gating problem at all — in smooth water OR whitewater.
+Across the other 10 spot-check images, two-step did add boxes, but
+inspection showed the large majority (53 of ~57 new boxes) were
+duplicate sub-boxes landing inside an already-detected surfer's box, not
+real recoveries — a real risk of count inflation, not just a null
+result. Naive threshold-lowering (Agent A) showed the identical pattern
+on the same two flagship images (3→4 and 19→20 boxes against 30/46
+actual) — confirming this isn't specific to the candidate-blob method
+either.
+
+**Conclusion: the smooth-water hypothesis is disproved by direct test.**
+Water texture (whitewater vs. smooth) isn't the real differentiator —
+fog/low-contrast conditions appear to suppress the model's features on
+certain surfers regardless of background, a representation-level gap no
+inference-time threshold or candidate-region trick can fix. This raises
+the bar for the whole two-step research angle: a real fix likely needs
+better/more training data for foggy, low-contrast conditions (see
+`code/train_model.py`, the retraining path), not further inference-time
+engineering. Updated `model_and_feature_ideas.md`'s "Two-step
+candidate-then-verify detection" entry with the full round-2 numbers and
+verdict.
