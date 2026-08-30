@@ -1379,3 +1379,55 @@ directly. Both explicitly instructed not to modify the repo, not to
 retrain, not to commit, and to report only real computed numbers — no
 fabricated stats. Results pending as of this entry; will be logged here
 once both report back.
+
+### Two-step candidate-blob experiment results: dead end (2026-08-30)
+
+Both agents reported back with real numbers against the tiled val set
+(`data/cvat_out_coco/splits_tiled/val/`, 60 tiled images, real GT boxes).
+
+**Agent A (naive global threshold lower)**: precision/recall/F1 at
+several thresholds vs the production 0.195:
+
+| Threshold | Precision | Recall | F1 | FP | FN |
+|---|---|---|---|---|---|
+| 0.195 (production) | 0.863 | 0.802 | 0.831 | 38 | 59 |
+| 0.15 | 0.859 | 0.815 | 0.837 | 40 | 55 |
+| 0.12 | 0.844 | 0.819 | 0.831 | 45 | 54 |
+| 0.10 | 0.839 | 0.822 | 0.831 | 47 | 53 |
+
+Lowering the threshold to 0.10 buys back ~2 points of recall at the cost
+of a ~24% increase in false positives (38→47). On the real motivating
+frame (`crop2026-08-29_07-29-00.jpg`), box count barely moved (28→29 at
+conf=0.10) and the extra box did not land in the whitewater band — the
+model isn't suppressing candidates there even at conf=0.10, it's simply
+not proposing them.
+
+**Agent B (actual candidate-blob two-step)**: local-background-
+subtraction blob detection (median-blur background estimate, size-
+filtered 3-48px × 6-30px, local-smoothness-gated), YOLO rescan at
+conf=0.10 in flagged candidate windows, merged via the same production
+NMS. Real result: F1 0.819→0.762 (worse than baseline), recovering only
+**+1 true positive out of 356 real GT boxes** while adding 55 more false
+positives (62→117) — confirmed not a tuning artifact via a 5-point
+parameter sweep (best alternate config: F1=0.784, still below baseline).
+On the real frame: 4 extra boxes, all 2-7px (well under real surfer box
+size), none corresponding to an actual surfer on visual inspection —
+3 of 4 clustered near the known tree-bough false-positive zone.
+
+**Root cause, structural not tunable**: the candidate detector's premise
+— a missed surfer sits against a locally *smooth* background — directly
+contradicts the whitewater-band failure mode it was meant to fix.
+Whitewater is high-variance foam texture by definition, so the same
+smoothness gate that's supposed to exclude foam-texture false positives
+also excludes real surfers sitting in the foam. This is a structural
+mismatch, not a parameter-tuning problem — confirmed by the sweep finding
+no configuration came close to baseline F1.
+
+**Conclusion**: closing this angle for the whitewater-contrast problem.
+Both approaches (naive threshold, candidate-blob) cost meaningfully more
+false positives than the recall they buy back, and neither one recovers
+detections in the actual region that motivated the experiment. Logged
+the untried alternative (motion/optical-flow-based candidate detection,
+since whitewater moves coherently with the wave while a surfer's head
+doesn't) in `model_and_feature_ideas.md` for future consideration — not
+attempted this round.
