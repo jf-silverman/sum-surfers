@@ -1240,3 +1240,94 @@ gitignored data outputs). Nothing here was previously git-tracked except
 the two `weekday_weekend_*.png` files (moved with `git mv` to preserve
 history) and `README.md`'s references to them, which were updated to the
 new `analysis/weekday_weekend_patterns/` path.
+
+### New code/train_model.py replaces detect_surfers_v2.ipynb as the model-retraining path (2026-08-29)
+
+While investigating what's needed to rebuild the detector (see the
+`model_out/yolov8s.pt` path-mismatch finding above), decided the training
+notebook was better as a proper script — matches how the rest of the
+pipeline works, and makes it a real one-command entry point for whenever
+there's a new or larger CVAT annotation export to train on, rather than
+something to click through cell-by-cell.
+
+`code/train_model.py` reimplements the notebook's three real stages
+(COCO tiling, COCO→YOLO conversion, YOLO fine-tune + validation) as
+functions with a CLI. Two things it does differently from the notebook,
+both deliberate:
+
+- Tile dimensions (`TILE_W`/`TILE_H`/`STEP_X`/`NUM_TILES`) are imported
+  directly from `detect_surfers.py` instead of being re-hardcoded, so
+  training tiling can never silently drift out of sync with production
+  inference tiling the way two independent copies could.
+- Each run writes to fresh, dated output folders
+  (`cvat_out_coco/splits_tiled_<run-name>/`, `cvat_out_yolo_rebuilt_<run-name>/`,
+  `model_out/<run-name>/`) instead of overwriting the current production
+  training data/weights in place — refuses to proceed if a run-name's
+  output folders already exist, unless `--force` is passed. Nothing
+  production-facing changes until `MODEL_PATH` is manually pointed at the
+  new weights, after reviewing the printed validation metrics.
+
+Verified the tiling + COCO→YOLO conversion stages are correct by running
+them against the current `data/cvat_out_coco/splits/` export into a
+throwaway run-name and diffing the output against what's on disk today:
+tiled image/annotation counts matched exactly (128/60/40 images,
+1268/356/188 annotations, same as the notebook's original run), and a
+sample of generated YOLO label `.txt` files were byte-identical to the
+existing `cvat_out_yolo_rebuilt/labels/`. One real discrepancy found and
+fixed: the notebook's source cell wrote `data.yaml`'s class name as
+`'Surfer'`, but the actual file on disk today reads `'surfer'` (lowercase)
+— matched the script to the current on-disk convention rather than the
+stale notebook source (no functional effect either way, single-class
+model, purely a label string). Did not run the full training stage
+(would take real compute time for no additional verification value beyond
+what `ultralytics`'s own training loop already does).
+
+Also attempted to fix the `yolov8s.pt` path directly in the notebook's
+training cell via a notebook-editing tool — that stripped the cell's
+stored output, which was the *actual* historical training log (real
+per-epoch losses, model summary, final metrics — the source
+`plot_daily_prediction.py`'s `DETECTOR_PRECISION`/`DETECTOR_RECALL`
+constants cite as "actual training log"). Reverted immediately via
+`git checkout`; the notebook is untouched except its `docs/PROJECT_FILES.md`
+description being corrected to point future readers at `train_model.py`
+instead.
+
+`data/cvat_out_coco/splits/`, `cvat_out_coco/splits_tiled/`,
+`cvat_out_yolo_rebuilt/`, and `model_out/20251013/` are all currently
+git-tracked (864 files, ~184MB for `model_out/20251013/` alone) — an
+existing convention `train_model.py`'s future dated output folders would
+also follow if/when a retrained model is adopted, but nothing about
+committing new run folders is automatic; that stays a deliberate decision
+each time.
+
+### Fixed: README's detection image disappeared entirely between local_pipeline.sh runs (2026-08-29)
+
+Reported by Joel: the detection image was missing from the GitHub README.
+Root cause was the previous day's fix (forecast defaults to tomorrow,
+detection stays on today) — `find_nearest_hour_crop()` only ever searched
+`detection_date` itself (usually "today"). `local_pipeline.sh` runs twice
+a week, not daily, so on any day it hasn't run yet, no crop exists for
+"today" and the whole detection section vanished from README even though
+`data/charts/latest_detection.png` from a previous day was still sitting
+on disk, valid and useful.
+
+Fixed `find_nearest_hour_crop()` to search backward through up to 7 days
+before falling back to nothing, so it now always shows the most recent
+available detection image instead of disappearing between pipeline runs.
+Verified live: with `local_pipeline.sh` last run 2026-08-28, today's
+(2026-08-29) `plot_daily_prediction.py` run correctly fell back to and
+found the 8/28 crop.
+
+Caught and fixed two knock-on bugs while making this change:
+- The dated output filename used the search-anchor date
+  (`detection_date`) instead of the crop's actual date, so a
+  fallback would save as e.g. `detection_2026-08-29.png` while
+  containing an 8/28 image. Now named from the row's real `date`.
+- The "Predicted: ..." text's live-forecast lookup
+  (`predict_nearest_hour`) was also keyed on the search-anchor date
+  rather than the crop's actual date — on a fallback to a past day, it
+  would have silently shown *today's* live forecast prediction next to
+  an *older* day's detection image, a real mismatch. Now keyed on the
+  crop's actual date; correctly prints "not available for this hour"
+  when that date has no live forecast entry (as any past date won't),
+  rather than showing a wrong number.

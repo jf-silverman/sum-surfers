@@ -328,35 +328,47 @@ def main():
     update_readme(target_date, detection_capture)
 
 
-def find_nearest_hour_crop(target_date, target_hour=8):
-    """Finds the predictions.csv row for target_date closest to target_hour (default
-    8am) with quality_ok=True and a crop image still on disk. Returns the row dict, or
-    None if no usable row exists for that date (e.g. the hour hasn't happened yet)."""
+def find_nearest_hour_crop(target_date, target_hour=8, lookback_days=7):
+    """Finds the predictions.csv row closest to target_hour on the most recent date
+    at or before target_date (searching back up to lookback_days) with quality_ok=True
+    and a crop image still on disk. Falls back to earlier dates rather than returning
+    None outright -- local_pipeline.sh runs twice a week, not daily, so target_date
+    itself (usually "today") frequently has no crop yet; without the fallback, the
+    README's detection image would disappear entirely between runs instead of just
+    showing the most recent one available. Returns the row dict, or None only if
+    nothing usable exists anywhere in the lookback window."""
     with open(ds.PREDS_CSV, newline="") as f:
-        rows = [r for r in csv.DictReader(f) if r["date"] == target_date.isoformat() and r["quality_ok"] == "True"]
-    if not rows:
-        return None
+        all_rows = list(csv.DictReader(f))
+
     def hour_distance(r):
         h, m = map(int, r["time_local"].split(":"))
         return abs((h * 60 + m) - target_hour * 60)
-    rows.sort(key=hour_distance)
-    for r in rows:
-        if (ds.CROPS_DIR / r["filename"]).exists():
-            return r
+
+    for days_back in range(lookback_days + 1):
+        check_date = target_date - timedelta(days=days_back)
+        rows = [r for r in all_rows if r["date"] == check_date.isoformat() and r["quality_ok"] == "True"]
+        rows.sort(key=hour_distance)
+        for r in rows:
+            if (ds.CROPS_DIR / r["filename"]).exists():
+                return r
     return None
 
 
 def generate_detection_image(detection_date, predict_nearest_hour):
-    """Draws real detection boxes + confidence labels on detection_date's ~8am
-    crop (the actual production tiling/NMS/false-positive-filter pipeline via
-    detect_surfers.run_inference_with_boxes — not a simplified re-implementation),
-    with the model's own predicted range/median for that same hour (via
-    predict_nearest_hour, independent of whatever date the forecast chart is
-    for) overlaid as text. Skipped (not an error) if detection_date's ~8am
-    clip hasn't been captured/processed yet."""
+    """Draws real detection boxes + confidence labels on the most recent ~8am
+    crop at or before detection_date (the actual production tiling/NMS/false-
+    positive-filter pipeline via detect_surfers.run_inference_with_boxes —
+    not a simplified re-implementation), with the model's own predicted
+    range/median for that same hour (via predict_nearest_hour, independent
+    of whatever date the forecast chart is for) overlaid as text.
+    find_nearest_hour_crop falls back to earlier dates (local_pipeline.sh
+    runs twice a week, not daily, so detection_date itself — usually
+    "today" — frequently has no crop yet) rather than skipping outright, so
+    this only returns None if nothing usable exists within its lookback
+    window at all."""
     row = find_nearest_hour_crop(detection_date, target_hour=8)
     if row is None:
-        print(f"No usable ~8am crop for {detection_date} yet — skipping detection image.")
+        print(f"No usable ~8am crop found at or before {detection_date} — skipping detection image.")
         return None
 
     img_path = ds.CROPS_DIR / row["filename"]
@@ -379,8 +391,14 @@ def generate_detection_image(detection_date, predict_nearest_hour):
     # Model's predicted range/median for this exact hour — looked up directly
     # (not from a chart-date-scoped table), so it's correct even when the
     # forecast chart is for a different date (e.g. tomorrow) than this image.
+    # Uses row["date"] (the crop's actual date, which find_nearest_hour_crop
+    # may have fallen back to an earlier day than detection_date) rather than
+    # detection_date itself -- by_hour only covers today+tomorrow's live
+    # forecast, so a past fallback date correctly comes back "not available"
+    # instead of silently showing a different day's predicted range.
+    row_date = datetime.strptime(row["date"], "%Y-%m-%d").date()
     hh, mm = map(int, row["time_local"].split(":"))
-    pred_row = predict_nearest_hour(detection_date, hh, mm)
+    pred_row = predict_nearest_hour(row_date, hh, mm)
     if pred_row is not None:
         pred_text = f"Predicted: {pred_row['point']:.0f} (33% range {pred_row['q335']:.0f}-{pred_row['q665']:.0f})"
     else:
@@ -401,7 +419,7 @@ def generate_detection_image(detection_date, predict_nearest_hour):
     cv2.putText(canvas, pred_text, (8, h + 36), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (211, 211, 211), 1, cv2.LINE_AA)
     cv2.putText(canvas, legend_text, (8, h + 54), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (170, 170, 170), 1, cv2.LINE_AA)
 
-    dated_path = CHARTS_DIR / f"detection_{detection_date.isoformat()}.png"
+    dated_path = CHARTS_DIR / f"detection_{row_date.isoformat()}.png"
     cv2.imwrite(str(dated_path), canvas)
     latest_path = CHARTS_DIR / "latest_detection.png"
     cv2.imwrite(str(latest_path), canvas)

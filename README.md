@@ -5,6 +5,10 @@ Automated surfer counting from Surfline clips.
 This project downloads short clips around daylight hours, extracts 3 cropped frames per clip (~1.5-3s apart), runs YOLOv8 inference on tiled images, and stores per-clip surfer counts averaged across those frames.
 
 <!-- DAILY_CHART_START -->
+## A Recent Surfer Detection Count: Friday, August 28, 2026, 7:56 AM
+
+![Latest detection review](data/charts/latest_detection.png)
+
 ## The Surfer Crowd Forecast for: Sunday, August 30, 2026
 
 ![Latest daily prediction chart](data/charts/latest.png)
