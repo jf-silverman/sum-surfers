@@ -1331,3 +1331,26 @@ Caught and fixed two knock-on bugs while making this change:
   crop's actual date; correctly prints "not available for this hour"
   when that date has no live forecast entry (as any past date won't),
   rather than showing a wrong number.
+
+### Real human count vs. detector: 49 actual vs. 27/28 detected on a foggy frame (2026-08-29)
+
+Joel was in the water at ~7:30am on 2026-08-29 and asked for a detection
+image to compare against his own count. Pulled the nearest real clip
+(7:29am), ran it through the actual production crop + detect pipeline
+(not a simplified version), and got 28 surfers on the primary frame /
+27 on the production 3-frame average (`crop2026-08-29_07-29-00.jpg`).
+Joel counted 49 in the same (somewhat foggy) image. Recorded 49 as
+`human_count` on that row in `predictions.csv`.
+
+Zoomed into the raw crop vs. the boxed version to see where the gap came
+from: surfers sitting further out in flatter water were mostly boxed
+correctly, but a whole line of small dark figures sitting in or right
+against the whitewater/breaking-wave foam had almost no boxes on them —
+a visually clear, consistent pattern across the width of the frame, not
+scattered/random misses. Logged as a new open item in `bugs.md`, linked
+to the existing "two-step candidate-then-verify detection" feature idea
+in `model_and_feature_ideas.md` (lower confidence threshold specifically
+in candidate-blob regions) — this is a concrete real example of exactly
+the failure mode that idea was meant to address. Single data point so
+far; worth checking whether the pattern holds on other foggy/whitewater-
+heavy frames before investing in a fix.
