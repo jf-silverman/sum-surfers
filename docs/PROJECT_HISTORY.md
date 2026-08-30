@@ -1354,3 +1354,28 @@ in candidate-blob regions) — this is a concrete real example of exactly
 the failure mode that idea was meant to address. Single data point so
 far; worth checking whether the pattern holds on other foggy/whitewater-
 heavy frames before investing in a fix.
+
+### Refined the 2026-08-29 undercount breakdown; started a two-agent blob-detection experiment (2026-08-30)
+
+Joel refined the miss breakdown on `crop2026-08-29_07-29-00.jpg`: of the
+gap between 27/28 detected and 49 actual, 7 were missed in the
+whitewater band and 9 were missed in flatter water above it — all 9
+prone (lying flat, paddling), a distinct failure mode from the
+whitewater-contrast one. Logged the posture-classification idea
+separately in `model_and_feature_ideas.md` (filed under Feature Ideas,
+not Model Ideas, since it's about the detector — Model Ideas in that doc
+is specifically the count-*prediction* model).
+
+Started two background agents to evaluate the "two-step candidate-then-
+verify detection" idea from `model_and_feature_ideas.md` — Agent A
+establishes the naive-baseline cost of just globally lowering
+`CONF_THRESH` (real precision/recall/F1 at 0.10/0.12/0.15 vs the current
+0.195, on the real tiled val set at `data/cvat_out_coco/splits_tiled/val/`);
+Agent B implements and evaluates the actual candidate-blob approach
+(classical CV blob detection for dark-blob-on-smooth-background
+candidates, then a targeted lower-threshold YOLO rescan only in those
+regions), same real val set, same metrics, so the two can be compared
+directly. Both explicitly instructed not to modify the repo, not to
+retrain, not to commit, and to report only real computed numbers — no
+fabricated stats. Results pending as of this entry; will be logged here
+once both report back.
