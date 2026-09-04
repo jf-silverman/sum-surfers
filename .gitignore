@@ -20,6 +20,7 @@ data/reviews/count_60sec_var/
 analysis/frame_timing_variability/frame_variability_analysis.csv
 analysis/frame_timing_variability/frame_variability_analysis_summary.png
 analysis/frame_timing_variability/hourly_60sec_counts_2026-08-27.png
+analysis/frame_timing_variability/human_validation_results.csv
 analysis/hourly_variability_8to9am/hourly_variability_analysis.csv
 analysis/hourly_variability_8to9am/hourly_variability_full.csv
 analysis/hourly_variability_8to9am/hourly_full_counts_2026-08-28.png

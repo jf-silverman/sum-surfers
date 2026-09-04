@@ -1550,3 +1550,42 @@ above:
   reran `plot_daily_prediction.py` directly to confirm the broadened
   `fetch()` exception handling doesn't break the normal (network-up)
   path.
+
+### Human validation of frame-spacing accuracy (2026-09-04)
+
+Joel filled in `data/reviews/count_60sec_var/review_counts.csv` with real
+counts (70 usable points across 7 clips; the 8th, `05_50`, was fogged
+throughout with lens condensation, unusable) and added a `notes` column.
+This was the pending piece from the 2026-08-28 frame-timing variability
+study — that study found wider-spread frame averaging cut the detector's
+own noise, but only measured self-consistency (stdev), not real accuracy.
+
+Wrote `analysis/frame_timing_variability/validate_against_human_counts.py`,
+matching Joel's human counts against the model's already-computed
+per-second counts (`frame_variability_analysis.csv` has every second
+0-62 for all 14 clips) for several real frame-selection strategies —
+real numbers, no re-running detection needed:
+
+| Strategy | MAE | Bias | RMSE | std(err) |
+|---|---|---|---|---|
+| single frame | 1.24 | -0.36 | 1.74 | 1.72 |
+| k=3, tight (~2s, today's production) | 1.18 | -0.45 | 1.54 | 1.49 |
+| k=3, spread (30s) | 1.14 | -0.35 | 1.54 | 1.51 |
+| k=5, spread (30s) | 1.12 | -0.40 | 1.51 | 1.47 |
+| k=5, wide (58s) | 1.30 | -0.39 | 1.60 | 1.56 |
+| k=10, wide (58s) | 1.20 | -0.38 | 1.49 | 1.45 |
+
+**Real finding: every strategy undercounts by roughly the same amount
+(~0.35-0.45 mean bias) regardless of averaging window — wider/more-frame
+averaging mainly reduces variance (std(err) 1.72→1.45-1.56), not the
+systematic bias.** This is the expected statistical behavior (averaging
+narrows spread around a mean, it doesn't move the mean toward truth) but
+is a real, direct answer to the open question: the accuracy gain from
+wider spread is real but modest (best MAE 1.12 vs. single-frame 1.24,
+~10%), and going wider than ~30s stops helping (k=5@58s is worse than
+single-frame on MAE, though still lower std(err)). Logged full numbers
+and the practical takeaway (worth a modest default change, but doesn't
+fix the underlying undercount bias — that needs the model-side fixes
+already logged, not frame-averaging tuning) in
+`model_and_feature_ideas.md`. n=70 across 7 clips — real but modest
+sample size, numbers are directional.
