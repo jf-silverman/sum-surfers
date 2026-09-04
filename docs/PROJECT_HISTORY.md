@@ -1484,3 +1484,43 @@ better/more training data for foggy, low-contrast conditions (see
 engineering. Updated `model_and_feature_ideas.md`'s "Two-step
 candidate-then-verify detection" entry with the full round-2 numbers and
 verdict.
+
+### Found and fixed why GitHub stopped updating: an uncaught network exception silently killed a whole daily_chart.sh run (2026-09-03)
+
+Joel noticed GitHub hadn't been updating. `git log` showed local and
+origin were actually in sync as of the 2026-09-02 auto-commit — so it
+wasn't a push failure. Diffing `data/daily_chart.log`'s
+"starting"/"complete" markers across recent days found the real gap: the
+2026-08-31 19:00 run crashed with an uncaught
+`requests.exceptions.ConnectionError` (DNS resolution failure —
+`services.surfline.com` unreachable, machine likely offline/asleep at
+that exact moment) and never got anywhere near its git commit/push step,
+because `get_surf_predictors.py`'s `build_predictor_map()` only caught
+`requests.exceptions.HTTPError` around each Surfline endpoint fetch —
+and `ConnectionError` is a sibling exception, not a subclass of
+`HTTPError` (verified directly: `issubclass(ConnectionError, HTTPError)`
+is `False`; `issubclass(ConnectionError, RequestException)` is `True`).
+So a transient network hiccup propagated all the way up through
+`main()` uncaught, and `daily_chart.sh`'s `set -e` killed the whole
+script right there — no chart, no README update, no log marker beyond a
+raw traceback, and no alert of any kind (unlike `get_clips.py`'s
+auth-failure email pattern). Runs on 09-01 and 09-02 succeeded normally
+afterward, so this was a single silently-skipped day, not an ongoing
+failure — but a real gap with no visibility until someone happened to
+check the log.
+
+Fixed `build_predictor_map()`'s except clause to catch the broader
+`requests.exceptions.RequestException` (matches the pattern
+`fetch_openmeteo_forecast()`'s error handling already used, a few lines
+below — that one was already correct). Also hardened `daily_chart.sh`
+itself: wrapped the python invocation so a future failure of any kind
+logs an explicit grep-able `ERROR: ... chart NOT generated` line instead
+of silently dying via `set -e` with nothing but a bare traceback —
+directly informed by how much manual log-diffing it took to find this
+one. Verified the fix is real (not just plausible) by checking the
+exception hierarchy directly, then ran `daily_chart.sh` manually to
+confirm it completes normally and catches GitHub up immediately rather
+than waiting for tonight's cron — pushed successfully
+(`e83fd5a`, forecast for 2026-09-04). Detection image still shows
+2026-09-01 (last local_pipeline.sh success) — expected, not a bug; the
+twice-weekly clip cron was due to run later that same evening.

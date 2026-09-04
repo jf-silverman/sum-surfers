@@ -235,7 +235,14 @@ def build_predictor_map():
         params = {"spotId": SPOT_ID, "days": str(DAYS), "intervalHours": "1"}
         try:
             responses[path] = fetch(path, params)
-        except requests.exceptions.HTTPError as e:
+        except requests.exceptions.RequestException as e:
+            # Broad exception type deliberately -- catches HTTPError (bad response)
+            # AND ConnectionError/Timeout/etc. (network down, DNS failure, ...).
+            # A narrower except HTTPError here let a real DNS-resolution failure
+            # (machine offline at cron time) propagate uncaught through main() and
+            # crash the whole daily_chart.sh run before it ever reached its git
+            # commit/push step -- no chart, no README update, no error surfaced
+            # anywhere. See docs/PROJECT_HISTORY.md's 2026-09-03 entry.
             print(f"  WARNING: {path} fetch failed ({e}), continuing without it")
             responses[path] = []
     by_hour = merge_into_by_hour({}, **responses)

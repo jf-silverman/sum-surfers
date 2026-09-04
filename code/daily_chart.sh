@@ -40,7 +40,17 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
 log "=== Daily chart generation starting ==="
 cd "$PROJECT_ROOT"
-"$PYTHON" code/plot_daily_prediction.py
+if ! "$PYTHON" code/plot_daily_prediction.py; then
+    # set -e would otherwise kill the script right here with nothing but a raw
+    # traceback in the log and no "complete" marker -- happened for real on
+    # 2026-08-31 (an uncaught network error crashed the whole run before it
+    # ever reached the git commit/push section below, silently skipping that
+    # day's chart/README update with no alert). This explicit marker makes a
+    # future failure grep-able instead of requiring a manual timestamp diff
+    # across the whole log to even notice a day was skipped.
+    log "ERROR: plot_daily_prediction.py failed (see traceback above) — chart NOT generated, README NOT updated this run."
+    exit 1
+fi
 
 # Auto-commit + push the updated chart/table/README — approved by Joel 2026-08-28
 # specifically so the latest chart is visible on GitHub without a manual step.
