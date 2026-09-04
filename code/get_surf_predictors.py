@@ -115,7 +115,16 @@ def fetch(path, params, headers=None, retries=3):
             )
             r.raise_for_status()
             return r.json()["data"][path]
-        except requests.exceptions.HTTPError as e:
+        except requests.exceptions.RequestException as e:
+            # Broad exception type deliberately -- was `HTTPError` (only a bad
+            # HTTP response, e.g. 404/500), which meant these retries never
+            # actually fired for a real connectivity failure (DNS down, no
+            # network, timeout): requests.get() itself raises ConnectionError
+            # or Timeout, sibling exceptions HTTPError doesn't catch, so the
+            # very first attempt would propagate immediately with 0 of the
+            # intended `retries` actually attempted. See docs/PROJECT_HISTORY.md's
+            # 2026-09-03 entry (same root-cause bug as build_predictor_map()'s
+            # except clause, found the same day).
             last_exc = e
             time.sleep(2 * (attempt + 1))
     raise last_exc

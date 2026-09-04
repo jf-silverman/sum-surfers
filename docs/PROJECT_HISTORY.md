@@ -1524,3 +1524,29 @@ than waiting for tonight's cron — pushed successfully
 (`e83fd5a`, forecast for 2026-09-04). Detection image still shows
 2026-09-01 (last local_pipeline.sh success) — expected, not a bug; the
 twice-weekly clip cron was due to run later that same evening.
+
+### Added retry-with-backoff so a short home-internet outage recovers same-evening (2026-09-03)
+
+Joel confirmed the 2026-08-31 outage was his home internet being down,
+and asked for resilience to that specific case rather than only relying
+on the next day's cron. Two more fixes, same root cause as the one
+above:
+
+- `get_surf_predictors.py`'s `fetch()` already had a 3-attempt retry
+  loop, but it had the identical narrow-exception bug —
+  `except requests.exceptions.HTTPError` doesn't catch the
+  `ConnectionError`/`Timeout` a real connectivity failure raises, so the
+  retries never actually fired; the first attempt would propagate
+  immediately. Broadened to `RequestException`, verified the same way
+  (`issubclass(ConnectionError, RequestException)` is `True`).
+- `daily_chart.sh` now retries the whole `plot_daily_prediction.py`
+  invocation up to 4 times with increasing delays (0, 5, 15, 30 min —
+  ~50 min total window) before giving up for the day. A short-to-medium
+  home-internet blip (the common case) now recovers within the same
+  evening instead of waiting a full 24h for the next scheduled run;
+  longer outages still fall back to that next-day retry as before, no
+  regression there. Verified the bash retry/break logic in isolation
+  with a simulated fail-fail-succeed sequence before trusting it, and
+  reran `plot_daily_prediction.py` directly to confirm the broadened
+  `fetch()` exception handling doesn't break the normal (network-up)
+  path.

@@ -40,7 +40,31 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
 log "=== Daily chart generation starting ==="
 cd "$PROJECT_ROOT"
-if ! "$PYTHON" code/plot_daily_prediction.py; then
+
+# Retry with increasing delays before giving up for the day -- added 2026-09-03
+# after a real home-internet outage at cron time (2026-08-31) caused a single
+# failed attempt to silently skip the whole day (the next scheduled run, 24h
+# later, was the only recovery). A short-to-medium outage (the common case for
+# a home internet blip) now gets retried within the same evening instead of
+# waiting a full day. Delays: 0, 5, 15, 30 min (~50 min total window). If the
+# outage outlasts that, tomorrow's cron still picks it up as before -- this
+# doesn't replace that, just covers the shorter, more common case too.
+RETRY_DELAYS_MIN=(0 5 15 30)
+generation_ok=false
+for delay in "${RETRY_DELAYS_MIN[@]}"; do
+    if [[ "$delay" -gt 0 ]]; then
+        log "Retrying in ${delay} minute(s)..."
+        sleep "$((delay * 60))"
+    fi
+    if "$PYTHON" code/plot_daily_prediction.py; then
+        generation_ok=true
+        break
+    else
+        log "WARNING: plot_daily_prediction.py failed (see traceback above)."
+    fi
+done
+
+if [[ "$generation_ok" != true ]]; then
     # set -e would otherwise kill the script right here with nothing but a raw
     # traceback in the log and no "complete" marker -- happened for real on
     # 2026-08-31 (an uncaught network error crashed the whole run before it
@@ -48,7 +72,7 @@ if ! "$PYTHON" code/plot_daily_prediction.py; then
     # day's chart/README update with no alert). This explicit marker makes a
     # future failure grep-able instead of requiring a manual timestamp diff
     # across the whole log to even notice a day was skipped.
-    log "ERROR: plot_daily_prediction.py failed (see traceback above) — chart NOT generated, README NOT updated this run."
+    log "ERROR: plot_daily_prediction.py failed on all ${#RETRY_DELAYS_MIN[@]} attempts — chart NOT generated, README NOT updated this run. Tomorrow's scheduled run will try again."
     exit 1
 fi
 
