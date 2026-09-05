@@ -66,14 +66,8 @@ for a map of what every file in this repo is for.
 - `code/backfill_historical_predictors.py`
   - Manual, one-off script (not run by `local_pipeline.sh`) that backfills
     the same predictor fields for past dates, using Surfline's historical
-    API with a personal account session token. See the script's docstring
-    for usage and safety notes before running it.
-- `code/backfill_predictors_from_har.py`
-  - Manual, one-off script: an alternative to the token-based backfill,
-    parsing HAR files exported from clicking through Surfline's own
-    Historical view instead of making live requests. Cannot get
-    `weather_condition`/`temperature_f`/`pressure_mb`/`consistency_wave_count`
-    (the Historical view never fetches those) — see the script's docstring.
+    API. See the script's docstring for usage and safety notes before
+    running it.
 - `code/manage_clips.py`
   - Emails a warning if local clip storage exceeds `CLIPS_DIR_LIMIT_GB`.
 - `code/send_email.py`

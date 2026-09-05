@@ -1589,3 +1589,13 @@ fix the underlying undercount bias — that needs the model-side fixes
 already logged, not frame-averaging tuning) in
 `model_and_feature_ideas.md`. n=70 across 7 clips — real but modest
 sample size, numbers are directional.
+
+### Removed the HAR-based predictor backfill script (2026-09-05)
+
+Removed `code/backfill_predictors_from_har.py` — the HAR-parsing
+alternative to `backfill_historical_predictors.py`'s token-based live
+requests. Not used in practice; `backfill_historical_predictors.py`
+covers the same real need. Also dropped the "personal account session
+token" detail from README.md and PROJECT_FILES.md's descriptions of
+`backfill_historical_predictors.py` — public docs don't need to spell
+out exactly what kind of credential a manual one-off script uses.
