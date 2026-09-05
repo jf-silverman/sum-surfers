@@ -165,10 +165,12 @@ def coco_to_yolo(coco_tiled_dir, yolo_dir):
         (yolo_dir / "labels" / split).mkdir(parents=True, exist_ok=True)
 
     counts = {}
+    categories_by_split = {}
     for split in SPLITS:
         json_path = coco_tiled_dir / f"instances_{split}.json"
         with open(json_path) as f:
             coco_data = json.load(f)
+        categories_by_split[split] = coco_data.get("categories", [])
 
         id_to_info = {img["id"]: img for img in coco_data["images"]}
         img_to_anns = {img_id: [] for img_id in id_to_info}
@@ -197,12 +199,33 @@ def coco_to_yolo(coco_tiled_dir, yolo_dir):
         counts[split] = copied
         print(f"  {split}: {copied} images + labels -> {yolo_dir}")
 
+    # nc/names come from the COCO categories actually present in the export
+    # (sorted by id) rather than being hardcoded, so a future export with
+    # multiple classes (e.g. real posture classes, see docs/model_and_feature_ideas.md)
+    # is picked up automatically -- category_id - 1 above already assumes
+    # contiguous ids starting at 1, so this just has to match that. All three
+    # splits' categories lists must agree (same label set); mismatched splits
+    # would mean a broken/inconsistent CVAT export, not something to silently
+    # paper over.
+    all_categories = [categories_by_split[s] for s in SPLITS if categories_by_split[s]]
+    if not all_categories:
+        raise ValueError("No 'categories' found in any instances_{split}.json -- malformed COCO export")
+    first = all_categories[0]
+    for split, cats in zip(SPLITS, all_categories):
+        if cats != first:
+            raise ValueError(
+                f"categories mismatch between splits (e.g. {SPLITS[0]} vs {split}) -- "
+                f"CVAT export is inconsistent, fix the export before training"
+            )
+    names = [c["name"] for c in sorted(first, key=lambda c: c["id"])]
+    nc = len(names)
+
     data_yaml = f"""train: {yolo_dir}/images/train
 val: {yolo_dir}/images/val
 test: {yolo_dir}/images/test
 
-nc: 1
-names: ['surfer']
+nc: {nc}
+names: {names!r}
 """
     (yolo_dir / "data.yaml").write_text(data_yaml)
     print(f"  wrote {yolo_dir / 'data.yaml'}")

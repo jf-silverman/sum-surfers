@@ -1599,3 +1599,47 @@ covers the same real need. Also dropped the "personal account session
 token" detail from README.md and PROJECT_FILES.md's descriptions of
 `backfill_historical_predictors.py` — public docs don't need to spell
 out exactly what kind of credential a manual one-off script uses.
+
+### Training-data-expansion plan: Phases 1 and 3 implemented (2026-09-05)
+
+Started implementing the training-data-expansion plan (see
+`/Users/jfs-m3/.claude/plans/dazzling-rolling-lemon.md` for the full
+plan — the current CVAT-labeled set is only 57 images from 5 days in
+Jul-Aug 2025, zero overlap with the actual automated pipeline or any
+2026 data, which is the real root cause behind several accuracy findings
+logged this month).
+
+**Phase 3 (`train_model.py` multi-class readiness)**: `coco_to_yolo()`'s
+`data.yaml` template hardcoded `nc: 1` / `names: ['surfer']`; now derives
+both from the COCO export's actual `categories` list (sorted by id),
+with a hard error if the three splits' category lists don't agree (an
+inconsistent CVAT export, not something to silently paper over). Ready
+for a future multi-class (e.g. posture) export with no further code
+changes. Regression-tested against the current single-class export:
+`nc: 1` / `names: ['Surfer']` (note: correctly reflects the COCO json's
+actual capitalized name now, vs. the old hardcode's lowercase `'surfer'`
+— purely cosmetic, no functional effect on a single-class model), and
+tiled counts still match exactly (128/60/40 images, 1268/356/188
+annotations) — no regression in tiling/conversion.
+
+**Phase 1 (`code/select_labeling_candidates.py`)**: produces
+`analysis/training_data_expansion/labeling_candidates.csv`, combining
+an error-driven tier (top 15 of 38 usable `model_spotcheck_50` rows by a
+count-weighted score, `|pct_diff| x human_count` — capping was needed
+because uncapped, all 38 usable rows got included regardless of how
+small the miss was, starving the gap-fill tier) with a gap-fill tier (42
+images sampled from `training_features.csv`, quota-weighted to
+oversample underrepresented months/tide-tails/high-count/RAIN-FOG
+buckets, excluding anything already in the current CVAT export). Real
+run output: 57 total candidates (matching the existing set's size, per
+Joel's scope call), months 3/5/7/8/10/11/12 represented (vs. only Jul/Aug
+in the current CVAT set), count buckets roughly balanced (11/13/11/10/12
+across the 5 buckets vs. the full corpus's heavy skew toward low counts),
+tide tails and FOG/RAIN meaningfully oversampled relative to their real
+base rates. Every one of the 57 candidate filenames verified to exist on
+disk. Output CSV is a starting shortlist for Joel to review/prune before
+CVAT upload, not an auto-decision.
+
+Phases 2 (posture attribute + retro-tagging the existing 57), 4 (merge +
+stratified re-split), and 5 (retrain + evaluate) remain — 2 and part of 4
+depend on Joel's manual CVAT labeling pass.
