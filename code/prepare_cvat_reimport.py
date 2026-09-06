@@ -96,20 +96,33 @@ def main():
     print(f"Zipped to {OUT_ZIP}")
 
     print(f"""
-=== Next steps in CVAT ===
-1. Create a new CVAT task (e.g. "sum-surfers-relabel-2026-09") and upload
-   the {len(merged['images'])} images from {images_out_dir} as its data.
-2. In the task, add a label attribute to the existing "Surfer" label:
-   name "posture", type "select" (radio/dropdown), values:
-   standing, sitting, prone, unknown.
-3. Import the existing boxes: Task menu -> Actions -> Upload annotations
-   -> format "COCO 1.0" -> select {OUT_ZIP.name}. This brings in all
-   {len(merged['annotations'])} existing boxes without redrawing them.
-4. Go through each image and set the posture attribute on each box
+=== Next steps in CVAT (verified against docs.cvat.ai + the current Online
+    pricing page, 2026-09-05 -- free tier: 1 project / 3 tasks / 1GB) ===
+1. Create a Project first (e.g. "sum-surfers") -- labels + their attributes
+   live at the project level and are inherited by every task under it,
+   which matters since you'll likely make a second task later for the new
+   gap-fill/error-candidate images (Phase 1's labeling_candidates.csv) and
+   want the same "posture" attribute available there too, without
+   redefining it. Free tier allows 1 project / 3 tasks total, so this
+   fits with room to spare.
+2. In the project, define the "Surfer" label with a "posture" attribute:
+   type "select" (radio/dropdown), values: standing, sitting, prone,
+   unknown.
+3. Create a Task inside that project (e.g. "existing-57-retrofit") and
+   upload the {len(merged['images'])} images from {images_out_dir} as its data.
+4. Import the existing boxes: open the task -> Actions -> Upload
+   annotations -> format "COCO 1.0" -> select {OUT_ZIP.name}. This brings
+   in all {len(merged['annotations'])} existing boxes without redrawing
+   them. Note: uploading annotations REPLACES whatever's already in the
+   task, so do this before any manual tagging, not after.
+5. Go through each image and set the posture attribute on each box
    (boxes already exist -- this is tagging, not drawing).
-5. When done, export the task: Actions -> Export task dataset -> COCO 1.0
-   -> download the zip. That export is what build_stratified_splits.py
-   (Phase 4) will merge with the new-image labeling pass.
+6. When done, export: Actions -> Export task dataset -> COCO 1.0 -> OK.
+   Free tier exports annotations only (no images bundled in the zip) --
+   that's fine, we already have every source image locally; the Phase 4
+   merge script will match the exported annotations back to
+   data/j_shore_cam/surf_crops/ (or this script's images/default/) by
+   filename.
 """)
 
 

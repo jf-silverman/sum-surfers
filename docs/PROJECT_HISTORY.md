@@ -1683,3 +1683,29 @@ Script prints the concrete next steps: create a CVAT task, add a
 `posture` (standing/sitting/prone/unknown) attribute to the `Surfer`
 label, import this zip's boxes via CVAT's "Upload annotations" (COCO
 1.0), tag each of the 1451 boxes, export.
+
+Joel didn't have a CVAT project set up yet and asked whether the
+instructions actually matched the current CVAT Online product rather
+than general/possibly-stale knowledge — fetched the real current docs
+(docs.cvat.ai) and pricing page to verify rather than guessing:
+
+- CVAT Online organizes as **Project → Task → Job**; labels and their
+  attributes live at the Project level and are inherited by every Task
+  under it — the original instructions skipped straight to "create a
+  task," missing this. Updated to create the Project first (defining
+  `Surfer`'s `posture` attribute there), so a later second task for the
+  new gap-fill/error-candidate images (Phase 1's output) inherits the
+  same attribute without redefining it.
+- **Free tier limits, confirmed from the real pricing page**: 1 project,
+  3 tasks, 1GB storage. Fits comfortably (57 images ≈ 2.3MB; the ~57
+  Phase-1 candidates would be similar) with room for a 3rd task later if
+  needed.
+- **Free tier task-dataset export is "annotations only" — no images
+  bundled in the export zip.** Not a problem here since every source
+  image already exists locally; noted in `prepare_cvat_reimport.py`'s
+  printed instructions that the future Phase 4 merge will match exported
+  annotations back to local files by filename rather than expecting
+  images inside the CVAT export.
+
+Updated `prepare_cvat_reimport.py`'s printed next-steps to reflect all
+of this.
