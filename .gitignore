@@ -25,6 +25,8 @@ analysis/hourly_variability_8to9am/hourly_variability_analysis.csv
 analysis/hourly_variability_8to9am/hourly_variability_full.csv
 analysis/hourly_variability_8to9am/hourly_full_counts_2026-08-28.png
 analysis/training_data_expansion/labeling_candidates.csv
+data/cvat_out_coco/reimport_existing_57/
+data/cvat_out_coco/reimport_existing_57.zip
 data/charts/surfer_count_*.png
 data/charts/detection_*.png
 data/.last_local_success

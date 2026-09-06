@@ -1643,3 +1643,43 @@ CVAT upload, not an auto-decision.
 Phases 2 (posture attribute + retro-tagging the existing 57), 4 (merge +
 stratified re-split), and 5 (retrain + evaluate) remain — 2 and part of 4
 depend on Joel's manual CVAT labeling pass.
+
+### Inventoried all CVAT export copies; built a reimport package for retro-tagging (2026-09-05)
+
+Joel wanted to start Phase 2 (posture attributes) with the existing 57
+images, but asked first what all the CVAT-related copies in the project
+actually are and whether any are redundant — real question, not
+previously documented anywhere. Verified directly (not assumed):
+
+- `archive/data/cvat_out_dataset_2025_09_24_coco 1.0.zip` (COCO, 57
+  images, one flat `instances_default.json`) has the exact same 57
+  images as `data/cvat_out_coco/splits/` — diffed the filename lists,
+  byte-identical. Genuinely redundant with what's in `data/`.
+- `archive/data/cvat_out_yolo_detect_1.0.zip` (YOLO, 57 images, untiled,
+  single flat "train" folder) is also redundant content-wise, AND — more
+  importantly for this task — confirmed that YOLO's `.txt` label format
+  has no field for attributes at all (a real line is just
+  `class x_center y_center width height`), so neither this zip nor
+  `data/cvat_out_yolo_rebuilt/` can ever carry posture data regardless of
+  redundancy. COCO format's `attributes` dict (already populated with
+  CVAT's default `occluded`/`rotation` keys in every existing annotation)
+  is the only viable path — confirmed present and identical in both the
+  COCO zip and `data/cvat_out_coco/splits/`.
+- Established `data/cvat_out_coco/splits/` (COCO, matches what actually
+  trained the current model) as the source of truth to work from, not
+  either archived zip.
+
+The original CVAT task for these 57 images no longer exists (deleted
+after the original export), so a fresh CVAT task is needed to add the
+posture attribute. New `code/prepare_cvat_reimport.py` merges the three
+split files back into one flat COCO export matching CVAT's own export
+layout exactly (`annotations/instances_default.json` + `images/default/`)
+— verified the splits are a clean, non-overlapping partition first
+(image ids 1-57, annotation ids 1-1451, zero collisions across
+train/val/test, so no id-remapping was needed). Real run: 57 images,
+1451 annotations merged with no loss, written to
+`data/cvat_out_coco/reimport_existing_57.zip` (gitignored, regenerable).
+Script prints the concrete next steps: create a CVAT task, add a
+`posture` (standing/sitting/prone/unknown) attribute to the `Surfer`
+label, import this zip's boxes via CVAT's "Upload annotations" (COCO
+1.0), tag each of the 1451 boxes, export.
