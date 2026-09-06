@@ -9,7 +9,7 @@ This project downloads short clips around daylight hours, extracts 3 cropped fra
 
 ![Latest detection review](data/charts/latest_detection.png)
 
-## The Surfer Crowd Forecast for: Saturday, September 05, 2026
+## The Surfer Crowd Forecast for: Sunday, September 06, 2026
 
 ![Latest daily prediction chart](data/charts/latest.png)
 
