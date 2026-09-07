@@ -76,45 +76,18 @@ detection pipeline and a glossary of terms, [`PROJECT_HISTORY.md`](docs/PROJECT_
 for how it was built and tuned over time, and [`PROJECT_FILES.md`](docs/PROJECT_FILES.md)
 for a map of what every file in this repo is for.
 
-## Pipeline Scripts
+## Detector Training Metrics
 
-- `code/local_pipeline.sh`
-  - The entry point. Downloads clips, extracts crops, checks local clip
-    storage, runs detection, pulls Surfline predictors, records a success
-    timestamp.
-- `code/get_clips.py`
-  - Downloads clips between real dawn and dusk (civil twilight) — Surfline's
-    own live light forecast for today, astral (corrected camera coordinates)
-    for backfill days.
-  - Uses the nearest Surfline clip windows and can backfill up to the previous 5 days.
-- `code/get_cropped_frame.py`
-  - Reads downloaded clips and saves 3 cropped JPG frames each (primary +
-    2 side frames), for multi-frame count averaging.
-- `code/detect_surfers.py`
-  - Checks the primary frame's brightness/blur before running detection,
-    skipping all 3 frames if it's too dark or too foggy to reliably count
-    (see [`HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md)).
-  - Runs YOLO on 4 horizontal overlapping tiles per frame, deduplicates
-    boxes, filters out known static false positives, averages the 3
-    per-frame counts, and writes the result plus raw per-frame data.
-- `code/backfill_multiframe_counts.py`
-  - Manual, one-off script that backfills `frame_count_*` for existing
-    `predictions.csv` rows whose raw clip is still on disk — never touches
-    the original `surfer_count`/`confidence_avg`.
-- `code/get_surf_predictors.py`
-  - Pulls weather, rating, tide, swell, wind, wave-energy, and consistency
-    data for Jack's from Surfline's public forecast API and appends to
-    `data/predictor_vars/surfline_predictors.csv`, matched to
-    `predictions.csv` rows by filename. Forward-looking only (today + tomorrow).
-- `code/backfill_historical_predictors.py`
-  - Manual, one-off script (not run by `local_pipeline.sh`) that backfills
-    the same predictor fields for past dates, using Surfline's historical
-    API. See the script's docstring for usage and safety notes before
-    running it.
-- `code/manage_clips.py`
-  - Emails a warning if local clip storage exceeds `CLIPS_DIR_LIMIT_GB`.
-- `code/send_email.py`
-  - Shared Gmail SMTP sender used for storage warnings.
+Real per-epoch training log for the production YOLOv8s surfer detector
+(`data/model_out/20251013/`, 60 epochs — see `code/train_model.py` for
+the retraining path). Precision/recall/mAP are computed on the held-out
+val split each epoch, not the training data.
+
+![YOLOv8s detector training metrics — loss, precision, recall, mAP over 60 epochs](analysis/detector_training_metrics/detector_training_metrics.png)
+
+Final epoch: precision 87.8%, recall 80.6%, mAP@0.5 84.4%, mAP@0.5:0.95
+37.3% — the same real numbers cited in the daily chart's caption
+(`code/plot_daily_prediction.py`'s `DETECTOR_PRECISION`/`DETECTOR_RECALL`).
 
 ## Surfer Count Prediction Model
 
@@ -183,6 +156,46 @@ GBT permutation-importance breakdown). A closer look at the weekend effect:
    28.0).
 
 ![Distribution of daily mean surfer counts, weekday vs weekend KDE](analysis/weekday_weekend_patterns/weekday_weekend_kde_2026-08-28.png)
+
+## Pipeline Scripts
+
+- `code/local_pipeline.sh`
+  - The entry point. Downloads clips, extracts crops, checks local clip
+    storage, runs detection, pulls Surfline predictors, records a success
+    timestamp.
+- `code/get_clips.py`
+  - Downloads clips between real dawn and dusk (civil twilight) — Surfline's
+    own live light forecast for today, astral (corrected camera coordinates)
+    for backfill days.
+  - Uses the nearest Surfline clip windows and can backfill up to the previous 5 days.
+- `code/get_cropped_frame.py`
+  - Reads downloaded clips and saves 3 cropped JPG frames each (primary +
+    2 side frames), for multi-frame count averaging.
+- `code/detect_surfers.py`
+  - Checks the primary frame's brightness/blur before running detection,
+    skipping all 3 frames if it's too dark or too foggy to reliably count
+    (see [`HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md)).
+  - Runs YOLO on 4 horizontal overlapping tiles per frame, deduplicates
+    boxes, filters out known static false positives, averages the 3
+    per-frame counts, and writes the result plus raw per-frame data.
+- `code/backfill_multiframe_counts.py`
+  - Manual, one-off script that backfills `frame_count_*` for existing
+    `predictions.csv` rows whose raw clip is still on disk — never touches
+    the original `surfer_count`/`confidence_avg`.
+- `code/get_surf_predictors.py`
+  - Pulls weather, rating, tide, swell, wind, wave-energy, and consistency
+    data for Jack's from Surfline's public forecast API and appends to
+    `data/predictor_vars/surfline_predictors.csv`, matched to
+    `predictions.csv` rows by filename. Forward-looking only (today + tomorrow).
+- `code/backfill_historical_predictors.py`
+  - Manual, one-off script (not run by `local_pipeline.sh`) that backfills
+    the same predictor fields for past dates, using Surfline's historical
+    API. See the script's docstring for usage and safety notes before
+    running it.
+- `code/manage_clips.py`
+  - Emails a warning if local clip storage exceeds `CLIPS_DIR_LIMIT_GB`.
+- `code/send_email.py`
+  - Shared Gmail SMTP sender used for storage warnings.
 
 ## Schedule
 

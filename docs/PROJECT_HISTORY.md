@@ -1769,3 +1769,32 @@ Reworked `code/plot_daily_prediction.py`'s main chart per Joel's request:
   restates the real calibration finding (nominal 80% coverage, actual
   ~65-67%, already documented elsewhere in this file) right where a
   reader would need it, not just buried in the existing Caveat line.
+
+### Added detector training-metrics chart; reordered README sections (2026-09-07)
+
+Joel asked for a visualization of training loss + precision/recall.
+Clarified this is really the YOLOv8 *detector's* territory (epochs,
+precision/recall), not the surf-count GBT *prediction* model (a
+regression model — no epochs in the same sense). Found the real data was
+already sitting unused: `data/model_out/20251013/train/runs/detect/train13/results.csv`,
+60 real per-epoch rows (train/val loss + precision/recall/mAP50/mAP50-95),
+and Ultralytics had already auto-generated a `results.png` from it —
+just in a light background that didn't match the site's dark theme, and
+never linked from anywhere in the docs.
+
+New `analysis/detector_training_metrics/plot_training_metrics.py`
+restyles that same real data (10-panel grid: 3 train losses + precision +
+recall on top, 3 val losses + mAP50 + mAP50-95 on bottom, aqua/lime dark
+theme, 5-epoch rolling-mean overlay) — no re-training, no new numbers,
+just making already-real data visible in the project's own style. Final
+epoch values print/render exactly matching `plot_daily_prediction.py`'s
+existing `DETECTOR_PRECISION`/`DETECTOR_RECALL` constants (0.87843/0.80618),
+confirmed as a sanity check. New "## Detector Training Metrics" README
+section embeds it.
+
+Also reordered README top-to-bottom: "Pipeline Scripts" (the detailed
+per-script bullet list) moved from right after "What This Repo Does" to
+after "Exploratory Findings" (end of the "Surfer Count Prediction Model"
+section), so a reader hits the daily chart, its explainer, the detector
+metrics, and the prediction-model findings before the more
+implementation-detail-heavy script-by-script listing.
