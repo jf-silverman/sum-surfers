@@ -1867,3 +1867,15 @@ This is exactly the kind of surprising-metric situation the project's
 working-preferences note about not trusting a metric without deeper
 investigation is meant for, applied to this project's own prediction
 model rather than the detector.
+
+### Added a plain-language project intro to README (2026-09-07)
+
+Joel asked for a high-school-reading-level explanation of the whole
+project up top, for a reader with no CV/ML background — camera → still
+images → trained object detector counts surfers → hourly counts feed a
+forecast for later in the day. Per his request, the new intro doesn't
+name the camera's data source; the rest of the README (env var names,
+script descriptions, filenames) is untouched. Added as a new "What This
+Project Does, In Plain Terms" section before the existing technical
+paragraph, which is now labeled "Technical Overview" so both audiences
+have a clear entry point.

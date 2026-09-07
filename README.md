@@ -1,6 +1,44 @@
 # Sum Surfers
 
-Automated surfer counting from Surfline clips.
+Automated surfer counting from a beach camera.
+
+## What This Project Does, In Plain Terms
+
+There's a live camera pointed at a surf spot in Santa Cruz, California.
+This project watches that camera and tries to answer a simple question:
+**how many surfers are out there, and how many will there be later
+today?**
+
+Here's the basic idea, step by step:
+
+1. **Grab video.** A few times a day, the project downloads a short clip
+   from the camera.
+2. **Pull out a picture.** From each clip, it grabs one still image and
+   crops it down to just the part of the water where surfers actually
+   are.
+3. **Count the surfers in the picture.** This is the hard part, and it's
+   done by a computer-vision model — a program that has been trained on
+   thousands of hand-labeled examples to recognize what a surfer in the
+   water looks like, and draw a box around each one it finds. This is
+   the same basic kind of technology used in things like self-driving
+   cars (spotting pedestrians) or photo apps (finding faces). The more
+   examples the model has seen, the better it gets at telling a real
+   surfer apart from, say, a bird, a shadow, or a whitecap.
+4. **Keep score over time.** Every count gets logged with the date, time,
+   and conditions (tide, weather, etc.), building up a running history
+   of how many surfers show up throughout the day and across the year.
+5. **Make a forecast.** Using that history, a second, simpler model
+   looks for patterns — for example, "it's a weekend, the tide is
+   dropping, and it's sunny" tends to mean more surfers — and uses those
+   patterns to predict roughly how crowded the spot will be later today,
+   hour by hour. It's the same general idea as a weather forecast: not a
+   guarantee, just an educated, data-backed guess with a plausible range
+   attached to it.
+
+The rest of this README goes into the technical details for anyone who
+wants them, but that's the whole project in a nutshell.
+
+## Technical Overview
 
 This project downloads short clips around daylight hours, extracts 3 cropped frames per clip (~1.5-3s apart), runs YOLOv8 inference on tiled images, and stores per-clip surfer counts averaged across those frames.
 
