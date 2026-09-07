@@ -40,15 +40,14 @@ we = daily.loc[daily["is_weekend"], "mean_count"]
 
 OUT_DIR = HERE
 
-# --- Chart 1: monthly bar chart ---
-fig1 = plt.figure(figsize=(14, 6.3), facecolor="black")
-gs1 = fig1.add_gridspec(2, 1, height_ratios=[3, 0.8], hspace=0.5)
-ax1 = fig1.add_subplot(gs1[0]); ax1.set_facecolor("#111111")
-ax_text1 = fig1.add_subplot(gs1[1]); ax_text1.axis("off")
+# --- Chart 1: monthly bar chart, std-dev error bars (within-month spread) ---
+fig1, ax1 = plt.subplots(figsize=(14, 5.5), facecolor="black")
+ax1.set_facecolor("#111111")
 
 sns.barplot(
     data=daily, x="month", y="mean_count", hue="Day type", order=month_order,
-    palette={"Weekday": WEEKDAY_COLOR, "Weekend": WEEKEND_COLOR}, errorbar=None, ax=ax1,
+    palette={"Weekday": WEEKDAY_COLOR, "Weekend": WEEKEND_COLOR},
+    errorbar="sd", capsize=0.15, err_kws={"color": "white", "linewidth": 1.2}, ax=ax1,
 )
 ax1.set_xlabel("Month")
 ax1.set_ylabel("Mean surfer count (per day)")
@@ -57,22 +56,13 @@ legend1 = ax1.legend(title=None, facecolor="#111111", edgecolor="#444444")
 for text in legend1.get_texts():
     text.set_color("white")
 
-bar_interp = (
-    f"1. Weekends run higher than weekdays: mean {we.mean():.1f} vs {wd.mean():.1f} surfers (p<0.001).\n"
-    f"2. Weekends are also more variable: std {we.std():.1f} vs {wd.std():.1f}.\n"
-    f"3. No clear seasonal trend — counts stay in a similar range across the months covered."
-)
-ax_text1.text(0.01, 0.95, bar_interp, wrap=True, fontsize=9.5, va="top", ha="left",
-              color="white", transform=ax_text1.transAxes)
-
+fig1.tight_layout()
 fig1.savefig(f"{OUT_DIR}/weekday_weekend_by_month_2026-08-28.png", dpi=150, facecolor="black", bbox_inches="tight")
 print("saved", f"{OUT_DIR}/weekday_weekend_by_month_2026-08-28.png")
 
 # --- Chart 2: KDE distribution ---
-fig2 = plt.figure(figsize=(14, 6.3), facecolor="black")
-gs2 = fig2.add_gridspec(2, 1, height_ratios=[3, 0.8], hspace=0.5)
-ax2 = fig2.add_subplot(gs2[0]); ax2.set_facecolor("#111111")
-ax_text2 = fig2.add_subplot(gs2[1]); ax_text2.axis("off")
+fig2, ax2 = plt.subplots(figsize=(14, 5.5), facecolor="black")
+ax2.set_facecolor("#111111")
 
 sns.kdeplot(
     data=daily, x="mean_count", hue="Day type",
@@ -91,13 +81,20 @@ if legend2 is not None:
     for text in legend2.get_texts():
         text.set_color("white")
 
-kde_interp = (
-    f"1. Each curve is normalized to its own group (n={len(wd)} weekdays, n={len(we)} weekends) — the taller weekday peak isn't a sample-size artifact.\n"
-    f"2. Weekday counts cluster closer to their mean (std {wd.std():.1f} vs {we.std():.1f}), giving it a taller, narrower peak.\n"
-    f"3. Weekends span a wider range (min {we.min():.1f} to max {we.max():.1f} vs weekday's {wd.min():.1f} to {wd.max():.1f})."
-)
-ax_text2.text(0.01, 0.95, kde_interp, wrap=True, fontsize=9.5, va="top", ha="left",
-              color="white", transform=ax_text2.transAxes)
-
+fig2.tight_layout()
 fig2.savefig(f"{OUT_DIR}/weekday_weekend_kde_2026-08-28.png", dpi=150, facecolor="black", bbox_inches="tight")
 print("saved", f"{OUT_DIR}/weekday_weekend_kde_2026-08-28.png")
+
+# --- Real numbers for the README prose (not baked into the images anymore) ---
+print("\n=== Overall stats (for README prose) ===")
+print(f"weekday: mean={wd.mean():.1f} std={wd.std():.1f} min={wd.min():.1f} max={wd.max():.1f} n={len(wd)}")
+print(f"weekend: mean={we.mean():.1f} std={we.std():.1f} min={we.min():.1f} max={we.max():.1f} n={len(we)}")
+
+print("\n=== Per-month weekend/weekday ratio (for the new first bullet) ===")
+g = daily.groupby(["year_month", "is_weekend"])["mean_count"].mean().reset_index()
+piv = g.pivot(index="year_month", columns="is_weekend", values="mean_count")
+piv.columns = ["weekday_mean", "weekend_mean"]
+piv["ratio"] = piv["weekend_mean"] / piv["weekday_mean"]
+piv = piv.sort_index()
+print(piv.round(2))
+print(f"ratio range: {piv['ratio'].min():.2f}x to {piv['ratio'].max():.2f}x")

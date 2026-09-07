@@ -1709,3 +1709,27 @@ than general/possibly-stale knowledge — fetched the real current docs
 
 Updated `prepare_cvat_reimport.py`'s printed next-steps to reflect all
 of this.
+
+### README Exploratory Findings: moved interp text out of the charts, added per-month weekend ratio finding (2026-09-07)
+
+Reworked the weekday/weekend charts and their README section:
+
+- `analysis/weekday_weekend_patterns/plot_daily_counts.py` no longer
+  bakes interpretation bullets into the PNGs (removed the separate
+  gridspec text-panel below each chart) — that text now lives as real
+  prose in README.md instead, split into two `####` subsections
+  ("Weekday vs. Weekend" and "Daily Mean Count Kernel Density Estimate
+  (KDE)") under the existing "Exploratory Findings" section.
+- Monthly bar chart now shows std-dev error bars per bar (`errorbar="sd"`
+  in `sns.barplot`), making within-month weekday/weekend spread visible
+  directly on the chart rather than only in prose.
+- New first bullet, replacing the old "no clear seasonal trend" one:
+  the weekend-to-weekday ratio varies by month — computed real per-month
+  ratios directly (`weekend_mean / weekday_mean` per calendar month):
+  Oct 2025 1.55x, Nov 2025 1.98x, Dec 2025 1.51x, Mar 2026 1.18x, May
+  2026 1.16x, Jul 2026 1.17x, Aug 2026 1.48x. Genuine range 1.16x-1.98x,
+  not a flat effect — some months show a much more pronounced weekend
+  effect than others. Flagged that several calendar months are still
+  completely unrepresented (see the 2026-08-30 training-data-gap
+  findings above), so whether this pattern holds needs more months of
+  data before treating it as settled.

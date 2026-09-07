@@ -114,7 +114,28 @@ Tide and weekend/weekday are the two strongest predictors of surfer count
 at this spot (see [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md) for the full
 GBT permutation-importance breakdown). A closer look at the weekend effect:
 
+#### Weekday vs. Weekend
+
+1. The weekend-to-weekday ratio varies noticeably by month — from about
+   1.16-1.18x in March, May, and July 2026 up to nearly 2x in November
+   2025 (also elevated, ~1.5x, in October/December 2025 and August
+   2026). Some months show a much more pronounced weekend effect than
+   others. We'll have to see if the trend holds once we have data from
+   every month — several calendar months are still completely
+   unrepresented in the dataset so far.
+2. Weekends are also more variable day-to-day than weekdays: standard
+   deviation 6.7 vs 5.6 surfers.
+
 ![Mean surfer count by month, weekday vs weekend](analysis/weekday_weekend_patterns/weekday_weekend_by_month_2026-08-28.png)
+
+#### Daily Mean Count Kernel Density Estimate (KDE)
+
+1. Each curve is normalized to its own group (n=61 weekdays, n=31
+   weekends) — the taller weekday peak isn't a sample-size artifact.
+2. Weekday counts cluster closer to their mean (std 5.6 vs 6.7), giving
+   it a taller, narrower peak.
+3. Weekends span a wider range (min 3.8 to max 33.8 vs weekday's 1.5 to
+   28.0).
 
 ![Distribution of daily mean surfer counts, weekday vs weekend KDE](analysis/weekday_weekend_patterns/weekday_weekend_kde_2026-08-28.png)
 
