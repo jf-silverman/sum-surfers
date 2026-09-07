@@ -1879,3 +1879,39 @@ script descriptions, filenames) is untouched. Added as a new "What This
 Project Does, In Plain Terms" section before the existing technical
 paragraph, which is now labeled "Technical Overview" so both audiences
 have a clear entry point.
+
+### Shrunk calibration chart; trimmed README prose; scrubbed remaining brand mentions; wired up glossary/reference links (2026-09-07)
+
+Follow-up round of README polish per Joel's feedback:
+
+- `analysis/surf_count_model_calibration/plot_calibration.py`'s figure
+  shrunk twice (8x8in → 4.8x4.8in → 4.0x4.0in at 150dpi = 600x600px,
+  Joel's exact requested size); the in-plot annotation explaining the
+  80% interval's floor effect was removed (it overlapped the trend
+  line) since the same explanation already lives in prose in README's
+  "Model Calibration" section.
+- "How to Read the Daily Chart" shortened significantly — combined the
+  gradient/side-table bullets (they show the same range two ways),
+  cut the inline confidence-vs-prediction-interval explainer down to a
+  link, and added 3 outbound links (`HOW_IT_WORKS.md#glossary`,
+  `HOW_IT_WORKS.md#main-resources`, `#model-calibration`) instead of
+  spelling everything out inline.
+- "What This Repo Does" rewritten with more real technical depth (tile
+  count and why tiling helps, why 3 frames not 1, real dawn/dusk vs.
+  fixed clock times) since the new plain-language intro up top already
+  covers the beginner-level version — this section no longer needed to
+  duplicate that.
+- Remaining prose mentions of the camera/data provider's brand name
+  scrubbed from README (the earlier pass only covered the new intro
+  paragraph) — reworded to "the camera provider," "the surf-forecast
+  provider," etc. Left the literal env var names
+  (`SURFLINE_CAMERA_ID`/`SURFLINE_ACCESS_TOKEN`/`SURFLINE_HISTORICAL_TOKEN`)
+  and the `surfline_predictors.csv` filename untouched — renaming actual
+  required config keys/filenames was out of scope for a wording change
+  and would break `.env.example`/existing setups.
+- Added new glossary entries to `HOW_IT_WORKS.md` (GBT, GLM, MAE,
+  prediction interval vs. confidence interval + quantile regression) —
+  that file already had a repo-wide glossary and a "Main resources"
+  section with real YOLOv8/CVAT links, so new README terms/acronyms
+  link out there instead of duplicating a second glossary in README
+  itself.

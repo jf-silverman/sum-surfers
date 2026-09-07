@@ -210,6 +210,15 @@ investigation, metrics, and known error rates are in `PROJECT_HISTORY.md`.
   that popularized it).
 - **Epoch** — one full pass through the entire training dataset during
   training. This model trained for 60 epochs.
+- **GBT (Gradient-Boosted Trees)** — the model type used for the
+  surfer-count forecast (a separate model from the YOLOv8 detector above,
+  see `PROJECT_HISTORY.md`'s "Surfer Count Prediction Model" section).
+  Builds many small decision trees one after another, each one correcting
+  the errors of the trees before it.
+- **GLM (Generalized Linear Model)** — a family of statistical models
+  (e.g. Poisson, negative-binomial) tried as an alternative to GBT for
+  the surfer-count forecast; GBT ended up more accurate, see
+  `PROJECT_HISTORY.md`.
 - **Ground truth** — the "correct answer" — in this project, the
   hand-drawn CVAT boxes (for the training/test data) or a human's manual
   count (for the later review batches), used to measure how well the
@@ -230,6 +239,11 @@ investigation, metrics, and known error rates are in `PROJECT_HISTORY.md`.
   have few strong edges and a low variance. Used here as a general
   "unreliable image" signal, since fog, lens condensation, and smooth
   low-texture water all suppress it similarly.
+- **MAE (Mean Absolute Error)** — the average, across every prediction, of
+  how far off (in either direction) that prediction was from the real
+  value, ignoring sign — e.g. an MAE of 6 surfers means predictions are,
+  on average, 6 surfers away from the actual count. Used to judge the
+  surfer-count forecast model, not the detector (which uses mAP below).
 - **mAP (mean Average Precision)** — a standard single-number summary of
   object-detection quality, combining precision and recall across
   different confidence thresholds. Shows up in this model's training
@@ -239,6 +253,17 @@ investigation, metrics, and known error rates are in `PROJECT_HISTORY.md`.
 - **NMS (Non-Maximum Suppression)** — the de-duplication step: among a
   group of overlapping boxes (above the IoU threshold), keep only the one
   with the highest confidence and discard the rest.
+- **Prediction interval** (vs. **confidence interval**) — both describe a
+  range of uncertainty, but around different things. A confidence
+  interval is about an *average* (e.g. "the average count at 2pm is
+  probably between X and Y"); a prediction interval is about *one
+  individual future observation* (e.g. "today's count at 2pm will
+  probably be between X and Y"). The surfer-count forecast's shaded band
+  in the README is a prediction interval — the right concept for a
+  one-day forecast, not a long-run average. Built here from **quantile
+  regression**: instead of one GBT model predicting the average count, a
+  separate GBT is fit for each percentile (e.g. the 10th and 90th), and
+  the gap between them forms the interval.
 - **Precision** — of everything the model *flagged* as a surfer, what
   fraction actually were surfers. Low precision = lots of false positives.
 - **Recall** — of everything that *actually was* a surfer, what fraction

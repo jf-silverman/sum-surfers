@@ -100,7 +100,7 @@ def main():
         "xtick.color": TEXT, "ytick.color": TEXT,
         "grid.color": GRID,
     })
-    fig, ax = plt.subplots(figsize=(4.8, 4.8))
+    fig, ax = plt.subplots(figsize=(4.0, 4.0))
 
     ax.plot([0, 1], [0, 1], color=LIME, linestyle="--", linewidth=1.5,
              label="Perfect calibration (actual = nominal)", zorder=1)

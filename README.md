@@ -40,7 +40,7 @@ wants them, but that's the whole project in a nutshell.
 
 ## Technical Overview
 
-This project downloads short clips around daylight hours, extracts 3 cropped frames per clip (~1.5-3s apart), runs YOLOv8 inference on tiled images, and stores per-clip surfer counts averaged across those frames.
+This project downloads short video clips around daylight hours, extracts 3 cropped frames per clip (roughly 1.5-3 seconds apart), runs a [YOLOv8](docs/HOW_IT_WORKS.md#main-resources) object detector on tiled sections of each frame, and stores per-clip surfer counts averaged across those frames.
 
 <!-- DAILY_CHART_START -->
 ## A Recent Surfer Detection Count: Thursday, September 03, 2026, 7:56 AM
@@ -55,65 +55,61 @@ This project downloads short clips around daylight hours, extracts 3 cropped fra
 
 ### How to Read the Daily Chart
 
-- **Aqua line (Median)** — the model's single best-guess count for each
-  hour: the point where it thinks there's roughly a 50/50 chance the real
-  count lands above vs. below.
-- **Shaded gradient around the line** — a *prediction interval*, not
-  technically a confidence interval, though people often use the two
-  terms interchangeably. A confidence interval describes uncertainty
-  around an estimated *average* (e.g. "the average count at 2pm is
-  probably between X and Y"); a prediction interval describes uncertainty
-  around one *individual future observation* — what you'll actually see
-  on one specific day — which is the right concept here, since a chart
-  showing today's forecast is about a single real outcome, not a
-  long-run average. The gradient spans the model's 10th-to-90th
-  percentile prediction, i.e. a nominal 80% interval: if the model were
-  perfectly calibrated, the real count would land inside the shaded band
-  on about 80% of days. **It isn't perfectly calibrated** — checked
-  directly against held-out data (see "Model Calibration" under "Surfer
-  Count Prediction Model" below), real coverage runs a few points under
-  nominal for the narrower bands but *over* nominal (~83%) for the wide
-  80% band, an artifact of ~12% of real counts being exactly 0 — so
-  treat the band as a useful guide to plausible range, not a strict
-  bound. Darker
-  shading near the median means the model considers those counts more
-  likely; the color fades toward the 10%/90% edges, which are real but
-  less likely outcomes.
-- **Side table ("80% Range")** — the same 10th-to-90th-percentile range
-  as the shaded band, as plain numbers per hour, without the median, for
-  a quick reference.
-- **Circle/square/triangle/diamond markers** — the model's predicted
-  weather condition for that hour (clear/cloudy/rain/fog), plotted at
-  the median count.
-- **Green dashed line + right-hand axis** — predicted tide height (ft).
-- **Hatched band on the left** — night hours (before real dawn for that
-  day). The model can still output a number here, but there's little
-  real training data for night hours, so treat those points cautiously.
-- **A "no training data this hour" label**, when it appears — flags
-  hours outside the range the model actually has training examples for
-  (extrapolation, not a hard error).
-- **Caption at the bottom of the chart** — which real predictors are
-  currently driving the model's live fit that day, plus the surfer
-  detector's actual precision/recall from its real training log (not
-  estimated).
+- **Aqua line** — the model's single best-guess ("median") count for each
+  hour.
+- **Shaded gradient + side table ("80% Range")** — the model's
+  [prediction interval](docs/HOW_IT_WORKS.md#glossary): the range the
+  real count is expected to fall in on most days, shown both as a
+  gradient around the line (darker = more likely, fading out toward the
+  10%/90% edges) and as plain numbers in the table. **It isn't perfectly
+  calibrated** — see [Model Calibration](#model-calibration) below for
+  the real, measured accuracy of this range, not just the claimed one.
+- **Weather markers** (circle/square/triangle/diamond) — the model's
+  predicted weather condition for that hour, plotted at the median
+  count.
+- **Green dashed line (right-hand axis)** — predicted tide height, in
+  feet.
+- **Hatched band / "no training data" label** — flags hours with little
+  or no real training data behind them (night hours, or hours outside
+  the model's normal range) — treat those points as a rough
+  extrapolation, not a confident prediction.
+- **Caption** — the real predictors driving that day's forecast, plus
+  the detector's actual [precision and recall](docs/HOW_IT_WORKS.md#glossary)
+  from its real training log (not estimated).
+
+See [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for a deeper walkthrough of
+the detection pipeline and a glossary of every term used on this page,
+and [PROJECT_HISTORY.md](docs/PROJECT_HISTORY.md) for the full history
+of how the forecast model was built, tested, and tuned.
 
 ## What This Repo Does
 
-1. Pulls Surfline clips into dated folders.
-2. Extracts 3 ROI frames from each clip (a primary frame + 2 "side" frames a
-   few seconds apart).
-3. Checks the primary frame's image quality (brightness/blur) and skips
-   detection on frames too dark or too foggy/blurred to reliably count.
-4. Runs tiled YOLOv8 inference on all 3 frames and deduplicates boxes across
-   tile boundaries.
-5. Averages the 3 per-frame counts and appends the result (plus the raw
-   per-frame data) to `data/predictions/predictions.csv`.
+1. Downloads a short video clip from the camera for each roughly
+   9-minute window during daylight hours (real dawn to dusk for that
+   date, not fixed clock times), into a dated folder.
+2. Extracts 3 cropped [regions of interest](docs/HOW_IT_WORKS.md#glossary)
+   from each clip — a primary frame plus 2 "side" frames a few seconds
+   apart — so one count isn't at the mercy of a single unlucky frame
+   (someone briefly hidden behind a wave, a bird flying through, etc.).
+3. Checks the primary frame's brightness and blur before running
+   detection; frames too dark or too blurred (fog, dusk, a wet lens) are
+   skipped entirely rather than counted wrong. See
+   [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for the exact thresholds.
+4. Splits each frame into 4 overlapping horizontal tiles — small,
+   distant surfers are easier for the detector to find within a tile
+   than scattered across one wide frame — runs
+   [YOLOv8](docs/HOW_IT_WORKS.md#main-resources) on each tile, then
+   merges detections that land on a tile boundary back into one count
+   per frame.
+5. Averages the 3 per-frame counts into one per-clip count, and appends
+   the result — plus the 3 raw per-frame counts, for later analysis —
+   to `data/predictions/predictions.csv`.
 
-Started project on a cloud VM, but then realized training and inference could be run locally for free for now. See
-[`HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md) for a full walkthrough of the
-detection pipeline and a glossary of terms, [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md)
-for how it was built and tuned over time, and [`PROJECT_FILES.md`](docs/PROJECT_FILES.md)
-for a map of what every file in this repo is for.
+See [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for a full walkthrough of the
+detection pipeline and a glossary of every term used in this repo,
+[PROJECT_HISTORY.md](docs/PROJECT_HISTORY.md) for how it was built and
+tuned over time, and [PROJECT_FILES.md](docs/PROJECT_FILES.md) for a map
+of what every file in this repo is for.
 
 ## Detector Training Metrics
 
@@ -219,13 +215,16 @@ GBT permutation-importance breakdown). A closer look at the weekend effect:
 
 - `code/local_pipeline.sh`
   - The entry point. Downloads clips, extracts crops, checks local clip
-    storage, runs detection, pulls Surfline predictors, records a success
-    timestamp.
+    storage, runs detection, pulls the surf-forecast predictors below,
+    records a success timestamp.
 - `code/get_clips.py`
-  - Downloads clips between real dawn and dusk (civil twilight) — Surfline's
-    own live light forecast for today, astral (corrected camera coordinates)
-    for backfill days.
-  - Uses the nearest Surfline clip windows and can backfill up to the previous 5 days.
+  - Downloads clips between real dawn and dusk — "civil twilight," the
+    point the sky is light enough to see by, not full sunrise/sunset —
+    using the camera provider's own live light forecast for today, or a
+    backup calculation (with corrected camera coordinates) for backfill
+    days.
+  - Uses the provider's own native clip windows and can backfill up to
+    the previous 5 days.
 - `code/get_cropped_frame.py`
   - Reads downloaded clips and saves 3 cropped JPG frames each (primary +
     2 side frames), for multi-frame count averaging.
@@ -233,23 +232,24 @@ GBT permutation-importance breakdown). A closer look at the weekend effect:
   - Checks the primary frame's brightness/blur before running detection,
     skipping all 3 frames if it's too dark or too foggy to reliably count
     (see [`HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md)).
-  - Runs YOLO on 4 horizontal overlapping tiles per frame, deduplicates
-    boxes, filters out known static false positives, averages the 3
-    per-frame counts, and writes the result plus raw per-frame data.
+  - Runs [YOLO](docs/HOW_IT_WORKS.md#main-resources) on 4 horizontal
+    overlapping tiles per frame, deduplicates boxes, filters out known
+    static false positives, averages the 3 per-frame counts, and writes
+    the result plus raw per-frame data.
 - `code/backfill_multiframe_counts.py`
   - Manual, one-off script that backfills `frame_count_*` for existing
     `predictions.csv` rows whose raw clip is still on disk — never touches
     the original `surfer_count`/`confidence_avg`.
 - `code/get_surf_predictors.py`
   - Pulls weather, rating, tide, swell, wind, wave-energy, and consistency
-    data for Jack's from Surfline's public forecast API and appends to
-    `data/predictor_vars/surfline_predictors.csv`, matched to
+    data for Jack's from the surf-forecast provider's public API and
+    appends to `data/predictor_vars/surfline_predictors.csv`, matched to
     `predictions.csv` rows by filename. Forward-looking only (today + tomorrow).
 - `code/backfill_historical_predictors.py`
   - Manual, one-off script (not run by `local_pipeline.sh`) that backfills
-    the same predictor fields for past dates, using Surfline's historical
-    API. See the script's docstring for usage and safety notes before
-    running it.
+    the same predictor fields for past dates, using the provider's
+    historical API. See the script's docstring for usage and safety notes
+    before running it.
 - `code/manage_clips.py`
   - Emails a warning if local clip storage exceeds `CLIPS_DIR_LIMIT_GB`.
 - `code/send_email.py`
