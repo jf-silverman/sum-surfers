@@ -1915,3 +1915,32 @@ Follow-up round of README polish per Joel's feedback:
   section with real YOLOv8/CVAT links, so new README terms/acronyms
   link out there instead of duplicating a second glossary in README
   itself.
+
+### Added an "Object Detection" section to README; further readability pass (2026-09-07)
+
+Third round of README feedback from Joel:
+
+- New "## Object Detection: Model, Training Data & Tools" section
+  (placed between "What This Repo Does" and "Surfer Count Prediction
+  Model," i.e. right after the pipeline-mechanics section and before
+  the forecast-model section) — a plain-language paragraph on what
+  object detection is generally, then two subsections: "The Model:
+  YOLO" (YOLOv8s specifics, why that variant, single-pass detection,
+  the CPU/tiling connection) and "Training Data & Labeling: CVAT" (the
+  real, verified numbers: 57 hand-labeled training images, 1,451
+  annotations, split 32/15/10 train/val/test — counted directly from
+  `data/cvat_out_coco/splits/instances_{train,val,test}.json` rather
+  than assumed from memory). The existing "Detector Training Metrics"
+  chart moved inside this section as its third subsection, near the
+  end, per Joel's request.
+- Stripped the `code/` folder prefix from every script reference in
+  prose/bullets throughout README (kept it in the two literal runnable
+  command blocks, and as the href in one markdown link) — added a
+  one-line note at the top of "Pipeline Scripts" and "Surfer Count
+  Prediction Model" that everything named there lives in `code/`,
+  instead of repeating the prefix on every line.
+- First-use acronym pass: GLM, GBT, and MAE now link to
+  `HOW_IT_WORKS.md`'s glossary on their first appearance (in the
+  `fit_surfer_count_model.py` bullet) rather than appearing unexplained;
+  confirmed no raw ROI/NMS/IoU acronyms remain unspelled anywhere in
+  README (checked via grep, not just visual scan).

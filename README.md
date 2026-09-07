@@ -111,44 +111,101 @@ detection pipeline and a glossary of every term used in this repo,
 tuned over time, and [PROJECT_FILES.md](docs/PROJECT_FILES.md) for a map
 of what every file in this repo is for.
 
-## Detector Training Metrics
+## Object Detection: Model, Training Data & Tools
+
+The step that actually counts surfers in a picture — step 3 in the plain
+overview above — is an **object detection** model. Object detection is a
+computer-vision task: given an image, find every instance of a chosen
+object type and draw a box around each one, rather than just labeling
+the image as a whole ("this photo contains a surfer" vs. exactly where
+and how many). It's the same underlying technology behind a photo app
+circling faces or a self-driving car outlining nearby pedestrians — here
+it's just pointed at a stretch of ocean, looking for surfers instead.
+
+A model like this doesn't know what a surfer looks like on its own. It
+has to be *trained*: shown a large number of real images where a human
+has already drawn the correct box around every surfer, and left to
+gradually adjust itself until its own boxes start matching those
+examples closely. More and more varied examples generally make it
+better at telling a real surfer apart from a bird, a shadow, or a patch
+of whitewater.
+
+### The Model: YOLO
+
+This project uses **YOLO** ("You Only Look Once"), a well-known family
+of object-detection models — specifically **YOLOv8s**, the "small," CPU-
+friendly variant of version 8, via the open-source
+[Ultralytics library](docs/HOW_IT_WORKS.md#main-resources). "Single-pass"
+here means the model looks at the whole image once and predicts every
+box, and how confident it is in each one, in one step — rather than
+scanning it multiple times — which is what makes it fast enough to run
+on an ordinary laptop with no dedicated graphics card. Because surfers
+are small relative to the wide strip of ocean the camera sees, each
+frame is first split into 4 overlapping tiles and the model runs on each
+tile separately (see "What This Repo Does" above) — a small object is
+easier to find in a smaller, more zoomed-in image.
+
+### Training Data & Labeling: CVAT
+
+Training a model requires real, hand-labeled examples. This project's
+57 training images (1,451 hand-drawn boxes total) were labeled using
+[CVAT](docs/HOW_IT_WORKS.md#main-resources) (Computer Vision Annotation
+Tool), an open-source browser tool made for exactly this kind of work —
+a person opens each image, draws a box around every surfer in it, and
+CVAT exports the result in a format the model can train on. Those 57
+images were split 32/15/10 into training, validation, and test sets (a
+model is trained only on the training set, and checked against images
+it's never seen — validation and test — so its reported accuracy
+reflects genuine performance, not memorization), and were tiled the same
+4-way split described above before training, so the model learns on
+exactly the shape of image it sees in production. See
+[HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for the full training walkthrough
+and [`train_model.py`](code/train_model.py) for the retraining script
+itself.
+
+### Detector Training Metrics
 
 Real per-epoch training log for the production YOLOv8s surfer detector
-(`data/model_out/20251013/`, 60 epochs — see `code/train_model.py` for
-the retraining path). Precision/recall/mAP are computed on the held-out
-val split each epoch, not the training data.
+(60 epochs). Precision and recall — see the
+[glossary](docs/HOW_IT_WORKS.md#glossary) if those terms are new — are
+computed each epoch against the held-out validation set, not the
+training data itself, so this reflects genuine model performance rather
+than how well it memorized what it trained on.
 
 ![YOLOv8s detector training metrics — loss, precision, recall, mAP over 60 epochs](analysis/detector_training_metrics/detector_training_metrics.png)
 
 Final epoch: precision 87.8%, recall 80.6%, mAP@0.5 84.4%, mAP@0.5:0.95
-37.3% — the same real numbers cited in the daily chart's caption
-(`code/plot_daily_prediction.py`'s `DETECTOR_PRECISION`/`DETECTOR_RECALL`).
+37.3% — the same real numbers cited in the daily chart's caption.
 
 ## Surfer Count Prediction Model
 
 A separate modeling pipeline on top of `data/predictions/predictions.csv` +
 `data/predictor_vars/surfline_predictors.csv`, built in three phases (see
 [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md) for the full story,
-including two real bugs found and fixed along the way):
+including two real bugs found and fixed along the way). Scripts below
+live in `code/`:
 
-- `code/backfill_openmeteo_weather.py` — adds real observed historical
+- `backfill_openmeteo_weather.py` — adds real observed historical
   weather (Open-Meteo archive API, free/no-auth) to
   `data/predictor_vars/openmeteo_weather.csv`.
-- `code/build_training_features.py` — joins predictions (target) with
+- `build_training_features.py` — joins predictions (target) with
   predictors (features) for `quality_ok=True` rows, adds derived
   time-of-day/day-of-week/month features. Writes `data/training_features.csv`.
-- `code/fit_surfer_count_model.py` — fits and compares Poisson GLM,
-  negative-binomial GLM, and gradient-boosted trees (the best performer,
-  ~6 surfer MAE), plus GBT quantile-regression prediction intervals.
-- `code/predict_surf_count.py` — pulls live tomorrow's forecast and outputs
+- `fit_surfer_count_model.py` — fits and compares a Poisson
+  [GLM](docs/HOW_IT_WORKS.md#glossary), a negative-binomial GLM, and
+  [gradient-boosted trees (GBT)](docs/HOW_IT_WORKS.md#glossary) — GBT is
+  the best performer, off by ~6 surfers on average
+  ([MAE](docs/HOW_IT_WORKS.md#glossary)) — plus GBT-based prediction
+  intervals (see [Model Calibration](#model-calibration) below).
+- `predict_surf_count.py` — pulls live tomorrow's forecast and outputs
   a prediction with an 80% range:
     ```bash
     python code/predict_surf_count.py                          # tomorrow, default hours
     python code/predict_surf_count.py --date 2026-08-28 --hours 07:10,12:00
     ```
-- `code/demo_predictions.py` — shows N random held-out predictions
+- `demo_predictions.py` — shows N random held-out predictions
   alongside the actual count and conditions, for eyeballing model behavior.
-- `code/plot_daily_prediction.py` + `code/daily_chart.sh` — generates a daily
+- `plot_daily_prediction.py` + `daily_chart.sh` — generates a daily
   prediction chart (median line + a continuous 10-90% prediction-interval
   gradient with a side-by-side 80%-range table, tide, weather, night
   shading) and a detection-review image (real boxes/labels on the day's
@@ -213,11 +270,13 @@ GBT permutation-importance breakdown). A closer look at the weekend effect:
 
 ## Pipeline Scripts
 
-- `code/local_pipeline.sh`
+All scripts named below live in the `code/` folder.
+
+- `local_pipeline.sh`
   - The entry point. Downloads clips, extracts crops, checks local clip
     storage, runs detection, pulls the surf-forecast predictors below,
     records a success timestamp.
-- `code/get_clips.py`
+- `get_clips.py`
   - Downloads clips between real dawn and dusk — "civil twilight," the
     point the sky is light enough to see by, not full sunrise/sunset —
     using the camera provider's own live light forecast for today, or a
@@ -225,10 +284,10 @@ GBT permutation-importance breakdown). A closer look at the weekend effect:
     days.
   - Uses the provider's own native clip windows and can backfill up to
     the previous 5 days.
-- `code/get_cropped_frame.py`
+- `get_cropped_frame.py`
   - Reads downloaded clips and saves 3 cropped JPG frames each (primary +
     2 side frames), for multi-frame count averaging.
-- `code/detect_surfers.py`
+- `detect_surfers.py`
   - Checks the primary frame's brightness/blur before running detection,
     skipping all 3 frames if it's too dark or too foggy to reliably count
     (see [`HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md)).
@@ -236,29 +295,29 @@ GBT permutation-importance breakdown). A closer look at the weekend effect:
     overlapping tiles per frame, deduplicates boxes, filters out known
     static false positives, averages the 3 per-frame counts, and writes
     the result plus raw per-frame data.
-- `code/backfill_multiframe_counts.py`
+- `backfill_multiframe_counts.py`
   - Manual, one-off script that backfills `frame_count_*` for existing
     `predictions.csv` rows whose raw clip is still on disk — never touches
     the original `surfer_count`/`confidence_avg`.
-- `code/get_surf_predictors.py`
+- `get_surf_predictors.py`
   - Pulls weather, rating, tide, swell, wind, wave-energy, and consistency
     data for Jack's from the surf-forecast provider's public API and
     appends to `data/predictor_vars/surfline_predictors.csv`, matched to
     `predictions.csv` rows by filename. Forward-looking only (today + tomorrow).
-- `code/backfill_historical_predictors.py`
+- `backfill_historical_predictors.py`
   - Manual, one-off script (not run by `local_pipeline.sh`) that backfills
     the same predictor fields for past dates, using the provider's
     historical API. See the script's docstring for usage and safety notes
     before running it.
-- `code/manage_clips.py`
+- `manage_clips.py`
   - Emails a warning if local clip storage exceeds `CLIPS_DIR_LIMIT_GB`.
-- `code/send_email.py`
+- `send_email.py`
   - Shared Gmail SMTP sender used for storage warnings.
 
 ## Schedule
 
-`code/local_pipeline.sh` (clip collection + detection) and
-`code/daily_chart.sh` (the daily prediction chart) each run automatically on
+`local_pipeline.sh` (clip collection + detection) and
+`daily_chart.sh` (the daily prediction chart) each run automatically on
 their own recurring schedule on the machine hosting the pipeline —
 `local_pipeline.sh` a couple times a week, `daily_chart.sh` once a day.
 Both are safe to run manually any time; see each script for details.
