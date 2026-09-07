@@ -100,7 +100,7 @@ def main():
         "xtick.color": TEXT, "ytick.color": TEXT,
         "grid.color": GRID,
     })
-    fig, ax = plt.subplots(figsize=(8, 8))
+    fig, ax = plt.subplots(figsize=(4.8, 4.8))
 
     ax.plot([0, 1], [0, 1], color=LIME, linestyle="--", linewidth=1.5,
              label="Perfect calibration (actual = nominal)", zorder=1)
@@ -110,43 +110,32 @@ def main():
     order = np.argsort(nominal_vals)
     nominal_vals = np.array(nominal_vals)[order]
     actual_vals = np.array(actual_vals)[order]
-    ax.plot(nominal_vals, actual_vals, color=AQUA, linewidth=2, marker="o", markersize=9,
+    ax.plot(nominal_vals, actual_vals, color=AQUA, linewidth=1.5, marker="o", markersize=6,
              zorder=3, label="Actual (held-out test set)")
 
     for r in results:
         ax.annotate(f"{r['actual']:.0%}", (r["nominal"], r["actual"]),
-                     textcoords="offset points", xytext=(10, -4), fontsize=9, color=AQUA)
+                     textcoords="offset points", xytext=(7, -3), fontsize=7.5, color=AQUA)
 
     ax.fill_between([0, 1], [0, 1], 0, color=CORAL, alpha=0.06, zorder=0)
     ax.text(0.06, 0.80, "Below diagonal = overconfident\n(actual < nominal)", color=CORAL,
-             fontsize=9, alpha=0.85)
-    # The 80% interval's lower bound is the 10th-percentile model, and this
-    # dataset's real y_test 10th percentile is exactly 0 (~12% of rows are
-    # genuinely surfer_count==0) -- a bound of 0 can't be undershot, which
-    # mechanically caps the below-lower miss rate and pulls actual coverage
-    # above nominal at that one point. Annotate it rather than let the dot
-    # look unexplained.
-    top_result = max(results, key=lambda r: r["nominal"])
-    if top_result["actual"] > top_result["nominal"]:
-        ax.annotate(
-            "80% interval's lower bound is the 10th-pct model;\n"
-            "~12% of real counts are exactly 0, so that bound\n"
-            "floors at 0 and can't be undershot -- inflates\n"
-            "coverage here vs. the narrower intervals.",
-            xy=(top_result["nominal"], top_result["actual"]),
-            xytext=(0.30, 0.62), color=TEXT, fontsize=8.5, alpha=0.85,
-            arrowprops=dict(arrowstyle="->", color=GRID, lw=1),
-        )
+             fontsize=8, alpha=0.85)
+    # Why the 80% interval sits above the diagonal (unlike the other three)
+    # is explained in prose in README.md's "Model Calibration" section
+    # rather than annotated on the chart itself -- an in-plot callout for
+    # just one point was cramped at this smaller size and covered the
+    # trend line.
 
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
-    ax.set_xlabel("Nominal (claimed) coverage")
-    ax.set_ylabel("Actual (empirical) coverage on held-out test set")
-    ax.set_title("Prediction-interval calibration — surf-count GBT quantile model", color=TEXT)
+    ax.set_xlabel("Nominal (claimed) coverage", fontsize=9)
+    ax.set_ylabel("Actual (empirical) coverage on held-out test set", fontsize=9)
+    ax.tick_params(labelsize=8)
+    ax.set_title("Prediction-interval calibration", color=TEXT, fontsize=11)
     ax.grid(alpha=0.3)
     for spine in ax.spines.values():
         spine.set_color(GRID)
-    legend = ax.legend(loc="upper left", facecolor=AXES_BG, edgecolor=GRID, fontsize=9)
+    legend = ax.legend(loc="upper left", facecolor=AXES_BG, edgecolor=GRID, fontsize=7.5)
     for text in legend.get_texts():
         text.set_color(TEXT)
 
