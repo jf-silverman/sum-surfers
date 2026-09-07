@@ -2,10 +2,12 @@
 plot_daily_prediction.py
 --------------------------
 Generates the daily surfer-count prediction chart (point estimate = median
-GBT model, 33%/66% quantile bands rendered as a side table, tide overlay,
-wave-energy bars, weather-coded markers, night-hour shading, model/detector
-info footer) to data/charts/surfer_count_YYYY-MM-DD.png, plus a detection-
-review image (real bounding boxes + labels on the day's ~8am crop, with the
+GBT model, a continuous 10-90% prediction-interval fan built from 9 real
+fitted quantile models rendered as a smooth gradient, an 80% range side
+table, tide overlay, weather-coded markers, night-hour shading,
+model/detector info footer) to data/charts/surfer_count_YYYY-MM-DD.png,
+plus a detection-review image (real bounding boxes + labels on the day's
+~8am crop, with the
 model's predicted range/median for that hour overlaid) to
 data/charts/latest_detection.png. Both get a stable, git-tracked "latest"
 copy and are embedded in README.md between the DAILY_CHART markers.
@@ -72,6 +74,13 @@ DETECTOR_RECALL = 0.80618  # = sensitivity
 # dawn time, only the coarse is_night flag, so it happily extrapolated).
 TRAINED_HOUR_MIN, TRAINED_HOUR_MAX = 5, 20
 
+# Prediction-interval quantile levels the fan chart is built from -- 9 real
+# fitted GBT quantile models (0.50 = median = point estimate), rendered as a
+# continuous gradient by interpolating between them (see main()). Chosen as
+# a 10%-90% span (an 80% central prediction interval) per Joel's request,
+# in place of the old fixed 33%/66% bands.
+FAN_LEVELS = [0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90]
+
 WEATHER_COLORS = {"CLEAR": "#f2c14e", "CLOUDY_OVERCAST": "#9aa0a6", "RAIN": "#4fa3d1", "FOG": "#c9c9c9"}
 WEATHER_MARKERS = {"CLEAR": "o", "CLOUDY_OVERCAST": "s", "RAIN": "^", "FOG": "D"}
 WEATHER_ABBREV = {"CLEAR": "clear", "CLOUDY_OVERCAST": "cloudy", "RAIN": "rain", "FOG": "fog"}
@@ -130,11 +139,11 @@ def main():
                                     random_state=42, scoring="neg_mean_absolute_error")
     top_predictors = pd.Series(perm.importances_mean, index=Xi_test.columns).sort_values(ascending=False).head(5)
 
-    q17_model, _ = fit_quantile_model_robust(X_std, y, 0.17)
-    q335_model, _ = fit_quantile_model_robust(X_std, y, 0.335)
-    median_model, _ = fit_quantile_model_robust(X_std, y, 0.5)
-    q665_model, _ = fit_quantile_model_robust(X_std, y, 0.665)
-    q83_model, _ = fit_quantile_model_robust(X_std, y, 0.83)
+    # Fan-chart quantiles: 9 real fitted models at 10%-90% (step 10), rendered
+    # as a continuous-looking gradient by interpolating between them at plot
+    # time (see the fill loop below) rather than fitting dozens of models.
+    # FAN_LEVELS[4] (0.50) is the median / point estimate.
+    quantile_models = {level: fit_quantile_model_robust(X_std, y, level)[0] for level in FAN_LEVELS}
 
     by_hour = sp.build_predictor_map()
     local_tz = pytz.timezone(gc.LOCATION["timezone"])
@@ -149,23 +158,23 @@ def main():
             return None
         feat_row = build_feature_row(hk, predictors, numeric_cols, weather_categories,
                                       train_mean, train_std, X_std.columns)
-        q17 = max(0.0, float(q17_model.predict(feat_row)[0]))
-        q335 = max(0.0, float(q335_model.predict(feat_row)[0]))
-        point = max(0.0, float(median_model.predict(feat_row)[0]))
-        q665 = max(0.0, float(q665_model.predict(feat_row)[0]))
-        q83 = max(0.0, float(q83_model.predict(feat_row)[0]))
-        q335 = max(q335, q17)
-        point = max(point, q335)
-        q665 = max(q665, point)
-        q83 = max(q83, q665)
+        # Predict all 9 fan levels, then force monotonicity (each level's value
+        # >= the previous one's) -- independently fit quantile models have no
+        # built-in guarantee they won't cross, same reasoning as the old
+        # 5-quantile chaining this replaces.
+        quantiles = {}
+        running_min = 0.0
+        for level in FAN_LEVELS:
+            val = max(running_min, float(quantile_models[level].predict(feat_row)[0]))
+            quantiles[level] = val
+            running_min = val
+        point = quantiles[0.50]
         weather_simple, is_night = simplify_weather_condition(predictors.get("weather_condition", ""))
         tide_ft = float(predictors.get("tide_ft", 0) or 0)
-        energy_nearshore_kj = float(predictors.get("energy_nearshore_kj", 0) or 0)
         in_training_range = TRAINED_HOUR_MIN <= hk.hour <= TRAINED_HOUR_MAX
-        return dict(hour=hk, point=point, q17=q17, q335=q335, q665=q665, q83=q83,
+        return dict(hour=hk, point=point, quantiles=quantiles,
                     weather_simple=weather_simple, is_night=is_night,
-                    tide_ft=tide_ft, energy_nearshore_kj=energy_nearshore_kj,
-                    in_training_range=in_training_range)
+                    tide_ft=tide_ft, in_training_range=in_training_range)
 
     def predict_nearest_hour(date_, hour, minute):
         """Finds the by_hour key on date_ closest to hour:minute and predicts
@@ -192,7 +201,7 @@ def main():
     ax = fig.add_subplot(gs[0], facecolor=AXES_BG)
     ax_table = fig.add_subplot(gs[1], facecolor=AXES_BG)
 
-    y_top = d["q83"].max() * 1.18
+    y_top = d["quantiles"].apply(lambda q: q[0.90]).max() * 1.18
     ax.set_ylim(bottom=0, top=y_top)
 
     for _, row in d.iterrows():
@@ -204,18 +213,26 @@ def main():
             ax.axvspan(row["hour"] - timedelta(minutes=30), row["hour"] + timedelta(minutes=30),
                        facecolor=CORAL, alpha=0.12, hatch="xx", edgecolor=CORAL, linewidth=0, zorder=0)
 
-    bar_width = timedelta(minutes=22, seconds=30)
-    energy_max = d["energy_nearshore_kj"].max()
-    energy_scale = (y_top * 0.20) / energy_max if energy_max > 0 else 0
-    bar_heights = d["energy_nearshore_kj"] * energy_scale
-    ax.bar(d["hour"], bar_heights, width=bar_width, color=LIME, alpha=0.45,
-           zorder=1, label="Wave energy, nearshore (kJ)")
-    for x, h, val in zip(d["hour"], bar_heights, d["energy_nearshore_kj"]):
-        ax.annotate(f"{val:.0f}", (x, h), textcoords="offset points", xytext=(0, 2),
-                    ha="center", fontsize=6.5, color=LIME, rotation=90, va="bottom")
-
-    ax.fill_between(d["hour"], d["q17"], d["q83"], color=AQUA, alpha=0.18, label="66% range")
-    ax.fill_between(d["hour"], d["q335"], d["q665"], color=AQUA, alpha=0.38, label="33% range")
+    # Continuous-looking prediction-interval fan: interpolate between the 9
+    # real fitted quantiles (FAN_LEVELS, 10%-90%) at each hour to get a much
+    # finer grid of levels, then draw many thin stacked bands whose alpha
+    # peaks at the median and fades toward the 10%/90% edges -- a smooth
+    # gradient built from real model output, not fit from dozens of models.
+    RENDER_LEVELS = np.linspace(FAN_LEVELS[0], FAN_LEVELS[-1], 41)  # 40 bands
+    quantile_matrix = np.array([
+        np.interp(RENDER_LEVELS, FAN_LEVELS, [q[lv] for lv in FAN_LEVELS])
+        for q in d["quantiles"]
+    ])  # shape (n_hours, len(RENDER_LEVELS))
+    MAX_BAND_ALPHA, MIN_BAND_ALPHA = 0.55, 0.04
+    for i in range(len(RENDER_LEVELS) - 1):
+        level_center = (RENDER_LEVELS[i] + RENDER_LEVELS[i + 1]) / 2
+        dist_from_median = abs(level_center - 0.50) / 0.40  # 0 at median, 1 at the 10%/90% edge
+        alpha = MAX_BAND_ALPHA - dist_from_median * (MAX_BAND_ALPHA - MIN_BAND_ALPHA)
+        ax.fill_between(d["hour"], quantile_matrix[:, i], quantile_matrix[:, i + 1],
+                         color=AQUA, alpha=alpha, linewidth=0, zorder=2)
+    # One representative legend entry for the whole gradient (can't label 40
+    # individual bands) -- details go in README's "How to read this chart".
+    fan_patch = Patch(facecolor=AQUA, alpha=0.35, label="10-90% prediction interval (darker = more likely)")
     ax.plot(d["hour"], d["point"], color=AQUA, linewidth=2.5, zorder=3, label="Median")
 
     for wx in ["CLEAR", "CLOUDY_OVERCAST", "RAIN", "FOG"]:
@@ -281,18 +298,19 @@ def main():
     night_patch = Patch(facecolor=NIGHT_COLOR, alpha=0.20, hatch="//", edgecolor=NIGHT_COLOR, label="Night hours")
     handles1, labels1 = ax.get_legend_handles_labels()
     handles2, labels2 = ax2.get_legend_handles_labels()
-    legend = ax.legend(handles1 + handles2 + [night_patch], labels1 + labels2 + ["Night hours"],
+    legend = ax.legend(handles1 + handles2 + [fan_patch, night_patch], labels1 + labels2 + [fan_patch.get_label(), "Night hours"],
                         loc="upper left", ncol=2, fontsize=8, facecolor=AXES_BG, edgecolor=GRID_COLOR)
     for text in legend.get_texts():
         text.set_color(TEXT_COLOR)
     ax.grid(alpha=0.25, color=GRID_COLOR)
 
-    # Table panel: hour -> 33% range only (no median — Joel asked for range without
-    # the point estimate here), rendered as part of the same figure/image rather than
-    # a separate markdown table, so chart and table always render side by side.
+    # Table panel: hour -> 80% range (10th-90th percentile) only (no median —
+    # Joel asked for range without the point estimate here), rendered as part
+    # of the same figure/image rather than a separate markdown table, so
+    # chart and table always render side by side.
     ax_table.axis("off")
-    ax_table.set_title("33% Range", fontsize=10, pad=10, color=TEXT_COLOR)
-    cell_text = [[row["hour"].strftime("%-I:%M %p"), f"{row['q335']:.0f}–{row['q665']:.0f}"]
+    ax_table.set_title("80% Range", fontsize=10, pad=10, color=TEXT_COLOR)
+    cell_text = [[row["hour"].strftime("%-I:%M %p"), f"{row['quantiles'][0.10]:.0f}–{row['quantiles'][0.90]:.0f}"]
                  for _, row in d.iterrows()]
     tbl = ax_table.table(cellText=cell_text, colLabels=["Time", "Range"],
                           cellLoc="center", loc="upper center")
@@ -400,7 +418,8 @@ def generate_detection_image(detection_date, predict_nearest_hour):
     hh, mm = map(int, row["time_local"].split(":"))
     pred_row = predict_nearest_hour(row_date, hh, mm)
     if pred_row is not None:
-        pred_text = f"Predicted: {pred_row['point']:.0f} (33% range {pred_row['q335']:.0f}-{pred_row['q665']:.0f})"
+        q = pred_row["quantiles"]
+        pred_text = f"Predicted: {pred_row['point']:.0f} (80% range {q[0.10]:.0f}-{q[0.90]:.0f})"
     else:
         pred_text = "Predicted range/median: not available for this hour"
 

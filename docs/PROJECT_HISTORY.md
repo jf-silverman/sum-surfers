@@ -1733,3 +1733,39 @@ Reworked the weekday/weekend charts and their README section:
   completely unrepresented (see the 2026-08-30 training-data-gap
   findings above), so whether this pattern holds needs more months of
   data before treating it as settled.
+
+### Daily prediction chart redesigned: continuous 10-90% fan, wave-energy bars removed, "How to Read" section (2026-09-07)
+
+Reworked `code/plot_daily_prediction.py`'s main chart per Joel's request:
+
+- **Removed wave-energy bars** entirely (the purple/lime bars along the
+  bottom).
+- **Replaced the fixed 33%/66% quantile bands with a continuous 10-90%
+  prediction-interval fan.** Fits 9 real GBT quantile models
+  (`FAN_LEVELS = [0.10, 0.20, ..., 0.90]`, median at 0.50) instead of the
+  old 5 (0.17/0.335/0.5/0.665/0.83) — a real, verified cost increase
+  (9 vs 5 quantile-model fits per run) but still well within the daily
+  cron's time budget. At render time, interpolates between the 9 fitted
+  quantiles at each hour (`np.interp` across 41 finer levels) and draws
+  40 thin stacked `fill_between` bands with alpha peaking at the median
+  and fading toward the 10%/90% edges — a real continuous-looking
+  gradient built from actual model output, not a stylistic approximation
+  with made-up shading. Verified visually: smooth center-to-edge fade,
+  no banding artifacts at normal viewing size.
+- **Side table** now shows the 10th-90th percentile ("80% Range")
+  instead of the old 33% range, matching the new fan.
+- **Y-axis** now scales off the day's max 90th-percentile value (was
+  83rd) with the same 1.18x headroom margin, so high-count days' full
+  upper band stays visible.
+- **Detection image's "Predicted: ..." text** updated to the same 80%
+  range (10th-90th) for consistency.
+- **New "How to Read the Daily Chart" section in README.md**, placed
+  right after the `DAILY_CHART_END` marker (outside the auto-regenerated
+  block, so it survives daily overwrites) explaining every visual
+  element, and explicitly distinguishing *prediction interval* (the
+  correct term — uncertainty around one future observation) from
+  *confidence interval* (uncertainty around an estimated average) since
+  Joel asked for the concept explained, not just labeled. Prominently
+  restates the real calibration finding (nominal 80% coverage, actual
+  ~65-67%, already documented elsewhere in this file) right where a
+  reader would need it, not just buried in the existing Caveat line.

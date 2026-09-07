@@ -9,11 +9,54 @@ This project downloads short clips around daylight hours, extracts 3 cropped fra
 
 ![Latest detection review](data/charts/latest_detection.png)
 
-## The Surfer Crowd Forecast for: Monday, September 07, 2026
+## The Surfer Crowd Forecast for: Tuesday, September 08, 2026
 
 ![Latest daily prediction chart](data/charts/latest.png)
 
 <!-- DAILY_CHART_END -->
+
+### How to Read the Daily Chart
+
+- **Aqua line (Median)** — the model's single best-guess count for each
+  hour: the point where it thinks there's roughly a 50/50 chance the real
+  count lands above vs. below.
+- **Shaded gradient around the line** — a *prediction interval*, not
+  technically a confidence interval, though people often use the two
+  terms interchangeably. A confidence interval describes uncertainty
+  around an estimated *average* (e.g. "the average count at 2pm is
+  probably between X and Y"); a prediction interval describes uncertainty
+  around one *individual future observation* — what you'll actually see
+  on one specific day — which is the right concept here, since a chart
+  showing today's forecast is about a single real outcome, not a
+  long-run average. The gradient spans the model's 10th-to-90th
+  percentile prediction, i.e. a nominal 80% interval: if the model were
+  perfectly calibrated, the real count would land inside the shaded band
+  on about 80% of days. **It isn't perfectly calibrated** — checked
+  directly against held-out data, the real coverage is closer to 65%
+  than 80% (see the Caveat under "Surfer Count Prediction Model" below)
+  — so treat the band as a useful guide to plausible range, not a strict
+  bound; the real count will fall outside it more often than a strict
+  80% interval would suggest. Darker
+  shading near the median means the model considers those counts more
+  likely; the color fades toward the 10%/90% edges, which are real but
+  less likely outcomes.
+- **Side table ("80% Range")** — the same 10th-to-90th-percentile range
+  as the shaded band, as plain numbers per hour, without the median, for
+  a quick reference.
+- **Circle/square/triangle/diamond markers** — the model's predicted
+  weather condition for that hour (clear/cloudy/rain/fog), plotted at
+  the median count.
+- **Green dashed line + right-hand axis** — predicted tide height (ft).
+- **Hatched band on the left** — night hours (before real dawn for that
+  day). The model can still output a number here, but there's little
+  real training data for night hours, so treat those points cautiously.
+- **A "no training data this hour" label**, when it appears — flags
+  hours outside the range the model actually has training examples for
+  (extrapolation, not a hard error).
+- **Caption at the bottom of the chart** — which real predictors are
+  currently driving the model's live fit that day, plus the surfer
+  detector's actual precision/recall from its real training log (not
+  estimated).
 
 ## What This Repo Does
 
@@ -98,11 +141,13 @@ including two real bugs found and fixed along the way):
 - `code/demo_predictions.py` — shows N random held-out predictions
   alongside the actual count and conditions, for eyeballing model behavior.
 - `code/plot_daily_prediction.py` + `code/daily_chart.sh` — generates a daily
-  prediction chart (median + 33%/66% bands with a side-by-side range table,
-  tide, wave energy, weather, night shading) and a detection-review image
-  (real boxes/labels on the day's ~8am crop with the predicted range
-  overlaid), auto-committed to the top of this README. Run via its own
-  daily cron entry, independent of the twice-weekly clip pipeline.
+  prediction chart (median line + a continuous 10-90% prediction-interval
+  gradient with a side-by-side 80%-range table, tide, weather, night
+  shading) and a detection-review image (real boxes/labels on the day's
+  ~8am crop with the predicted range overlaid), auto-committed to the top
+  of this README. Run via its own daily cron entry, independent of the
+  twice-weekly clip pipeline. See "How to Read the Daily Chart" below for
+  what everything on it means.
 
 Caveat: held-out MAE is ~6 surfers on a typical count of ~15, and the
 reported 80% prediction interval is empirically closer to a 65%
