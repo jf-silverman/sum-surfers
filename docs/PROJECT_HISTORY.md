@@ -1798,3 +1798,72 @@ after "Exploratory Findings" (end of the "Surfer Count Prediction Model"
 section), so a reader hits the daily chart, its explainer, the detector
 metrics, and the prediction-model findings before the more
 implementation-detail-heavy script-by-script listing.
+
+### Built the surf-count model's own calibration plot; found the documented "closer to 65% than 80%" figure is stale (2026-09-07)
+
+Joel asked for a calibration/coverage viz for the surf-count GBT model
+itself (as a complement to the detector training-metrics chart above,
+which is detector territory — precision/recall/loss — not this
+regression model's). New `analysis/surf_count_model_calibration/plot_calibration.py`
+reuses the exact same pipeline `fit_quantile_intervals()` in
+`code/fit_surfer_count_model.py` already uses (`load_and_prepare()`,
+`train_test_split(test_size=0.2, random_state=42)`, `standardize()`,
+`fit_quantile_model_robust()`) — fits all 9 of `FAN_LEVELS`' quantile
+models, enforces monotonicity, and measures real empirical coverage on
+the held-out test split for the four symmetric intervals derivable from
+them (20/40/60/80%).
+
+**Real result surprised**: the 80% interval measured **82.8% empirical
+coverage** on today's data — not the ~65-67% figure documented on
+2026-08-27 (this file, "quantile coverage 65.5%→65.1%") and repeated in
+README's Caveat line and "How to Read the Daily Chart" section ever
+since. The below-lower miss rate for that interval was only 0.4%
+(target 10%), closely resembling the *symptom* of the original
+degenerate-lower-quantile-model bug documented earlier this file (a
+model that always predicts 0 can never be undershot). Treated this as a
+real discrepancy needing verification before publishing anything, per
+this project's standing "no fabricated stats" rule — not assumed to be
+either number without checking:
+
+- Re-ran the ORIGINAL, unmodified `fit_quantile_intervals()` directly
+  (bypassing the new script entirely) — got the identical 82.8%/0.4%
+  result, ruling out a bug in the new script's own monotonicity/interval
+  logic.
+- Inspected the raw q=0.10 model's predictions on the test set directly:
+  real per-row variation (std ≈2.4, range up to ~11.4), not a flat
+  constant — it passes the `fit_quantile_model_robust()` self-check
+  (`train_std > 0.5`) and is using the already-corrected hyperparameters
+  (`l2_regularization=0.0`, `max_depth=3`). So *not* a repeat of the
+  original collapse-to-constant-0 bug — the model has real signal.
+- Checked the real y_test distribution: **12.0% of test rows are
+  genuinely `surfer_count==0`**, and the real empirical 10th percentile
+  of y_test is exactly 0.0. A lower bound of 0 mechanically cannot be
+  undershot (counts can't go negative), so a correctly-fit 10th-
+  percentile model on this genuinely zero-inflated data will
+  structurally show a near-0% below-lower miss rate — this is a real
+  property of the data, not a sign of a broken model.
+- The other three intervals (20/40/60%) don't show this pattern and
+  instead run a few points *under* nominal (18% vs 20%, 36.1% vs 40%,
+  51.1% vs 60%) — ordinary mild overconfidence, consistent with the
+  general finding that this model's intervals aren't perfectly
+  calibrated, just not in the direction the old 65% figure implied for
+  the wide band specifically.
+- Row count today (1164, post-drop) is nearly identical to the
+  2026-08-27 measurement's, so the shift isn't explained by a much
+  larger dataset. The most likely real explanation is the real-weather-
+  backfill / daily-chart-automation work landed in between
+  (`e8b7077`, after 08-27) changing which predictor columns and values
+  feed `training_features.csv` — not confirmed with a diff, since
+  `training_features.csv` is gitignored and no historical copy exists
+  to compare against.
+
+**Conclusion**: trusted the current, twice-independently-verified 82.8%
+number as the honest current state, over the stale 65-67% figure, and
+updated README's Caveat and "How to Read the Daily Chart" text plus
+added a new "Model Calibration" section with the plot and this
+explanation — rather than either silently keeping the old (now
+contradicted) number or silently overwriting history without saying so.
+This is exactly the kind of surprising-metric situation the project's
+working-preferences note about not trusting a metric without deeper
+investigation is meant for, applied to this project's own prediction
+model rather than the detector.

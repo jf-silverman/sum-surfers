@@ -32,11 +32,12 @@ This project downloads short clips around daylight hours, extracts 3 cropped fra
   percentile prediction, i.e. a nominal 80% interval: if the model were
   perfectly calibrated, the real count would land inside the shaded band
   on about 80% of days. **It isn't perfectly calibrated** — checked
-  directly against held-out data, the real coverage is closer to 65%
-  than 80% (see the Caveat under "Surfer Count Prediction Model" below)
-  — so treat the band as a useful guide to plausible range, not a strict
-  bound; the real count will fall outside it more often than a strict
-  80% interval would suggest. Darker
+  directly against held-out data (see "Model Calibration" under "Surfer
+  Count Prediction Model" below), real coverage runs a few points under
+  nominal for the narrower bands but *over* nominal (~83%) for the wide
+  80% band, an artifact of ~12% of real counts being exactly 0 — so
+  treat the band as a useful guide to plausible range, not a strict
+  bound. Darker
   shading near the median means the model considers those counts more
   likely; the color fades toward the 10%/90% edges, which are real but
   less likely outcomes.
@@ -122,9 +123,28 @@ including two real bugs found and fixed along the way):
   twice-weekly clip pipeline. See "How to Read the Daily Chart" below for
   what everything on it means.
 
-Caveat: held-out MAE is ~6 surfers on a typical count of ~15, and the
-reported 80% prediction interval is empirically closer to a 65%
-interval — treat outputs as directional estimates, not precise counts.
+Caveat: held-out MAE is ~6 surfers on a typical count of ~15 — treat
+outputs as directional estimates, not precise counts.
+
+### Model Calibration
+
+Empirical coverage of the GBT quantile prediction intervals, checked
+directly against a held-out test split (`analysis/surf_count_model_calibration/plot_calibration.py`)
+rather than trusted from the nominal target:
+
+![Prediction-interval calibration for the surf-count model](analysis/surf_count_model_calibration/calibration_plot.png)
+
+The narrower intervals (20-60%) run a few points under their nominal
+target — mildly overconfident, in the normal direction for this kind of
+model. The wide 80% interval instead measures *above* nominal (~83%
+actual vs. 80% claimed): its lower bound is the 10th-percentile model,
+and since ~12% of real held-out counts are genuinely 0, that bound
+floors at 0 and can't be undershot, which mechanically inflates coverage
+at that one point rather than reflecting better-than-usual calibration.
+This is a real re-check of a number reported earlier
+([`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md)) as "closer to 65% than
+80%" — re-run today on the current codebase and current data, it comes
+out differently (see PROJECT_HISTORY.md for the investigation).
 
 ### Exploratory Findings
 
