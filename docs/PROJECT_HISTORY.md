@@ -1995,3 +1995,31 @@ steps, richer captions on the two daily-chart images) and asked for:
   valid markdown (bracketed text with no URL, plus a dangling
   parenthetical after it) — rebuilt as two real links to their glossary
   entries.
+
+### Explained the Detector Training Metrics charts panel-by-panel (2026-09-08)
+
+Joel asked for the "Detector Training Metrics" section to actually
+explain the 10-panel chart, not just caption it. Added a new glossary
+entry to `HOW_IT_WORKS.md` for "Loss" (covering box/class/DFL loss
+together, since YOLOv8 tracks all three and they're easiest to explain
+as one concept) and rewrote the README section as 4 bullets matching the
+chart's real 2x5 layout: top-row training loss (aqua), bottom-row
+validation loss (aqua), top-row precision/recall (lime), bottom-row
+mAP@0.5/mAP@0.5:0.95 (lime) — verified the row/column/color assignment
+directly against `plot_training_metrics.py`'s `PANELS` list and its
+`color = LIME if "metrics" in col else AQUA` logic rather than assuming
+from memory, and against the rendered chart image itself for the actual
+shape of each curve (the ~epoch 10-15 dip in precision/recall, the
+~epoch 40 flattening). Also added a line explaining why mAP@0.5:0.95
+(37.3%) looks so much lower than mAP@0.5 (84.4%) in the same caption —
+stricter averaged IoU thresholds, not a worse model.
+
+Separately noticed while re-reading: the README's daily-chart captions
+(inside the auto-regenerated markers) still contain the wind-sock and
+"recently predictions have been low" sentences that were trimmed from
+`plot_daily_prediction.py`'s hardcoded template two commits ago — Joel
+appears to have restored them by hand in the README directly. Flagged
+to Joel rather than silently resolved either direction, since the
+template and the live file now disagree and the next scheduled
+`daily_chart.sh` run will overwrite whichever version is only in the
+README.

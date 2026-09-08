@@ -232,6 +232,20 @@ investigation, metrics, and known error rates are in `PROJECT_HISTORY.md`.
   decide if two predicted boxes are "the same" detection (NMS) and to
   decide if a predicted box "matches" a ground-truth box when scoring
   accuracy.
+- <a id="term-loss"></a>**Loss** — a single number a model tries to minimize during
+  training: how wrong its current predictions are, measured against
+  ground truth. Each epoch adjusts the model to make this number a
+  little smaller. YOLOv8 tracks three separate loss components: **box
+  loss** (how far off a predicted box's edges are from the real box),
+  **class loss** (how confident/correct the predicted class label
+  was — with only one class, "surfer," here, this mostly measures how
+  well the model recognizes "surfer-ness" itself), and **DFL loss**
+  (Distribution Focal Loss, a more fine-grained measure of exactly how
+  precisely each box edge is placed). All three should trend downward
+  over training if it's going well; each is tracked separately for the
+  training data and the held-out validation data, so a training loss
+  that keeps dropping while validation loss stalls or rises is a sign of
+  overfitting.
 - <a id="term-laplacian-variance"></a>**Laplacian variance (`lap_var`)** — a standard no-reference blur/detail
   metric: apply a Laplacian (edge-detecting) filter to the image, then
   take the variance of the result. Sharp, detailed images have lots of

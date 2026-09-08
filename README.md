@@ -9,7 +9,8 @@ There's a live camera pointed at a surf spot in Santa Cruz, California. This pro
 2. **_How many will there be at different times in the upcoming days?_**
 
 Why Does this matter?  
-**_Because as it gets more crowded, the competition for each wave becomes more intense.  For this reason many surfers like to know how crowded it will be and some may decide to go at less crowded times._**
+
+**_As a surf spot gets more crowded, the competition for each wave becomes more intense.  For this reason many surfers like to know how crowded it will be and some may decide to go at less crowded times._**
 
 Here's the basic idea, step by step:
 
@@ -171,13 +172,49 @@ itself.
 
 ### Detector Training Metrics
 
-Real per-epoch training log for the production YOLOv8s surfer detector (60 epochs). Precision and recall
-are computed each epoch against the held-out validation set, not the training data itself, so this reflects genuine model performance rather than how well it memorized what it trained on.
+Real per-[epoch](docs/HOW_IT_WORKS.md#term-epoch) training log for the
+production YOLOv8s surfer detector (60 epochs) — 10 charts tracking how
+training went, not estimated after the fact. The white dotted line on
+each chart is a 5-epoch rolling average, to make the trend easier to
+see through the epoch-to-epoch noise.
+
+- **Top row, first 3 charts (aqua): training [loss](docs/HOW_IT_WORKS.md#term-loss)** —
+  box loss, class loss, and DFL loss, measured on the data the model was
+  actually training on. All three should generally trend downward, and
+  do here — the model is getting better at matching its own training
+  examples.
+- **Bottom row, first 3 charts (aqua): validation loss** — the same
+  three loss measurements, but on the held-out validation images the
+  model never trains on. This is the more meaningful set of loss
+  charts, since it shows how the model does on images it hasn't
+  memorized. They trend downward too, with more visible noise
+  (validation is a much smaller set of images than training) but no
+  sign of the val loss rising while train loss keeps falling, which
+  would signal overfitting.
+- **Top row, last 2 charts (lime): [precision](docs/HOW_IT_WORKS.md#term-precision)
+  and [recall](docs/HOW_IT_WORKS.md#term-recall)** — both computed on
+  the validation set each epoch, not the training data, so they reflect
+  genuine model performance rather than how well it memorized what it
+  trained on. Both climb from noisy, mediocre starting values toward
+  their final ~88%/~81%, with a rough patch in the first ~15 epochs
+  where the model still hasn't learned much and both metrics swing
+  widely epoch to epoch.
+- **Bottom row, last 2 charts (lime): [mAP](docs/HOW_IT_WORKS.md#term-map)@0.5
+  and mAP@0.5:0.95** — single-number summaries that combine precision
+  and recall at one confidence threshold (0.5) or averaged across many
+  stricter ones (0.5:0.95), also on the validation set. Same overall
+  shape as precision/recall: noisy early on, climbing and flattening out
+  by around epoch 40, which is a sign training had mostly converged by
+  then rather than still improving at epoch 60.
 
 ![YOLOv8s detector training metrics — loss, precision, recall, mAP over 60 epochs](analysis/detector_training_metrics/detector_training_metrics.png)
 
 Final epoch: precision 87.8%, recall 80.6%, mAP@0.5 84.4%, mAP@0.5:0.95
-37.3% — the same real numbers cited in the daily chart's caption.
+37.3% — the same real numbers cited in the daily chart's caption. Note
+mAP@0.5:0.95 (37.3%) is much lower than mAP@0.5 (84.4%): it's an average
+over much stricter box-overlap requirements (up to near-perfect box
+placement), not a sign the model is actually worse than the headline
+84.4% number suggests.
 
 ## Surfer Count Prediction Model
 
