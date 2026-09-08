@@ -461,19 +461,26 @@ def update_readme(target_date, detection_capture=None):
               f"Add {README_START_MARKER} / {README_END_MARKER} to enable this.")
         return
 
+    # Static caption text, rewritten into the README on every run. Kept
+    # verbatim from what's currently in README.md so the daily automation
+    # preserves it instead of overwriting it.
     DETECTION_CAPTION = (
         "Each green box below contains a surfer, according to the object "
-        "detection model. Each number above a box indicates the probability "
-        "that the object is a surfer. Look carefully and you may find "
-        "additional surfers that the model missed or other objects which "
-        "are misclassified as surfers.\n\n"
+        "detection model.  Each number above a box indicates the probability "
+        "that the object is a surfer.  Look carefully and you may find "
+        "additional surfers that the model missed or other objects which are "
+        "misclassified as surfers - like the wind sock at the bottom center "
+        "of the photo.\n"
     )
     FORECAST_CAPTION = (
-        "Once enough hours and days were gathered along with weather and "
-        "surf conditions, a surf count prediction model was built to "
-        "forecast how many surfers would be present at each hour for the "
-        "coming day. This is useful for surfers to plan to avoid busy times "
-        "or at least know what to expect.\n\n"
+        "Once enough hours and days were gathered along with weather and surf "
+        "conditions, a surf count prediction model was built to forecast how "
+        "many surfers would be present at each hour for the coming day.  This "
+        "is useful for surfers to plan to avoid busy times or at least know "
+        "what to expect.  Recently the predictions have been low compared to "
+        "actual counts, so more images are being collected to improve the "
+        "object detection model's ability to find surfers in a variety of "
+        "light and water conditions, like fog or choppy water surfaces.\n"
     )
 
     detection_block = ""
