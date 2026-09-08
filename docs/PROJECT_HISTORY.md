@@ -1944,3 +1944,54 @@ Third round of README feedback from Joel:
   `fit_surfer_count_model.py` bullet) rather than appearing unexplained;
   confirmed no raw ROI/NMS/IoU acronyms remain unspelled anywhere in
   README (checked via grep, not just visual scan).
+
+### Fourth README round: deleted Pipeline Scripts, wrote steps 6-8, exact glossary anchors, caught a real auto-overwrite bug (2026-09-08)
+
+Joel made several direct edits to README himself this round (a fuller
+plain-language intro with a "why this matters" framing, a merged
+"Technical Overview" replacing "What This Repo Does" with numbered
+steps, richer captions on the two daily-chart images) and asked for:
+
+- **Deleted "## Pipeline Scripts"** (the detection-pipeline script list)
+  — redundant with the Technical Overview's step-by-step list and the
+  Object Detection section. Added links to `HOW_IT_WORKS.md` and
+  `PROJECT_FILES.md` at the end of "Surfer Count Prediction Model"
+  instead, covering what that deleted section used to.
+- **Wrote real content for Technical Overview steps 6-8** (left as
+  placeholder text by Joel): predictor-data collection, the forecast
+  model + its output, and the daily automated image/chart update to
+  README — matching the style and detail level of steps 1-5.
+- **Exact glossary anchors**: added `<a id="term-xxx">` to every entry
+  in `HOW_IT_WORKS.md`'s Glossary and repointed every README glossary
+  link (prediction interval, precision, recall, GLM, GBT, MAE, ROI) at
+  its specific entry instead of the top of the glossary section. GitHub
+  renders raw HTML anchor ids and honors URL fragments to another file
+  in the same repo, so this works without needing to copy the glossary
+  into README itself.
+- **Found and fixed a real bug while checking flow**: Joel's new H4
+  headers + descriptive captions on the two daily-chart images sit
+  *inside* the `<!-- DAILY_CHART_START/END -->` markers, which
+  `plot_daily_prediction.py`'s `update_readme()` fully regenerates every
+  day — and that function still hardcoded the old H2 headers with no
+  captions at all. Without a fix, the next scheduled `daily_chart.sh` run
+  would have silently wiped out Joel's new captions and heading level.
+  Updated `update_readme()`'s hardcoded template to emit H4 headers plus
+  static caption text matching what Joel wrote, so the daily automation
+  preserves them going forward. Two caveats on that fix, called out to
+  Joel rather than decided silently: the caption text is now baked into
+  every day's regeneration, so (a) the original caption's specific
+  callout of "the wind sock at the bottom center of the photo" was
+  dropped (that's a detail of one particular image, not something true
+  of every day's `latest_detection.png`), and (b) "recently the
+  predictions have been low compared to actual counts, so more images
+  are being collected" was dropped from the forecast caption since it's
+  a time-bound claim that would go stale baked into permanent template
+  text — both are preserved verbatim if this file is checked at this
+  commit, for reference.
+- Also fixed two stale/broken bits found during the flow read-through:
+  a cross-reference to the now-deleted "What This Repo Does" heading
+  (repointed to "Technical Overview"), and a malformed
+  precision/recall link in "How to Read the Daily Chart" that wasn't
+  valid markdown (bracketed text with no URL, plus a dangling
+  parenthetical after it) — rebuilt as two real links to their glossary
+  entries.

@@ -199,61 +199,61 @@ investigation, metrics, and known error rates are in `PROJECT_HISTORY.md`.
 
 ## Glossary
 
-- **Bounding box** — a rectangle (x1, y1, x2, y2 coordinates) drawn around
+- <a id="term-bounding-box"></a>**Bounding box** — a rectangle (x1, y1, x2, y2 coordinates) drawn around
   a detected object.
-- **Confidence score** — the model's own estimate (0-1) of how sure it is
+- <a id="term-confidence-score"></a>**Confidence score** — the model's own estimate (0-1) of how sure it is
   that a given box actually contains the object class it's predicting.
-- **CVAT** — Computer Vision Annotation Tool, the software used to
+- <a id="term-cvat"></a>**CVAT** — Computer Vision Annotation Tool, the software used to
   hand-label surfers in the training images. [cvat.ai](https://www.cvat.ai/)
-- **COCO format** — a common JSON-based annotation format for object
+- <a id="term-coco-format"></a>**COCO format** — a common JSON-based annotation format for object
   detection datasets (named after the "Common Objects in Context" dataset
   that popularized it).
-- **Epoch** — one full pass through the entire training dataset during
+- <a id="term-epoch"></a>**Epoch** — one full pass through the entire training dataset during
   training. This model trained for 60 epochs.
-- **GBT (Gradient-Boosted Trees)** — the model type used for the
+- <a id="term-gbt"></a>**GBT (Gradient-Boosted Trees)** — the model type used for the
   surfer-count forecast (a separate model from the YOLOv8 detector above,
   see `PROJECT_HISTORY.md`'s "Surfer Count Prediction Model" section).
   Builds many small decision trees one after another, each one correcting
   the errors of the trees before it.
-- **GLM (Generalized Linear Model)** — a family of statistical models
+- <a id="term-glm"></a>**GLM (Generalized Linear Model)** — a family of statistical models
   (e.g. Poisson, negative-binomial) tried as an alternative to GBT for
   the surfer-count forecast; GBT ended up more accurate, see
   `PROJECT_HISTORY.md`.
-- **Ground truth** — the "correct answer" — in this project, the
+- <a id="term-ground-truth"></a>**Ground truth** — the "correct answer" — in this project, the
   hand-drawn CVAT boxes (for the training/test data) or a human's manual
   count (for the later review batches), used to measure how well the
   model is actually doing.
-- **Image-quality gate** — the pre-detection check (see above) that skips
+- <a id="term-image-quality-gate"></a>**Image-quality gate** — the pre-detection check (see above) that skips
   running the model on frames too dark or too low-detail to reliably
   count, based on brightness and `lap_var`.
-- **IoU (Intersection over Union)** — a measure of how much two boxes
+- <a id="term-iou"></a>**IoU (Intersection over Union)** — a measure of how much two boxes
   overlap: the area they share divided by the total area they cover
   together. 1.0 = identical boxes, 0.0 = no overlap at all. Used both to
   decide if two predicted boxes are "the same" detection (NMS) and to
   decide if a predicted box "matches" a ground-truth box when scoring
   accuracy.
-- **Laplacian variance (`lap_var`)** — a standard no-reference blur/detail
+- <a id="term-laplacian-variance"></a>**Laplacian variance (`lap_var`)** — a standard no-reference blur/detail
   metric: apply a Laplacian (edge-detecting) filter to the image, then
   take the variance of the result. Sharp, detailed images have lots of
   strong edges and a high variance; blurry, foggy, or low-texture images
   have few strong edges and a low variance. Used here as a general
   "unreliable image" signal, since fog, lens condensation, and smooth
   low-texture water all suppress it similarly.
-- **MAE (Mean Absolute Error)** — the average, across every prediction, of
+- <a id="term-mae"></a>**MAE (Mean Absolute Error)** — the average, across every prediction, of
   how far off (in either direction) that prediction was from the real
   value, ignoring sign — e.g. an MAE of 6 surfers means predictions are,
   on average, 6 surfers away from the actual count. Used to judge the
   surfer-count forecast model, not the detector (which uses mAP below).
-- **mAP (mean Average Precision)** — a standard single-number summary of
+- <a id="term-map"></a>**mAP (mean Average Precision)** — a standard single-number summary of
   object-detection quality, combining precision and recall across
   different confidence thresholds. Shows up in this model's training
   logs (`results.csv`) but is a *box-level* metric — not directly
   comparable to the *count-level* MAE/bias numbers used elsewhere in this
   project's review work (see `PROJECT_HISTORY.md` for why).
-- **NMS (Non-Maximum Suppression)** — the de-duplication step: among a
+- <a id="term-nms"></a>**NMS (Non-Maximum Suppression)** — the de-duplication step: among a
   group of overlapping boxes (above the IoU threshold), keep only the one
   with the highest confidence and discard the rest.
-- **Prediction interval** (vs. **confidence interval**) — both describe a
+- <a id="term-prediction-interval"></a>**Prediction interval** (vs. **confidence interval**) — both describe a
   range of uncertainty, but around different things. A confidence
   interval is about an *average* (e.g. "the average count at 2pm is
   probably between X and Y"); a prediction interval is about *one
@@ -264,20 +264,20 @@ investigation, metrics, and known error rates are in `PROJECT_HISTORY.md`.
   regression**: instead of one GBT model predicting the average count, a
   separate GBT is fit for each percentile (e.g. the 10th and 90th), and
   the gap between them forms the interval.
-- **Precision** — of everything the model *flagged* as a surfer, what
+- <a id="term-precision"></a>**Precision** — of everything the model *flagged* as a surfer, what
   fraction actually were surfers. Low precision = lots of false positives.
-- **Recall** — of everything that *actually was* a surfer, what fraction
+- <a id="term-recall"></a>**Recall** — of everything that *actually was* a surfer, what fraction
   did the model find. Low recall = lots of missed surfers (undercounting).
-- **ROI (Region of Interest)** — the fixed rectangular crop of the raw
+- <a id="term-roi"></a>**ROI (Region of Interest)** — the fixed rectangular crop of the raw
   camera frame that the pipeline actually processes (the ocean strip,
   excluding sky/shore clutter above and below it).
-- **Tile / tiling** — splitting one image into smaller overlapping pieces
+- <a id="term-tiling"></a>**Tile / tiling** — splitting one image into smaller overlapping pieces
   before running the model, then merging the results back together. Used
   here because the ROI's wide, short shape and the surfers' small size
   within it make full-frame detection less reliable than tiled detection.
-- **YOLO (You Only Look Once)** — the object-detection model family used
+- <a id="term-yolo"></a>**YOLO (You Only Look Once)** — the object-detection model family used
   in this project. [Ultralytics YOLOv8 docs](https://docs.ultralytics.com/)
-- **YOLO format (annotation)** — a plain-text annotation format (one
+- <a id="term-yolo-format"></a>**YOLO format (annotation)** — a plain-text annotation format (one
   `.txt` file per image, one line per box: class + normalized center
   x/y/width/height) — simpler than COCO's JSON, and what
   `code/detect_surfers.py`'s ground-truth comparisons were built from.

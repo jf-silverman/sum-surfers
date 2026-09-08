@@ -461,13 +461,29 @@ def update_readme(target_date, detection_capture=None):
               f"Add {README_START_MARKER} / {README_END_MARKER} to enable this.")
         return
 
+    DETECTION_CAPTION = (
+        "Each green box below contains a surfer, according to the object "
+        "detection model. Each number above a box indicates the probability "
+        "that the object is a surfer. Look carefully and you may find "
+        "additional surfers that the model missed or other objects which "
+        "are misclassified as surfers.\n\n"
+    )
+    FORECAST_CAPTION = (
+        "Once enough hours and days were gathered along with weather and "
+        "surf conditions, a surf count prediction model was built to "
+        "forecast how many surfers would be present at each hour for the "
+        "coming day. This is useful for surfers to plan to avoid busy times "
+        "or at least know what to expect.\n\n"
+    )
+
     detection_block = ""
     if (CHARTS_DIR / "latest_detection.png").exists() and detection_capture is not None:
         capture_date, capture_time = detection_capture
         capture_dt = datetime.strptime(f"{capture_date} {capture_time}", "%Y-%m-%d %H:%M")
         capture_str = capture_dt.strftime("%A, %B %d, %Y, %-I:%M %p")
         detection_block = (
-            f"## A Recent Surfer Detection Count: {capture_str}\n\n"
+            f"#### A Recent Surfer Detection Count: {capture_str}\n\n"
+            f"{DETECTION_CAPTION}"
             f"![Latest detection review](data/charts/latest_detection.png)\n\n"
         )
 
@@ -475,7 +491,8 @@ def update_readme(target_date, detection_capture=None):
     section = (
         f"{README_START_MARKER}\n"
         f"{detection_block}"
-        f"## The Surfer Crowd Forecast for: {target_date_str}\n\n"
+        f"#### The Surfer Crowd Forecast for: {target_date_str}\n\n"
+        f"{FORECAST_CAPTION}"
         f"![Latest daily prediction chart](data/charts/latest.png)\n\n"
         f"{README_END_MARKER}"
     )

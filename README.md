@@ -4,16 +4,18 @@ Automated surfer counting from a beach camera.
 
 ## What This Project Does, In Plain Terms
 
-There's a live camera pointed at a surf spot in Santa Cruz, California.
-This project watches that camera and tries to answer a simple question:
-**how many surfers are out there, and how many will there be later
-today?**
+There's a live camera pointed at a surf spot in Santa Cruz, California. This project watches that camera and tries to answer two simple questions:
+1. **_How many surfers are out there?_**
+2. **_How many will there be at different times in the upcoming days?_**
+
+Why Does this matter?  
+**_Because as it gets more crowded, the competition for each wave becomes more intense.  For this reason many surfers like to know how crowded it will be and some may decide to go at less crowded times._**
 
 Here's the basic idea, step by step:
 
-1. **Grab video.** A few times a day, the project downloads a short clip
+1. **Gather video.** Each week, the project downloads short clips
    from the camera.
-2. **Pull out a picture.** From each clip, it grabs one still image and
+2. **Pull out a picture.** From each video clip, it grabs one still photo and
    crops it down to just the part of the water where surfers actually
    are.
 3. **Count the surfers in the picture.** This is the hard part, and it's
@@ -23,32 +25,64 @@ Here's the basic idea, step by step:
    the same basic kind of technology used in things like self-driving
    cars (spotting pedestrians) or photo apps (finding faces). The more
    examples the model has seen, the better it gets at telling a real
-   surfer apart from, say, a bird, a shadow, or a whitecap.
+   surfer apart from, say, a bird, a shadow, or a wave.
 4. **Keep score over time.** Every count gets logged with the date, time,
    and conditions (tide, weather, etc.), building up a running history
    of how many surfers show up throughout the day and across the year.
-5. **Make a forecast.** Using that history, a second, simpler model
-   looks for patterns — for example, "it's a weekend, the tide is
-   dropping, and it's sunny" tends to mean more surfers — and uses those
-   patterns to predict roughly how crowded the spot will be later today,
-   hour by hour. It's the same general idea as a weather forecast: not a
-   guarantee, just an educated, data-backed guess with a plausible range
-   attached to it.
+5. **Make a forecast.** Using that history, a second, simpler model looks for patterns — for example, "it's a weekend, the tide is dropping, and it's sunny" tends to mean more surfers — and uses those patterns to predict roughly how crowded the spot will be later today, hour by hour. It's the same general idea as a weather forecast: not a  guarantee, just an educated, data-backed guess with a likely range attached to it.
 
-The rest of this README goes into the technical details for anyone who
-wants them, but that's the whole project in a nutshell.
+The rest of this README below goes into more technical details.
 
 ## Technical Overview
 
-This project downloads short video clips around daylight hours, extracts 3 cropped frames per clip (roughly 1.5-3 seconds apart), runs a [YOLOv8](docs/HOW_IT_WORKS.md#main-resources) object detector on tiled sections of each frame, and stores per-clip surfer counts averaged across those frames.
+This project downloads short video clips around daylight hours, extracts still image frames, runs an object detector on tiled sections of each frame, stores per-clip surfer counts averaged across those frames, and forecasts future surf crowd levels using a variety of real-world conditions as inputs.  In brief, the project does the following:
+
+1. Downloads a short video clip from the camera from each hour during daylight hours (real dawn to dusk for that
+   date, not fixed clock times), into a dated folder.
+2. Extracts 3 cropped [regions of interest](docs/HOW_IT_WORKS.md#term-roi)
+   from each clip — a primary frame plus 2 "side" frames a few seconds
+   apart — so one count isn't at the mercy of a single unlucky frame
+   (someone briefly hidden behind a wave, a bird flying through, etc.).
+3. Checks the primary frame's brightness and blur before running
+   detection; frames too dark or too blurred (fog, dusk, a wet lens) are  skipped entirely rather than counted wrong. 
+4. Splits each frame into 4 overlapping horizontal tiles — small, distant surfers are easier for the detector to find within a tile than scattered across one wide frame — runs the object detection model [YOLOv8](docs/HOW_IT_WORKS.md#main-resources) on each tile, then
+   merges detections that land on a tile boundary back into one count
+   per frame.
+5. Averages the 3 per-frame counts into one per-clip count, and appends
+   the result — plus the 3 raw per-frame counts, for later analysis —
+   to `data/predictions/predictions.csv`.
+6. Collects the real-world conditions that help explain and forecast
+   crowd size — weather, tide height, swell, wind, and wave energy for
+   the spot, today and tomorrow — and matches each hour of that data to
+   the surfer counts already logged, building up a table the forecast
+   model can learn from.
+7. Feeds that combined table (past counts + the conditions at the time)
+   into a forecasting model, which learns which conditions tend to mean
+   more or fewer surfers, then uses tomorrow's forecasted conditions to
+   predict an hour-by-hour surfer count for the coming day, along with a
+   likely range around each prediction (see "Surfer Count Prediction
+   Model" below).
+8. Once a day, redraws the detection-review image (a recent camera frame
+   with the model's boxes drawn on it) and the daily forecast chart with
+   the latest data, and automatically commits both images to this
+   repository — which is why the two images below update on their own
+   each day without anyone manually running anything.
+
+See [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for a full walkthrough of the
+detection pipeline and a glossary of every term used in this repo,
+[PROJECT_HISTORY.md](docs/PROJECT_HISTORY.md) for how it was built and
+tuned over time, and [PROJECT_FILES.md](docs/PROJECT_FILES.md) for a map
+of what every file in this repo does.
 
 <!-- DAILY_CHART_START -->
-## A Recent Surfer Detection Count: Thursday, September 03, 2026, 7:56 AM
+#### A Recent Surfer Detection Count: Thursday, September 03, 2026, 7:56 AM
 
+Each green box below contains a surfer, according to the object detection model.  Each number above a box indicates the probability that the object is a surfer.  Look carefully and you may find additional surfers that the model missed or other objects which are misclassified as surfers - like the wind sock at the bottom center of the photo.
 ![Latest detection review](data/charts/latest_detection.png)
 
-## The Surfer Crowd Forecast for: Tuesday, September 08, 2026
+#### The Surfer Crowd Forecast for: Tuesday, September 08, 2026
 
+Once enough hours and days were gathered along with weather and surf conditions, a surf count prediction model was built to forecast how many surfers would be present at each hour for the coming day.  This is useful for surfers to plan to avoid busy times or at least know what to expect.  Recently the predictions have been low compared to actual counts, so more images are being collected to improve the object detection model's ability to find surfers in a variety of light and water conditions, like fog or choppy water surfaces.
 ![Latest daily prediction chart](data/charts/latest.png)
 
 <!-- DAILY_CHART_END -->
@@ -58,7 +92,7 @@ This project downloads short video clips around daylight hours, extracts 3 cropp
 - **Aqua line** — the model's single best-guess ("median") count for each
   hour.
 - **Shaded gradient + side table ("80% Range")** — the model's
-  [prediction interval](docs/HOW_IT_WORKS.md#glossary): the range the
+  [prediction interval](docs/HOW_IT_WORKS.md#term-prediction-interval): the range the
   real count is expected to fall in on most days, shown both as a
   gradient around the line (darker = more likely, fading out toward the
   10%/90% edges) and as plain numbers in the table. **It isn't perfectly
@@ -73,43 +107,15 @@ This project downloads short video clips around daylight hours, extracts 3 cropp
   or no real training data behind them (night hours, or hours outside
   the model's normal range) — treat those points as a rough
   extrapolation, not a confident prediction.
-- **Caption** — the real predictors driving that day's forecast, plus
-  the detector's actual [precision and recall](docs/HOW_IT_WORKS.md#glossary)
-  from its real training log (not estimated).
+- **Caption** — the conditions driving that day's forecast, plus the
+  detector's actual [precision](docs/HOW_IT_WORKS.md#term-precision) and
+  [recall](docs/HOW_IT_WORKS.md#term-recall) from its real training log
+  (not estimated).
 
 See [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for a deeper walkthrough of
 the detection pipeline and a glossary of every term used on this page,
 and [PROJECT_HISTORY.md](docs/PROJECT_HISTORY.md) for the full history
 of how the forecast model was built, tested, and tuned.
-
-## What This Repo Does
-
-1. Downloads a short video clip from the camera for each roughly
-   9-minute window during daylight hours (real dawn to dusk for that
-   date, not fixed clock times), into a dated folder.
-2. Extracts 3 cropped [regions of interest](docs/HOW_IT_WORKS.md#glossary)
-   from each clip — a primary frame plus 2 "side" frames a few seconds
-   apart — so one count isn't at the mercy of a single unlucky frame
-   (someone briefly hidden behind a wave, a bird flying through, etc.).
-3. Checks the primary frame's brightness and blur before running
-   detection; frames too dark or too blurred (fog, dusk, a wet lens) are
-   skipped entirely rather than counted wrong. See
-   [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for the exact thresholds.
-4. Splits each frame into 4 overlapping horizontal tiles — small,
-   distant surfers are easier for the detector to find within a tile
-   than scattered across one wide frame — runs
-   [YOLOv8](docs/HOW_IT_WORKS.md#main-resources) on each tile, then
-   merges detections that land on a tile boundary back into one count
-   per frame.
-5. Averages the 3 per-frame counts into one per-clip count, and appends
-   the result — plus the 3 raw per-frame counts, for later analysis —
-   to `data/predictions/predictions.csv`.
-
-See [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for a full walkthrough of the
-detection pipeline and a glossary of every term used in this repo,
-[PROJECT_HISTORY.md](docs/PROJECT_HISTORY.md) for how it was built and
-tuned over time, and [PROJECT_FILES.md](docs/PROJECT_FILES.md) for a map
-of what every file in this repo is for.
 
 ## Object Detection: Model, Training Data & Tools
 
@@ -142,7 +148,7 @@ scanning it multiple times — which is what makes it fast enough to run
 on an ordinary laptop with no dedicated graphics card. Because surfers
 are small relative to the wide strip of ocean the camera sees, each
 frame is first split into 4 overlapping tiles and the model runs on each
-tile separately (see "What This Repo Does" above) — a small object is
+tile separately (see "Technical Overview" above) — a small object is
 easier to find in a smaller, more zoomed-in image.
 
 ### Training Data & Labeling: CVAT
@@ -165,12 +171,8 @@ itself.
 
 ### Detector Training Metrics
 
-Real per-epoch training log for the production YOLOv8s surfer detector
-(60 epochs). Precision and recall — see the
-[glossary](docs/HOW_IT_WORKS.md#glossary) if those terms are new — are
-computed each epoch against the held-out validation set, not the
-training data itself, so this reflects genuine model performance rather
-than how well it memorized what it trained on.
+Real per-epoch training log for the production YOLOv8s surfer detector (60 epochs). Precision and recall
+are computed each epoch against the held-out validation set, not the training data itself, so this reflects genuine model performance rather than how well it memorized what it trained on.
 
 ![YOLOv8s detector training metrics — loss, precision, recall, mAP over 60 epochs](analysis/detector_training_metrics/detector_training_metrics.png)
 
@@ -182,7 +184,7 @@ Final epoch: precision 87.8%, recall 80.6%, mAP@0.5 84.4%, mAP@0.5:0.95
 A separate modeling pipeline on top of `data/predictions/predictions.csv` +
 `data/predictor_vars/surfline_predictors.csv`, built in three phases (see
 [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md) for the full story,
-including two real bugs found and fixed along the way). Scripts below
+including bugs found and fixed along the way). Scripts below
 live in `code/`:
 
 - `backfill_openmeteo_weather.py` — adds real observed historical
@@ -192,10 +194,10 @@ live in `code/`:
   predictors (features) for `quality_ok=True` rows, adds derived
   time-of-day/day-of-week/month features. Writes `data/training_features.csv`.
 - `fit_surfer_count_model.py` — fits and compares a Poisson
-  [GLM](docs/HOW_IT_WORKS.md#glossary), a negative-binomial GLM, and
-  [gradient-boosted trees (GBT)](docs/HOW_IT_WORKS.md#glossary) — GBT is
+  [GLM](docs/HOW_IT_WORKS.md#term-glm), a negative-binomial GLM, and
+  [gradient-boosted trees (GBT)](docs/HOW_IT_WORKS.md#term-gbt) — GBT is
   the best performer, off by ~6 surfers on average
-  ([MAE](docs/HOW_IT_WORKS.md#glossary)) — plus GBT-based prediction
+  ([MAE](docs/HOW_IT_WORKS.md#term-mae)) — plus GBT-based prediction
   intervals (see [Model Calibration](#model-calibration) below).
 - `predict_surf_count.py` — pulls live tomorrow's forecast and outputs
   a prediction with an 80% range:
@@ -216,6 +218,12 @@ live in `code/`:
 
 Caveat: held-out MAE is ~6 surfers on a typical count of ~15 — treat
 outputs as directional estimates, not precise counts.
+
+See [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for how the real-world
+condition data above (weather, tide, swell, wind, wave energy) is
+collected, and [PROJECT_FILES.md](docs/PROJECT_FILES.md) for a map of
+every script and data file in this repo, including the clip-download and
+detection scripts not listed above.
 
 ### Model Calibration
 
@@ -267,52 +275,6 @@ GBT permutation-importance breakdown). A closer look at the weekend effect:
    28.0).
 
 ![Distribution of daily mean surfer counts, weekday vs weekend KDE](analysis/weekday_weekend_patterns/weekday_weekend_kde_2026-08-28.png)
-
-## Pipeline Scripts
-
-All scripts named below live in the `code/` folder.
-
-- `local_pipeline.sh`
-  - The entry point. Downloads clips, extracts crops, checks local clip
-    storage, runs detection, pulls the surf-forecast predictors below,
-    records a success timestamp.
-- `get_clips.py`
-  - Downloads clips between real dawn and dusk — "civil twilight," the
-    point the sky is light enough to see by, not full sunrise/sunset —
-    using the camera provider's own live light forecast for today, or a
-    backup calculation (with corrected camera coordinates) for backfill
-    days.
-  - Uses the provider's own native clip windows and can backfill up to
-    the previous 5 days.
-- `get_cropped_frame.py`
-  - Reads downloaded clips and saves 3 cropped JPG frames each (primary +
-    2 side frames), for multi-frame count averaging.
-- `detect_surfers.py`
-  - Checks the primary frame's brightness/blur before running detection,
-    skipping all 3 frames if it's too dark or too foggy to reliably count
-    (see [`HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md)).
-  - Runs [YOLO](docs/HOW_IT_WORKS.md#main-resources) on 4 horizontal
-    overlapping tiles per frame, deduplicates boxes, filters out known
-    static false positives, averages the 3 per-frame counts, and writes
-    the result plus raw per-frame data.
-- `backfill_multiframe_counts.py`
-  - Manual, one-off script that backfills `frame_count_*` for existing
-    `predictions.csv` rows whose raw clip is still on disk — never touches
-    the original `surfer_count`/`confidence_avg`.
-- `get_surf_predictors.py`
-  - Pulls weather, rating, tide, swell, wind, wave-energy, and consistency
-    data for Jack's from the surf-forecast provider's public API and
-    appends to `data/predictor_vars/surfline_predictors.csv`, matched to
-    `predictions.csv` rows by filename. Forward-looking only (today + tomorrow).
-- `backfill_historical_predictors.py`
-  - Manual, one-off script (not run by `local_pipeline.sh`) that backfills
-    the same predictor fields for past dates, using the provider's
-    historical API. See the script's docstring for usage and safety notes
-    before running it.
-- `manage_clips.py`
-  - Emails a warning if local clip storage exceeds `CLIPS_DIR_LIMIT_GB`.
-- `send_email.py`
-  - Shared Gmail SMTP sender used for storage warnings.
 
 ## Schedule
 
