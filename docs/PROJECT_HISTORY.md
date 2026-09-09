@@ -2138,3 +2138,38 @@ reason.
 - **Rating / energy / consistency — no free equivalent.** Surfline
   proprietary scores; only recoverable via the premium historical token
   (`backfill_historical_predictors.py`).
+
+### Premium token verified good; historical `swells` slot-ordering is worse than live (2026-09-09)
+
+Joel asked whether the premium token was stale, noting
+`SURFLINE_HISTORICAL_TOKEN` and `SURFLINE_ACCESS_TOKEN` are the same
+value (confirmed: both present, both 40 chars, identical).
+
+**Not stale.** `forecasts/rating` with `start=2026-08-22&days=3` and an
+`x-auth-accesstoken` header returned HTTP 200 and 72 real records for
+that past date — a 400 would have meant expired/invalid/non-premium.
+
+**All 8 endpoints work historically**, including the `surf` and `swells`
+that replaced the retired `wave` earlier the same day — previously
+flagged in `bugs.md` as unverified against dated requests, now exercised
+for real (72 records each; tides 85, being finer-grained).
+
+**The finding worth keeping**: the `swells[0]` trap is *worse* on the
+historical endpoint than the live one, in a way that would have been
+easy to miss. Live, slot 0 is frequently an empty partition (nonzero
+only 11/48 hours) — an obvious failure, since it writes zeros.
+Historically, slot 0 is *always* populated (72/72 nonzero), which looks
+correct — but it is **not the dominant swell**: it differed from the
+max-height swell in **62 of 72 hours**, understating it several-fold
+(0.72ft in slot 0 where the real primary was 3.43ft; 0.79ft vs 4.59ft).
+A slot-0 read would therefore have written plausible, non-null,
+systematically ~5x-too-small swell heights across the entire backfill —
+the kind of wrong data that survives review precisely because it doesn't
+look broken. `primary_swell()`'s max-by-height selection is required on
+both endpoints, for opposite-looking reasons.
+
+Also corrected in passing: a throwaway label printed during this check
+asserted the historical list "IS size-ordered," which its own numbers
+(62/72 mismatches) contradicted — noted here rather than left standing,
+since the earlier `wave`-endpoint entry in this file does still describe
+that (now-dead, untestable) endpoint's list as size-ordered.
