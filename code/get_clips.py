@@ -10,8 +10,15 @@ from astral.sun import sun
 import pytz
 
 # ---------- CONFIG ----------
-CAMERA_ID = os.environ["SURFLINE_CAMERA_ID"]
-ACCESS_TOKEN = os.environ["SURFLINE_ACCESS_TOKEN"]
+# Read lazily (.get, not [...]): these are only needed to actually download a
+# clip, but this module is also imported purely for LOCATION below — by
+# get_surf_predictors.py, and transitively by backfill_historical_predictors.py
+# and anything else importing that. A hard os.environ[...] here made those
+# imports raise KeyError in any shell that hadn't sourced .env, so scripts that
+# never touch the camera API couldn't run without camera credentials.
+# clip_api_url() does the real check, at the point of use.
+CAMERA_ID = os.environ.get("SURFLINE_CAMERA_ID")
+ACCESS_TOKEN = os.environ.get("SURFLINE_ACCESS_TOKEN")
 # Resolve data dir relative to project root (parent of this script's directory)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = _PROJECT_ROOT / "data" / "not_needed_in_repo" / "surf_clips"
@@ -43,7 +50,23 @@ LOCATION = dict(
 )
 # --------------------------------
 
-BASE_URL = f"https://services.surfline.com/cameras/{CAMERA_ID}/clip?accessToken={ACCESS_TOKEN}"
+def clip_api_url():
+    """Clip-request URL, with the credential check done here rather than at import.
+
+    Raises a RuntimeError naming exactly what's missing and how to supply it,
+    which is more useful than the bare `KeyError: 'SURFLINE_CAMERA_ID'` an
+    import-time lookup produced.
+    """
+    missing = [name for name, val in (("SURFLINE_CAMERA_ID", CAMERA_ID),
+                                      ("SURFLINE_ACCESS_TOKEN", ACCESS_TOKEN)) if not val]
+    if missing:
+        raise RuntimeError(
+            f"Missing required environment variable(s): {', '.join(missing)}. "
+            f"Set them in .env, then either run via code/local_pipeline.sh (which sources it) "
+            f"or load it into your shell first:\n"
+            f"    set -o allexport && source .env && set +o allexport"
+        )
+    return f"https://services.surfline.com/cameras/{CAMERA_ID}/clip?accessToken={ACCESS_TOKEN}"
 
 # Browser-like headers required to pass Cloudflare's bot check on services.surfline.com
 # (plain requests without these get a Cloudflare 403 challenge page regardless of token validity).
@@ -102,7 +125,7 @@ def download_clip(start_ms, end_ms, out_path):
     payload = {"startTimestampInMs": start_ms, "endTimestampInMs": end_ms}
 
     try:
-        resp = requests.post(BASE_URL, headers=REQUEST_HEADERS, json=payload, timeout=REQUEST_TIMEOUT_SEC)
+        resp = requests.post(clip_api_url(), headers=REQUEST_HEADERS, json=payload, timeout=REQUEST_TIMEOUT_SEC)
     except requests.RequestException as e:
         raise RuntimeError(f"Transient network error requesting clip JSON: {type(e).__name__}: {e}") from e
 
