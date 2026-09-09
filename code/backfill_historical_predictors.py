@@ -33,6 +33,16 @@ Usage:
 
     # preview what would be fetched without making any requests
     python code/backfill_historical_predictors.py --start 2025-10-15 --end 2025-11-01 --dry-run
+
+    # smaller chunks = fewer days per request, more requests, gentler on the
+    # authenticated session (3 days/request is a deliberately cautious setting)
+    python code/backfill_historical_predictors.py --start 2026-08-22 --end 2026-09-07 \
+        --chunk-days 3 --refetch-incomplete
+
+`--refetch-incomplete` also repairs rows already in the output CSV that have
+blank predictor columns — without it, any filename already present is skipped
+no matter how empty it is. Rows are replaced in place (the file is rewritten
+atomically), so re-running never leaves duplicate rows for one filename.
 """
 
 import argparse
@@ -73,8 +83,37 @@ def parse_args():
     p.add_argument("--min-pause", type=float, default=DEFAULT_MIN_PAUSE, help=f"Minimum seconds between requests (default {DEFAULT_MIN_PAUSE})")
     p.add_argument("--max-pause", type=float, default=DEFAULT_MAX_PAUSE, help=f"Maximum seconds between requests (default {DEFAULT_MAX_PAUSE})")
     p.add_argument("--chunk-days", type=int, default=CHUNK_MAX_DAYS, help=f"Max days per API request (default {CHUNK_MAX_DAYS})")
+    p.add_argument("--refetch-incomplete", action="store_true",
+                   help="Also re-fetch rows already in the output CSV that have blank predictor "
+                        "fields (e.g. the surf/swell columns left null while Surfline's retired "
+                        "`wave` endpoint 404'd, or blank energy_* rows), replacing them in place "
+                        "instead of skipping them. Without this, any filename already present is "
+                        "skipped regardless of how complete it is.")
     p.add_argument("--dry-run", action="store_true", help="Show what would be fetched/written without making any requests")
     return p.parse_args()
+
+
+# Columns that come from the Surfline endpoints — a blank in any of these means
+# the row didn't get everything it should have. date/time_local/filename are the
+# row's identity, not fetched data, so they're excluded.
+_FETCHED_COLUMNS = [c for c in sp.CSV_HEADER if c not in ("date", "time_local", "filename")]
+
+
+def is_complete(row):
+    """True if every Surfline-derived column in an existing output row has a value."""
+    return all(str(row.get(c, "")).strip() != "" for c in _FETCHED_COLUMNS)
+
+
+def write_rows(out_csv, rows):
+    """Rewrite out_csv atomically (temp file + replace), so a crash mid-write
+    can't leave a half-written predictors file behind."""
+    tmp = out_csv.with_suffix(out_csv.suffix + ".tmp")
+    with open(tmp, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=sp.CSV_HEADER)
+        writer.writeheader()
+        for r in rows:
+            writer.writerow({k: r.get(k, "") for k in sp.CSV_HEADER})
+    tmp.replace(out_csv)
 
 
 def resolve_token(cli_token):
@@ -159,7 +198,15 @@ def main():
 
     out_csv = Path(args.out)
     existing = sp.load_rows(out_csv)
-    already_done = {r["filename"] for r in existing}
+    if args.refetch_incomplete:
+        # Only fully-populated rows count as done, so rows with blank predictor
+        # columns become targets again and get replaced rather than skipped.
+        already_done = {r["filename"] for r in existing if is_complete(r)}
+        n_incomplete = len(existing) - len(already_done)
+        print(f"--refetch-incomplete: {n_incomplete} existing row(s) have blank predictor "
+              f"fields and are eligible for re-fetch.")
+    else:
+        already_done = {r["filename"] for r in existing}
 
     targets = load_targets(start_date, end_date, already_done)
     if not targets:
@@ -199,7 +246,7 @@ def main():
             break
         sp.merge_into_by_hour(by_hour, **responses)
 
-    written = 0
+    new_rows = {}
     unmatched = 0
     for date_str, time_local, filename in targets:
         target_dt = datetime.strptime(f"{date_str} {time_local}", "%Y-%m-%d %H:%M")
@@ -208,10 +255,20 @@ def main():
         if predictors is None:
             unmatched += 1
             continue
-        sp.append_row(out_csv, sp.row_from_predictors(date_str, time_local, filename, predictors))
-        written += 1
+        new_rows[filename] = sp.row_from_predictors(date_str, time_local, filename, predictors)
 
-    print(f"\nDone. Wrote {written} row(s) to {out_csv} ({unmatched} target row(s) had no matching hour in the fetched data).")
+    # Rewrite rather than append: with --refetch-incomplete a target may already
+    # have a (blank-ish) row in the file, and appending would leave two rows for
+    # the same filename. Existing rows keep their original position; anything
+    # re-fetched is replaced in place, and genuinely new rows go on the end.
+    replaced = sum(1 for r in existing if r["filename"] in new_rows)
+    merged = [new_rows.pop(r["filename"], r) for r in existing]
+    merged.extend(new_rows.values())
+    added = len(merged) - len(existing)
+    write_rows(out_csv, merged)
+
+    print(f"\nDone. {added} row(s) added, {replaced} replaced in {out_csv} "
+          f"({unmatched} target row(s) had no matching hour in the fetched data).")
     if denied:
         print("Run was stopped early due to a denied request — re-run later (fresh token if needed) to pick up the rest.")
 
