@@ -77,7 +77,15 @@ DAYS = 2  # today + 1, covers utcOffset edge cases around midnight
 
 # Endpoints fetched, and the key each response's payload is nested under
 # (data[<path>]) — same for every endpoint observed so far.
-ENDPOINT_PATHS = ["weather", "rating", "tides", "wave", "wind", "energy", "consistency"]
+#
+# `wave` was removed by Surfline (verified 2026-09-08: a plain nginx 404 on
+# every parameter variant, while the other six endpoints return 200) and
+# silently nulled the primary_swell_* columns from 2026-09-03 on. It supplied
+# two different things, so it takes two endpoints to replace it:
+#   - `surf`   -> surf_min_ft / surf_max_ft (row["surf"]["min"/"max"])
+#   - `swells` -> primary_swell_* (row["swells"], see merge_into_by_hour)
+# Both are hourly, same as the old `wave`. See docs/bugs.md.
+ENDPOINT_PATHS = ["weather", "rating", "tides", "surf", "swells", "wind", "energy", "consistency"]
 
 # Same "recent" scope logic as detect_surfers.py, so a fresh machine doesn't
 # try to walk the entire crop history looking for matches.
@@ -135,13 +143,38 @@ def local_hour_key(timestamp, utc_offset):
     return dt.replace(minute=0, second=0, microsecond=0)
 
 
+def primary_swell(swells):
+    """
+    Picks the dominant swell from one hour's swell list.
+
+    NOT simply swells[0]: the `swells` endpoint returns 6 fixed partition
+    slots per hour, ordered by partition rather than by size, so slot 0 is
+    frequently an empty (all-zero) partition — measured 2026-09-08 on a
+    real 48-hour response, swells[0] was nonzero in only 11/48 hours while
+    the largest-height swell was nonzero in 48/48. Taking slot 0 would
+    write mostly-zero swell heights, which is worse than the nulls this
+    replaced, since zeros read as real measurements. The old `wave`
+    endpoint did return a size-ordered list, which is why swells[0] was
+    correct there. See docs/bugs.md.
+    """
+    real = [s for s in (swells or []) if isinstance(s, dict)]
+    if not real:
+        return {}
+    return max(real, key=lambda s: s.get("height") or 0)
+
+
 def merge_into_by_hour(by_hour, weather=None, rating=None, tides=None, wave=None,
-                        wind=None, energy=None, consistency=None):
+                        surf=None, swells=None, wind=None, energy=None,
+                        consistency=None):
     """
     Pure merge step (no network calls) — folds raw per-endpoint response
     lists into a {local_hour_datetime: {field: value}} dict. Shared by the
     live (forward-looking) and historical backfill scripts so the field
     extraction logic only lives in one place.
+
+    `wave` is the retired endpoint (see ENDPOINT_PATHS); its handling is
+    kept so any already-saved response still merges identically, but live
+    runs now pass `surf` + `swells` instead.
     """
     for w in weather or []:
         key = local_hour_key(w["timestamp"], w["utcOffset"])
@@ -156,16 +189,31 @@ def merge_into_by_hour(by_hour, weather=None, rating=None, tides=None, wave=None
         by_hour[key]["rating_key"] = r["rating"]["key"]
         by_hour[key]["rating_value"] = r["rating"]["value"]
 
+    # Retired `wave` endpoint: size-ordered swells, so slot 0 was the primary.
     for w in wave or []:
         key = local_hour_key(w["timestamp"], w["utcOffset"])
         by_hour.setdefault(key, {})
         by_hour[key]["surf_min_ft"] = w["surf"]["min"]
         by_hour[key]["surf_max_ft"] = w["surf"]["max"]
-        swells = w.get("swells") or []
-        primary = swells[0] if swells else {}
+        wave_swells = w.get("swells") or []
+        primary = wave_swells[0] if wave_swells else {}
         by_hour[key]["primary_swell_height_ft"] = round(primary.get("height", 0), 2)
         by_hour[key]["primary_swell_period_s"] = primary.get("period", 0)
         by_hour[key]["primary_swell_direction_deg"] = round(primary.get("direction", 0), 1)
+
+    for s in surf or []:
+        key = local_hour_key(s["timestamp"], s["utcOffset"])
+        by_hour.setdefault(key, {})
+        by_hour[key]["surf_min_ft"] = s["surf"]["min"]
+        by_hour[key]["surf_max_ft"] = s["surf"]["max"]
+
+    for s in swells or []:
+        key = local_hour_key(s["timestamp"], s["utcOffset"])
+        by_hour.setdefault(key, {})
+        primary = primary_swell(s.get("swells"))
+        by_hour[key]["primary_swell_height_ft"] = round(primary.get("height") or 0, 2)
+        by_hour[key]["primary_swell_period_s"] = primary.get("period") or 0
+        by_hour[key]["primary_swell_direction_deg"] = round(primary.get("direction") or 0, 1)
 
     # Tides are finer-grained than hourly; snap each to the nearest hour bucket
     # already created above (or start its own if no weather/wave/rating entry

@@ -2023,3 +2023,48 @@ to Joel rather than silently resolved either direction, since the
 template and the live file now disagree and the next scheduled
 `daily_chart.sh` run will overwrite whichever version is only in the
 README.
+
+### Surfline retired `forecasts/wave`; replaced with `surf` + `swells` (2026-09-09)
+
+While checking how the comparable `crowdfactor` project talks to Surfline
+(2026-09-08 repo-benchmarking work, see `model_and_feature_ideas.md`),
+tested this project's own `REQUEST_HEADERS` against all 7 endpoints in
+`get_surf_predictors.py`'s `ENDPOINT_PATHS`: six returned 200 and **`wave`
+returned a plain nginx 404** on every parameter variant tried (days=1,
+days=2, +intervalHours, spotId alone). Surfline removed it.
+
+- **It had been failing silently.** `build_predictor_map()` catches the
+  per-endpoint exception and continues without that endpoint (the correct
+  behavior added 2026-09-03 for network outages), so the run completed and
+  wrote *nulls* rather than crashing. Real impact in
+  `surfline_predictors.csv`: all 13 rows on 2026-09-03 have null
+  `primary_swell_height_ft`/`_period_s`/`_direction_deg` while `tide_ft`
+  and `rating_value` on the same rows are fine; last date with real swell
+  data was 2026-09-01.
+- **`wave` supplied two different things, so it took two endpoints to
+  replace**: `surf` (→ `surf_min_ft`/`surf_max_ft`) and `swells`
+  (→ the `primary_swell_*` fields). Both are hourly, matching the old
+  cadence.
+- **Not a blind path swap — the subtle part.** The `swells` endpoint
+  returns 6 fixed partition slots per hour, ordered by partition rather
+  than by size, so `swells[0]` — exactly what the old code treated as
+  "primary" — was nonzero in only **11 of 48** hours, while the
+  max-height swell was nonzero in **48 of 48**. Just renaming the path
+  would have written mostly-zero swell heights, which is *worse* than the
+  nulls it replaced, since zeros read as real measurements downstream.
+  New `primary_swell()` helper takes the max-height swell instead, with
+  the reasoning recorded in its docstring so it doesn't get "simplified"
+  back to `[0]` later. The retired `wave` branch is kept in
+  `merge_into_by_hour()` (its list genuinely was size-ordered) so any
+  already-saved response still merges identically.
+- **Verified**: all 8 endpoints 200; `surf_min_ft`, `surf_max_ft`, and all
+  three `primary_swell_*` fields 48/48 present and nonzero across the live
+  forecast window; `primary_swell()` unit-checked against empty/None/
+  all-zero/missing-key/None-height/junk inputs; new `surf`+`swells` path
+  confirmed byte-identical to the old `wave` path on equivalent data; a
+  real `get_surf_predictors.py` run completed and left the CSV unmodified
+  (0 rows written — the 64 pending rows predate the forward-looking
+  window, the known limitation, not a regression).
+- **Not fixed**: the 13 already-written null rows stay null (`main()`
+  skips filenames already present, and these endpoints can't serve past
+  dates without the premium historical token).
