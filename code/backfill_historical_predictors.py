@@ -89,6 +89,11 @@ def parse_args():
                         "`wave` endpoint 404'd, or blank energy_* rows), replacing them in place "
                         "instead of skipping them. Without this, any filename already present is "
                         "skipped regardless of how complete it is.")
+    p.add_argument("--force", action="store_true",
+                   help="Re-fetch and replace EVERY predictions.csv row in the date range, even "
+                        "rows already fully populated. Use when the extraction logic itself "
+                        "changed (e.g. primary_swell()'s selection rule) and existing rows are "
+                        "complete but computed the old way. Implies --refetch-incomplete.")
     p.add_argument("--dry-run", action="store_true", help="Show what would be fetched/written without making any requests")
     return p.parse_args()
 
@@ -198,7 +203,11 @@ def main():
 
     out_csv = Path(args.out)
     existing = sp.load_rows(out_csv)
-    if args.refetch_incomplete:
+    if args.force:
+        # Nothing counts as done — every row in range is re-fetched and replaced.
+        already_done = set()
+        print("--force: re-fetching every row in range, including already-complete ones.")
+    elif args.refetch_incomplete:
         # Only fully-populated rows count as done, so rows with blank predictor
         # columns become targets again and get replaced rather than skipped.
         already_done = {r["filename"] for r in existing if is_complete(r)}

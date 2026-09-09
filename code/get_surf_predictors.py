@@ -145,21 +145,39 @@ def local_hour_key(timestamp, utc_offset):
 
 def primary_swell(swells):
     """
-    Picks the dominant swell from one hour's swell list.
+    Picks the swell train actually driving the surf, from one hour's list.
 
-    NOT simply swells[0]: the `swells` endpoint returns 6 fixed partition
-    slots per hour, ordered by partition rather than by size, so slot 0 is
-    frequently an empty (all-zero) partition — measured 2026-09-08 on a
-    real 48-hour response, swells[0] was nonzero in only 11/48 hours while
-    the largest-height swell was nonzero in 48/48. Taking slot 0 would
-    write mostly-zero swell heights, which is worse than the nulls this
-    replaced, since zeros read as real measurements. The old `wave`
-    endpoint did return a size-ordered list, which is why swells[0] was
-    correct there. See docs/bugs.md.
+    The `swells` endpoint returns 6 slots per hour, each a distinct swell
+    *train* with its own height/period/direction plus `impact`, `power` and
+    `spectralPower`. Unused slots are all-zero. Two traps, both measured
+    rather than assumed (2026-09-09, see docs/bugs.md):
+
+    1. NOT slot 0. The slots are not size- or importance-ordered. On the
+       live endpoint slot 0 is frequently an empty all-zero partition
+       (nonzero in only 11/48 hours); on the historical endpoint it is
+       always populated but is usually a *minor* train (differed from the
+       largest by height in 62/72 hours, e.g. 0.72ft where the real
+       primary was 3.43ft).
+
+    2. NOT the tallest, either. Height alone ignores whether a swell can
+       even reach this spot: `impact` measures how much of a train
+       actually arrives given its angle and local shadowing. Over a real
+       72-hour sample the tallest train was the most powerful in only
+       35/72 hours (49%) — the disagreements are stark and systematic,
+       e.g. a 5.17ft 10s train at impact 0.128 losing to a 2.96ft **18s**
+       train at impact 0.498. Long-period swell from an open angle drives
+       the surf; a taller short-period train from a blocked direction does
+       not. Selecting by height would systematically favour exactly the
+       trains that matter least.
+
+    So: order by `power` (Surfline's own per-train energy delivered),
+    falling back to height only if no train reports usable power.
     """
-    real = [s for s in (swells or []) if isinstance(s, dict)]
+    real = [s for s in (swells or []) if isinstance(s, dict) and (s.get("height") or 0) > 0]
     if not real:
         return {}
+    if any((s.get("power") or 0) > 0 for s in real):
+        return max(real, key=lambda s: s.get("power") or 0)
     return max(real, key=lambda s: s.get("height") or 0)
 
 
