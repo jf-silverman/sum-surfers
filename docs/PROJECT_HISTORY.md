@@ -2068,3 +2068,73 @@ days=2, +intervalHours, spotId alone). Surfline removed it.
 - **Not fixed**: the 13 already-written null rows stay null (`main()`
   skips filenames already present, and these endpoints can't serve past
   dates without the premium historical token).
+
+### Nightly pipeline; predictor audit found the training table frozen 12 days (2026-09-09)
+
+Joel asked to move clip collection to 9pm nightly, then audit what
+predictor data is missing and whether it can be backfilled.
+
+**Schedule.** Cron changed from `28 18 * * 2,4` (Tue/Thu 18:28) to
+`0 21 * * *` (nightly 21:00). Joel applies cron changes himself — the
+new crontab was staged to a file for him to install. The timing matters
+for a specific reason now documented at the top of `local_pipeline.sh`:
+Surfline's forecast endpoints are forward-looking only, serving today
+and tomorrow but never a past date without a premium token, so a clip
+gets predictors **only if the pipeline runs the same day it was
+recorded**. On Tue/Thu, everything captured the other five days aged out
+before Step 5 ever saw it.
+
+**The audit found a bigger problem than the schedule.** Neither
+`backfill_openmeteo_weather.py` nor `build_training_features.py` was in
+any pipeline — both were manual-only. So:
+
+- `openmeteo_weather.csv` was frozen at **2026-08-28**, 12 days stale.
+- `training_features.csv`, which needs those `real_*` columns, was
+  therefore also frozen at 2026-08-28 (1,179 rows).
+- `plot_daily_prediction.py` calls `load_and_prepare()`, which reads
+  `training_features.csv` — so **the daily chart had been retraining on
+  a frozen table** while 161 new quality_ok rows piled up unused.
+
+Fixed by adding both as Steps 6 and 7 of `local_pipeline.sh` (now 8
+steps), each `|| log WARNING` so neither can fail the run and cost the
+irreplaceable detection data. Both are full-rewrite/idempotent, so
+running them nightly is safe. Ran them manually to catch up:
+Open-Meteo +200 rows (through 2026-09-08, 0 unmatched, no nulls),
+training features 1,179 → 1,219 rows.
+
+**Remaining gaps, measured:**
+
+| Gap | Rows | Cause |
+|---|---|---|
+| No Surfline predictors at all | 206 across 16 dates (2026-08-22 → 09-07) | Tue/Thu schedule vs. forward-only API |
+| Null `surf_*`/`primary_swell_*` | 27 | the retired `wave` endpoint (fixed 2026-09-09) |
+| Null `energy_*` | 15-17 | scattered, from 2026-07-23 |
+
+The 206 missing dates map exactly onto the non-Tue/Thu days (2026-08-27
+and 09-01 are the partial ones — the pipeline ran those days). Only 40
+of the 161 newly-available rows made it into the training table for this
+reason.
+
+**What's backfillable, tested rather than assumed:**
+
+- **Tide — yes.** NOAA CO-OPS (station 9413745, free, no auth) via the
+  existing untracked `backfill_tide.py`. Checked against Surfline's own
+  `tide_ft` on 888 overlapping rows: **r=+0.972, MAE 0.34 ft**, max
+  divergence 1.46 ft. Same physical quantity. This matters more than
+  everything else combined — `tide_ft` is the single strongest predictor
+  (permutation importance 0.603).
+- **Weather — yes, already done.** Open-Meteo archive, now automated.
+- **Swell/surf — no, not safely.** Open-Meteo's marine archive is free,
+  no-auth, and returned 240/240 complete hours for exactly the missing
+  range, so availability isn't the problem — agreement is. Against
+  Surfline on 615 overlapping hours: swell height **r=+0.43** (means
+  4.45 vs 2.57 ft), swell period **r=-0.12** (essentially uncorrelated,
+  slightly negative), direction **r=+0.26** with 60° MAE, surf height
+  **r=+0.17**. Different models of different things (spot-transformed
+  spectral partition vs. coarse offshore grid point). Writing these into
+  the same columns would teach the model *which source produced a row*
+  rather than real conditions — and the swell variables were already the
+  weakest group (all |r|<0.11 with count). Not adopted.
+- **Rating / energy / consistency — no free equivalent.** Surfline
+  proprietary scores; only recoverable via the premium historical token
+  (`backfill_historical_predictors.py`).
