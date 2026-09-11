@@ -134,20 +134,47 @@ def fit_and_report(X_train, y_train, X_test, y_test):
     # much better-behaved near the right answer than from statsmodels' default
     # all-zeros start, given 30 features.
     start_params = np.append(poisson_model.params.values, max(dispersion - 1, 0.1))
-    negbin_model = NegativeBinomial(y_train, X_train, loglike_method="nb2").fit(
-        start_params=start_params, disp=0, method="bfgs", maxiter=1000, gtol=1e-8
-    )
-    if not negbin_model.mle_retvals["converged"]:
-        raise RuntimeError("Negative binomial MLE did not converge — results below would not be trustworthy")
-    pred_negbin = negbin_model.predict(X_test)
-    mae_nb = mean_absolute_error(y_test, pred_negbin)
-    rmse_nb = mean_squared_error(y_test, pred_negbin) ** 0.5
-    results["negbin"] = dict(model=negbin_model, mae=mae_nb, rmse=rmse_nb, aic=negbin_model.aic)
+    # Try successively more robust optimizers rather than giving up on the first
+    # failure. bfgs from the Poisson warm start is fastest and usually enough;
+    # nm (Nelder-Mead, derivative-free) and powell are slower but cope better
+    # with an awkward likelihood surface. Previously a single bfgs attempt that
+    # failed raised outright, which killed the entire script — including the GBT
+    # results and permutation importance below, the parts actually used in
+    # production — over one of three comparison models not converging.
+    negbin_model = None
+    for method, kwargs in (("bfgs", dict(maxiter=1000, gtol=1e-8)),
+                           ("nm", dict(maxiter=5000)),
+                           ("powell", dict(maxiter=5000))):
+        try:
+            candidate = NegativeBinomial(y_train, X_train, loglike_method="nb2").fit(
+                start_params=start_params, disp=0, method=method, **kwargs
+            )
+        except Exception as e:  # noqa: BLE001 — any optimizer blow-up is just "this method failed"
+            print(f"  NegBin MLE via {method} raised {type(e).__name__}, trying next method...")
+            continue
+        if candidate.mle_retvals.get("converged"):
+            negbin_model = candidate
+            if method != "bfgs":
+                print(f"  NegBin MLE converged via fallback optimizer '{method}'.")
+            break
+        print(f"  NegBin MLE via {method} did not converge, trying next method...")
 
     print("\n=== Negative Binomial GLM (alpha estimated via MLE) ===")
-    print(f"Estimated alpha (dispersion): {negbin_model.params['alpha']:.3f}")
-    print(f"AIC: {negbin_model.aic:.1f}")
-    print(f"Held-out test MAE: {mae_nb:.2f}  RMSE: {rmse_nb:.2f}")
+    if negbin_model is None:
+        # Report it as unavailable and keep going. The NB numbers genuinely
+        # wouldn't be trustworthy, but that's a reason to omit them from the
+        # comparison, not to discard the GBT work in the rest of the script.
+        print("  DID NOT CONVERGE with any optimizer (bfgs/nm/powell) — negative-binomial")
+        print("  results are omitted from the comparison below rather than reported untrustworthy.")
+        results["negbin"] = None
+    else:
+        pred_negbin = negbin_model.predict(X_test)
+        mae_nb = mean_absolute_error(y_test, pred_negbin)
+        rmse_nb = mean_squared_error(y_test, pred_negbin) ** 0.5
+        results["negbin"] = dict(model=negbin_model, mae=mae_nb, rmse=rmse_nb, aic=negbin_model.aic)
+        print(f"Estimated alpha (dispersion): {negbin_model.params['alpha']:.3f}")
+        print(f"AIC: {negbin_model.aic:.1f}")
+        print(f"Held-out test MAE: {mae_nb:.2f}  RMSE: {rmse_nb:.2f}")
 
     # GBT: no distributional assumption, captures nonlinearities/interactions the
     # GLMs can't (e.g. tide effect that differs by time of day) — same train/test
@@ -166,17 +193,27 @@ def fit_and_report(X_train, y_train, X_test, y_test):
     print(f"Held-out test MAE: {mae_gbt:.2f}  RMSE: {rmse_gbt:.2f}")
 
     print("\n=== Comparison ===")
-    better_aic = "Negative Binomial" if negbin_model.aic < poisson_model.aic else "Poisson"
-    print(f"Lower AIC (GLMs only, GBT has no AIC): {better_aic} "
-          f"(Poisson={poisson_model.aic:.1f}, NegBin={negbin_model.aic:.1f})")
-    mae_table = {"Poisson": mae_p, "Negative Binomial": mae_nb, "GBT": mae_gbt}
-    best_mae_name = min(mae_table, key=mae_table.get)
-    print(f"Held-out MAE — Poisson={mae_p:.2f}  NegBin={mae_nb:.2f}  GBT={mae_gbt:.2f}  "
-          f"(best: {best_mae_name})")
-    rmse_table = {"Poisson": rmse_p, "Negative Binomial": rmse_nb, "GBT": rmse_gbt}
-    best_rmse_name = min(rmse_table, key=rmse_table.get)
-    print(f"Held-out RMSE — Poisson={rmse_p:.2f}  NegBin={rmse_nb:.2f}  GBT={rmse_gbt:.2f}  "
-          f"(best: {best_rmse_name})")
+    # NegBin is omitted throughout if it failed to converge (see above) rather
+    # than reported with untrustworthy numbers.
+    has_nb = results.get("negbin") is not None
+    if has_nb:
+        better_aic = "Negative Binomial" if negbin_model.aic < poisson_model.aic else "Poisson"
+        print(f"Lower AIC (GLMs only, GBT has no AIC): {better_aic} "
+              f"(Poisson={poisson_model.aic:.1f}, NegBin={negbin_model.aic:.1f})")
+    else:
+        print(f"Lower AIC: Poisson={poisson_model.aic:.1f} (NegBin unavailable — did not converge)")
+
+    mae_table = {"Poisson": mae_p, "GBT": mae_gbt}
+    rmse_table = {"Poisson": rmse_p, "GBT": rmse_gbt}
+    if has_nb:
+        mae_table["Negative Binomial"] = mae_nb
+        rmse_table["Negative Binomial"] = rmse_nb
+    nb_mae = f"  NegBin={mae_nb:.2f}" if has_nb else "  NegBin=n/a"
+    nb_rmse = f"  NegBin={rmse_nb:.2f}" if has_nb else "  NegBin=n/a"
+    print(f"Held-out MAE — Poisson={mae_p:.2f}{nb_mae}  GBT={mae_gbt:.2f}  "
+          f"(best: {min(mae_table, key=mae_table.get)})")
+    print(f"Held-out RMSE — Poisson={rmse_p:.2f}{nb_rmse}  GBT={rmse_gbt:.2f}  "
+          f"(best: {min(rmse_table, key=rmse_table.get)})")
 
     # Feature importance via permutation (model-agnostic, comparable across all three)
     from sklearn.inspection import permutation_importance
@@ -302,7 +339,9 @@ def main():
 
     results = fit_and_report(X_train, y_train, X_test, y_test)
 
-    best_key = "negbin" if results["negbin"]["aic"] < results["poisson"]["aic"] else "poisson"
+    # Falls back to Poisson if NegBin didn't converge (results["negbin"] is None).
+    nb = results.get("negbin")
+    best_key = "negbin" if nb is not None and nb["aic"] < results["poisson"]["aic"] else "poisson"
     best_model = results[best_key]["model"]
     print(f"\n=== {best_key.upper()} coefficients (as incidence rate ratios, exp(coef)) ===")
     coef_params = best_model.params.drop("alpha", errors="ignore")  # alpha is a dispersion param, not a rate-ratio coefficient

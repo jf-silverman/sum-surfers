@@ -270,17 +270,25 @@ rather than trusted from the nominal target:
 
 ![Prediction-interval calibration for the surf-count model](analysis/surf_count_model_calibration/calibration_plot.png)
 
-The narrower intervals (20-60%) run a few points under their nominal
-target — mildly overconfident, in the normal direction for this kind of
-model. The wide 80% interval instead measures *above* nominal (~83%
-actual vs. 80% claimed): its lower bound is the 10th-percentile model,
-and since ~12% of real held-out counts are genuinely 0, that bound
-floors at 0 and can't be undershot, which mechanically inflates coverage
-at that one point rather than reflecting better-than-usual calibration.
-This is a real re-check of a number reported earlier
-([`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md)) as "closer to 65% than
-80%" — re-run today on the current codebase and current data, it comes
-out differently (see PROJECT_HISTORY.md for the investigation).
+Every interval runs under its nominal target — 21% vs 20%, 35% vs 40%,
+52% vs 60%, and **72% vs 80%** — so the model is consistently a little
+overconfident: the real count falls outside the shaded band somewhat
+more often than the band claims. That's the ordinary direction for this
+kind of model, and the gap widens for the wider bands.
+
+Worth knowing how that number moved, because it's a case of a metric
+looking *better* while the model was actually worse. On 2026-09-08 this
+same check reported 82.8% — above nominal, seemingly well calibrated.
+It wasn't: the 10th-percentile model had collapsed toward zero (92% of
+its predictions were below 1 surfer), and a lower bound pinned at 0
+can't be undershot, so almost nothing fell below it and coverage looked
+inflated. After the swell-data corrections of 2026-09-09/10 gave the
+model real signal to work with, that same lower bound became a genuine
+estimate (median 5.5 surfers, only 20% below 1) — it can now be missed
+low, and is, on 17% of rows. Coverage dropped to 72% precisely *because*
+the interval got more informative. See
+[`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md) for the full
+investigation.
 
 ### Exploratory Findings
 

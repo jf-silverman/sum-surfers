@@ -2233,3 +2233,72 @@ and got *stronger*, but it was masking a genuine positive period effect.
 Effect sizes are still small (r² ≈ 2%) and `tide_ft` (-0.33) remains far
 and away the dominant predictor. Correlational only — not yet re-checked
 against GBT permutation importance.
+
+### NegBin convergence hardened; swell now ranks #2; the 82.8% calibration mystery resolved (2026-09-10)
+
+Follow-up to the swell re-backfill, answering "does swell actually
+matter to the model now?"
+
+**1. `fit_surfer_count_model.py` no longer dies on NegBin non-convergence.**
+It happened to converge on the corrected data (alpha=0.703, AIC 8364 vs
+Poisson's 13878), so the crash logged in `bugs.md` isn't currently
+reproducible — but the fragility was real: a single failed `bfgs` attempt
+raised outright and killed the whole script, discarding the GBT results,
+permutation importance and quantile intervals below it, i.e. everything
+production actually uses, over one of three comparison models. Now tries
+`bfgs` → `nm` → `powell` in turn and, if all fail, prints that NegBin is
+unavailable and continues with Poisson/GBT instead of aborting. Verified
+both paths: forcing all three optimizers to fail runs the script to
+completion (and caught a second latent crash — the "best GLM" selection
+at the end still indexed `results["negbin"]` unconditionally); the normal
+path's output is byte-identical to before the change.
+
+**2. Wave/energy variables now matter, and the offshore/nearshore split
+is the story.** GBT permutation importance (MAE increase when shuffled):
+
+| feature | importance |
+|---|---|
+| `tide_ft` | 4.863 |
+| **`energy_nearshore_kj`** | **1.444** |
+| `hour_cos` | 0.769 |
+| `is_weekend` | 0.608 |
+| `consistency_wave_count` | 0.395 |
+| `energy_offshore_kj` | 0.163 |
+| `primary_swell_height_ft` | 0.080 |
+| `primary_swell_period_s` | 0.060 |
+
+Nearshore energy is now the **second** most important feature, ahead of
+`is_weekend`, and is **~9x more important than offshore energy** — direct
+empirical support for Joel's point that Surfline distinguishes deep-water
+swell from what actually reaches the beach. Previously wave variables
+didn't appear in the top 15 at all. (Absolute importances aren't
+comparable to the earlier run — different row count and corrected data
+change the scale, `tide_ft` itself reads 4.863 vs 0.603 — so the
+*ordering* is the meaningful comparison.)
+
+**3. The 82.8% coverage figure from 2026-09-08 was an artifact, and the
+mechanism is now pinned down.** Re-running the calibration check on
+current data gives **71.6%** for the nominal 80% interval, with all four
+intervals now consistently *under* nominal (21/20, 35/40, 52/60, 72/80) —
+ordinary overconfidence, no anomalous point. What changed is not the
+data's zero-inflation (still 11.3% zeros, y's 10th percentile still
+exactly 0.0) but the **lower-quantile model itself**:
+
+| q=0.10 model | 2026-09-08 | 2026-09-10 |
+|---|---|---|
+| prediction std | 2.396 | 3.439 |
+| fraction < 1 surfer | **92.3%** | **19.9%** |
+| median prediction | ~0 | **5.47** |
+| below-lower miss rate | 0.4% | 17.1% |
+| resulting 80% coverage | 82.8% | 71.6% |
+
+With sparse/incorrect swell features the 10th-percentile model had
+collapsed toward zero, and a bound pinned at 0 can't be undershot — so
+nothing fell below it and coverage looked inflated. Given real signal it
+became a genuine discriminating estimate, which can be (and is) missed
+low. **Coverage got worse precisely because the interval got more
+informative** — a good reminder that a metric moving in the "right"
+direction can mean the opposite of what it looks like. This also
+vindicates the originally-documented ~65-67%, which was closer to the
+truth than the 82.8% that briefly replaced it. README's Model
+Calibration section updated accordingly.
