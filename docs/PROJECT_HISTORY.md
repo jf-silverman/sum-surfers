@@ -2460,3 +2460,61 @@ while the release ships the q0.10/q0.90 pair alone. That is 2 rows out of
 292, and the reconciliation is recorded in `release_metadata.json` and
 printed by the eval script so the two numbers do not read as a
 contradiction.
+
+### Charts stamped with their training snapshot; the fit scatter shows what the bias hides (2026-09-11)
+
+Two follow-ups to the release work, both prompted by Joel asking why
+`fit_surfer_count_model.py` retrains every run instead of persisting a model.
+
+**Why it retrains** (recorded here because the question will come up again):
+the script is a validation report, not a serving path — nothing imports it to
+produce a prediction. It fits on 80% and scores the held-out 20%, and that
+answer legitimately moves as rows arrive. The serving paths,
+`predict_surf_count.py` and `plot_daily_prediction.py`, deliberately fit on
+*all* rows rather than the split, since the split already established
+generalization. So there were never two copies of one model to persist; the
+validated fit and the serving fit are different fits by design. It is also
+cheap: one quantile model takes 0.51s and `load_and_prepare()` 0.01s, so the
+daily chart's nine models plus the importance model run in well under a
+minute inside a job that already runs YOLO on CPU. `git log -S"joblib"` and
+`-S"pickle"` confirm no persistence step ever existed and was removed.
+
+**The cost, now mitigated.** Because the chart refits nightly against a table
+that grows, the model behind any past chart is not recoverable — last week's
+chart cannot be reproduced. `plot_daily_prediction.py`'s footer now stamps
+`Refit this run on N detection-hours, <first date> to <last date>`, so a
+published chart is at least attributable to a data snapshot and an
+odd-looking older one is diagnosable. (The flip side of nightly refitting is
+worth keeping: it is why the swell backfill propagated to the forecast with
+no redeploy.)
+
+**New `analysis/surf_count_model_fit/`.** Predicted vs. actual for the GBT
+point model on the held-out rows, with the 1:1 line and a mean-prediction
+trend binned by actual count. The aggregate numbers actively mislead here —
+mean bias is **+0.01 surfers**, which reads as unbiased. Binned, the model
+is nothing of the sort:
+
+| actual (mean) | n | mean predicted | error |
+|---|---|---|---|
+| 0.4 | 50 | 4.4 | +4.0 |
+| 7.1 | 42 | 12.0 | +5.0 |
+| 12.3 | 40 | 12.7 | +0.4 |
+| 21.6 | 23 | 21.0 | -0.6 |
+| 34.4 | 34 | 26.0 | -8.4 |
+| 45.9 | 14 | 31.0 | -14.8 |
+
+It over-predicts quiet hours and under-predicts crowded ones, crossing over
+around **22 surfers**, and the two errors cancel into a bias near zero. Plain
+regression to the mean, and invisible in every headline metric the project
+publishes. It compounds with the detector's own measured undercount on
+crowded frames (`eval_detector.py`: -6.1% overall, worst on the busiest
+images), so the two biases point the same direction on exactly the hours the
+forecast most needs to get right.
+
+Chart colors reuse the repo's existing palette rather than an independently
+chosen one. That pair sits slightly outside the ideal dark-mode lightness
+band, but clears CVD separation (dE 15.9 protan), normal-vision separation
+(dE 28.7) and 3:1 contrast on this surface — and a lone chart in different
+colors would be worse than one slightly off-band. First render put the
+crossover callouts behind the legend; they now anchor to the empty strip
+above the x-axis.

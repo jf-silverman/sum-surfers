@@ -269,10 +269,16 @@ def main():
         predictor_lines.append(f"  • {label}")
 
     predictors_str = ", ".join(seen_names)
+    # Record which data this run's models were fit on. The forecast models are
+    # refit from scratch every run against a table that grows nightly, so
+    # without this stamp a published chart is not attributable to any
+    # particular snapshot and an odd-looking older chart can't be diagnosed
+    # after the fact.
     info_text = (
         f"Model: gradient-boosted trees (quantile regression), point estimate = median model  "
         f"|  Top predictors (live fit): {predictors_str}\n"
-        f"Surfer detector (YOLOv8s, train13 — actual training log): "
+        f"Refit this run on {len(df):,} detection-hours, {df['date'].min()} to {df['date'].max()}  "
+        f"|  Surfer detector (YOLOv8s, train13 — actual training log): "
         f"precision {DETECTOR_PRECISION:.1%}, recall {DETECTOR_RECALL:.1%}"
     )
     fig.text(0.5, 0.01, info_text, fontsize=8, ha="center", va="bottom", color=MUTED_TEXT)
