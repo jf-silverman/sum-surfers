@@ -180,5 +180,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# watch_live.py output — demo/real-time collection frames (regenerable, not source data)
-data/live_watch/frames/
+# watch_live.py output — demo/real-time collection run (regenerable, not source data)
+data/live_watch/
