@@ -266,14 +266,27 @@ def main():
             continue
         new_rows[filename] = sp.row_from_predictors(date_str, time_local, filename, predictors)
 
-    # Rewrite rather than append: with --refetch-incomplete a target may already
-    # have a (blank-ish) row in the file, and appending would leave two rows for
-    # the same filename. Existing rows keep their original position; anything
+    # Re-read the file immediately before merging rather than reusing the
+    # snapshot taken at startup. A full-history run takes ~2 hours, and the
+    # scheduled pipeline appends to this same CSV partway through (Step 5,
+    # get_surf_predictors.py) — rewriting from the stale startup snapshot
+    # would silently delete every row the pipeline added while we were
+    # fetching. Rows that appeared in the meantime are kept as-is unless this
+    # run actually re-fetched that filename.
+    current = sp.load_rows(out_csv)
+    appeared = len(current) - len(existing)
+    if appeared:
+        print(f"note: {appeared} row(s) were added to {out_csv.name} by another process "
+              f"during this run (likely the scheduled pipeline) — preserving them.")
+
+    # Rewrite rather than append: with --refetch-incomplete/--force a target may
+    # already have a row in the file, and appending would leave two rows for the
+    # same filename. Existing rows keep their original position; anything
     # re-fetched is replaced in place, and genuinely new rows go on the end.
-    replaced = sum(1 for r in existing if r["filename"] in new_rows)
-    merged = [new_rows.pop(r["filename"], r) for r in existing]
+    replaced = sum(1 for r in current if r["filename"] in new_rows)
+    merged = [new_rows.pop(r["filename"], r) for r in current]
     merged.extend(new_rows.values())
-    added = len(merged) - len(existing)
+    added = len(merged) - len(current)
     write_rows(out_csv, merged)
 
     print(f"\nDone. {added} row(s) added, {replaced} replaced in {out_csv} "
