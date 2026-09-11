@@ -2173,3 +2173,63 @@ asserted the historical list "IS size-ordered," which its own numbers
 (62/72 mismatches) contradicted — noted here rather than left standing,
 since the earlier `wave`-endpoint entry in this file does still describe
 that (now-dead, untestable) endpoint's list as size-ordered.
+
+### Full-history swell re-backfill: closed every predictor gap, and a real swell signal appeared (2026-09-10)
+
+Ran `backfill_historical_predictors.py --start 2025-10-11 --end 2026-09-08
+--chunk-days 7 --force` (48 chunks, 384 requests, ~2 hours) to re-fetch
+every predictor row under the corrected `primary_swell()` rule.
+
+**Ran clean.** 383/384 requests succeeded; the one failure was a
+transient 20s read timeout on `consistency` in chunk 29 (2026-04-25 →
+05-01) — a window with zero crops, so it cost nothing. No 400s, no 429s,
+no throttling across two hours at 7-day chunks.
+
+**The concurrency fix earned itself immediately.** The run straddled the
+20:30 pipeline, which appended 16 rows mid-run; the re-read-before-write
+change added hours earlier preserved them (`note: 16 row(s) were added
+... preserving them`). Under the previous stale-snapshot rewrite those 16
+rows would have been silently deleted.
+
+**Results.** 1,608 rows replaced, 2 added, 0 duplicates, **0 nulls
+anywhere**, and the **151 physically-impossible all-zero swell rows are
+gone (151 → 0)**. Those rows now read mean 8.06ft @ 14.4s, which is
+finally coherent with the 2,524 kJ offshore energy and 2.97ft surf they
+always reported.
+
+**The controls confirm the change was isolated to swell selection**, not
+a source or scale shift: `tide_ft` **0%** of rows changed, `surf_min/max`
+**0%**, `energy_offshore_kj` 1.6%, `rating_value` 6.4% (the last two
+presumably minor retrospective forecast revisions). Meanwhile the swell
+columns changed in **~49%** of rows — matching the independently measured
+49% max-power/max-height disagreement rate almost exactly. Mean swell
+period moved **9.04s → 12.99s**, since the old rule systematically
+favoured short-period trains.
+
+**Every predictor gap is now closed**: `build_training_features.py`
+reports **1,457 of 1,457** quality_ok rows matched (was 1,219 of 1,425
+with 206 unmatched this morning).
+
+**A real swell signal emerged where there had been noise** — correlations
+with `surfer_count`, before vs. after:
+
+| feature | r before | p before | r after | p after |
+|---|---|---|---|---|
+| `primary_swell_period_s` | +0.015 | 0.58 | **+0.158** | <0.0001 |
+| `primary_swell_height_ft` | -0.074 | 0.005 | **-0.134** | <0.0001 |
+| `primary_swell_direction_deg` | +0.006 | 0.83 | **-0.111** | <0.0001 |
+| `energy_offshore_kj` (control) | -0.088 | 0.0009 | -0.087 | 0.0009 |
+| `tide_ft` (control) | -0.331 | <0.0001 | -0.332 | <0.0001 |
+
+Swell *period* went from indistinguishable from zero (p=0.58) to a real,
+highly significant **positive** association: longer-period groundswell,
+more surfers. Height moved further **negative**. Those pull in opposite
+directions, which is physically sensible — clean long-period swell draws
+people out, big raw swell height doesn't — and the old wrong-train
+selection had been blending the two into noise. This partly answers the
+open "wave-size vs. surfer-count negative correlation" question in
+`model_and_feature_ideas.md`: the negative height relationship is real
+and got *stronger*, but it was masking a genuine positive period effect.
+Effect sizes are still small (r² ≈ 2%) and `tide_ft` (-0.33) remains far
+and away the dominant predictor. Correlational only — not yet re-checked
+against GBT permutation importance.
