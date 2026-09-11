@@ -2302,3 +2302,79 @@ direction can mean the opposite of what it looks like. This also
 vindicates the originally-documented ~65-67%, which was closer to the
 truth than the 82.8% that briefly replaced it. README's Model
 Calibration section updated accordingly.
+
+### A credential-free real-time collection path; and what the 371 committed crops are (2026-09-11)
+
+Joel asked two things: what the crops committed to the repo actually are,
+and for a reproducible version of the collection script that pulls
+real-time data during daylight for as long as the machine is running.
+
+**The 371 committed crops.** `data/j_shore_cam/surf_crops/` holds 4,917
+crops locally but only 371 are tracked in git, from two commits:
+
+- `991f8c2` (2025-10-16, "code to auto-pull clips, pull frames, and crop
+  roi; adds 5 days of cropped imgs") — 70 crops, 2025-10-11 to 10-15.
+- `6762433` (2026-02-25, "improved detections") — the other 301, extending
+  the run to 2025-11-10.
+
+Together they are a contiguous 27-day stretch, 2025-10-11 → 2025-11-10, at
+14 crops/day. So: **early pipeline output, not a curated set** — not fog
+research, and not training data. Confirmed not training data directly:
+**zero of the 371 appear in the CVAT labeled set**, whose 57 images come
+from pre-pipeline manual captures in Jul-Aug 2025. The directory was added
+to `.gitignore` on 2026-08-28 (`86868ea`), which is why the tracked set
+stops at 2025-11-10 while collection continued; the 371 were already
+committed by then and stayed.
+
+**`watch_live.py`.** The production path needs `SURFLINE_CAMERA_ID` +
+`SURFLINE_ACCESS_TOKEN` — a paid account — so nobody else can run this
+repo end to end. The new script needs no account and no environment
+variables at all:
+
+- The spot's live HLS playlist comes from the public
+  `kbyg/spots/reports` endpoint keyed by the already-public spotId.
+  Verified tokenless on 2026-09-11: 200, and the stream itself plays
+  without a token. The browser-like `REQUEST_HEADERS` are still required —
+  Cloudflare 403s plain requests regardless of token.
+- The stream is **1280x720**, the same resolution the clip pipeline
+  produces, so the hardcoded ROI crop and the tiled detector apply
+  unchanged. `check_clip_dimensions()` asserts this every run rather than
+  assuming it, since a resolution change would silently crop the wrong
+  patch of water instead of failing.
+- The production model weights are already committed
+  (`train13/weights/best.pt`), so a clone has everything it needs.
+
+**It records a clip, not a single frame.** The first version grabbed one
+frame per cycle, and four consecutive test grabs 30 seconds apart returned
+7, 11, 13 and 17 surfers — the same within-clip variance the 2026-08-25
+entry documents and that `run_inference_multi()`'s 3-frame averaging exists
+to damp. A one-frame live feed would have been noisier than every row
+already in the dataset and not comparable to it. It now records ~6 seconds
+(`-c copy`, ~1s wall time), cuts frames at the same 1.0/2.5/4.0s offsets
+`get_cropped_frame.py` uses, and calls the same `run_inference_multi()`, so
+`frame_count_1/2/3`, `frame_count_mean` and `frame_count_stdev` are
+populated identically. The clip is deleted as soon as the crops are cut.
+
+**Deliberate limits.** It writes to `data/live_watch/` — its own frames dir
+and its own CSV with the same columns as `predictions.csv` — so a demo run
+can never mix into the real dataset, and crops use a `live` prefix rather
+than `crop` so nothing that globs or parses filenames can confuse them. It
+waits outside the dawn/dusk window (sharing `get_clips.py`'s
+`get_light_window()`). It cannot backfill: a live stream has no rewind,
+which is the flip side of needing no token.
+
+Sleep/wake was treated as the normal case, not an edge case — the script is
+meant to run for hours on a laptop. `sleep_until()` re-reads the wall clock
+every 20 seconds instead of counting down a single long sleep, so a suspend
+and resume is absorbed rather than skipped past; the stream URL is
+re-resolved hourly in case the CDN path rotates; and a failed cycle logs and
+continues rather than ending a multi-hour run.
+
+**Verified**: a full run with `SURFLINE_CAMERA_ID`/`SURFLINE_ACCESS_TOKEN`
+unset from the environment completed end to end and wrote
+`9 surfers (frames 9/10/7, sd 1.25)`; the written header matches
+`detect_surfers.CSV_HEADER` exactly; the crop is 1280x180 and visually
+frames the same water as the pipeline's crops; a forced quality-gate
+rejection still wrote its row, did not call inference, and cleaned up its
+clip; consecutive cycles fired at the requested interval; and `sleep_until()`
+returns immediately on a past target.

@@ -329,6 +329,39 @@ their own recurring schedule on the machine hosting the pipeline —
 `local_pipeline.sh` a couple times a week, `daily_chart.sh` once a day.
 Both are safe to run manually any time; see each script for details.
 
+## Run It Yourself (No Account Needed)
+
+Most of this repo's collection path depends on a paid camera account, which
+makes it hard for anyone else to reproduce. `watch_live.py` is the version
+that does not: it needs no account, no token, and no environment variables.
+
+While it is running, it records a few seconds off the camera's public live
+stream once every few minutes during daylight, cuts three frames from that
+clip the same way the scheduled pipeline does, crops each to the region the
+detector was trained on, counts surfers with the [trained model weights
+committed to this repo](data/model_out/20251013/train/runs/detect/train13/weights),
+and appends the averaged count to its own file — `data/live_watch/live_predictions.csv`,
+with the same columns as the main predictions file, kept separate so a demo
+run can never mix into the real dataset.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r docs/requirements.txt
+
+python code/watch_live.py --once   # grab one frame and count it
+python code/watch_live.py          # keep collecting until you stop it
+```
+
+It needs [ffmpeg](https://ffmpeg.org/) on your path to read the stream
+(`brew install ffmpeg` or `apt install ffmpeg`).
+
+The limitation is the flip side of needing no account: a live stream has no
+rewind, so this collects only while your computer is awake and the script is
+running. It cannot fill in the past. Outside the daylight window it waits
+rather than collecting frames the [image quality gate](docs/HOW_IT_WORKS.md#term-image-quality-gate)
+would reject anyway.
+
 ## Local Setup
 
 1. Create and activate a virtual environment.
