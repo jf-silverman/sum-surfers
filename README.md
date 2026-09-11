@@ -76,12 +76,12 @@ tuned over time, and [PROJECT_FILES.md](docs/PROJECT_FILES.md) for a map
 of what every file in this repo does.
 
 <!-- DAILY_CHART_START -->
-#### A Recent Surfer Detection Count: Wednesday, September 09, 2026, 8:05 AM
+#### A Recent Surfer Detection Count: Thursday, September 10, 2026, 8:05 AM
 
 Each green box below contains a surfer, according to the object detection model.  Each number above a box indicates the probability that the object is a surfer.  Look carefully and you may find additional surfers that the model missed or other objects which are misclassified as surfers - like the wind sock at the bottom center of the photo.
 ![Latest detection review](data/charts/latest_detection.png)
 
-#### The Surfer Crowd Forecast for: Thursday, September 10, 2026
+#### The Surfer Crowd Forecast for: Friday, September 11, 2026
 
 Once enough hours and days were gathered along with weather and surf conditions, a surf count prediction model was built to forecast how many surfers would be present at each hour for the coming day.  This is useful for surfers to plan to avoid busy times or at least know what to expect.  Recently the predictions have been low compared to actual counts, so more images are being collected to improve the object detection model's ability to find surfers in a variety of light and water conditions, like fog or choppy water surfaces.
 ![Latest daily prediction chart](data/charts/latest.png)
