@@ -2378,3 +2378,85 @@ frames the same water as the pipeline's crops; a forced quality-gate
 rejection still wrote its row, did not call inference, and cleaned up its
 clip; consecutive cycles fired at the requested interval; and `sleep_until()`
 returns immediately on a past target.
+
+### Both models made externally checkable; two reporting errors found doing it (2026-09-11)
+
+Joel asked whether publishing the modeling test set would be better than the
+live-collection demo, so a reader could check labels against predictions.
+The answer split in two, because the two models were in very different
+states.
+
+**The detector test set was already public** — `instances_test.json` (10
+whole frames, 148 boxes), the 40 tiles cut from them, the full tiled YOLO
+dataset, and `train13/best.pt` are all committed. Nothing needed publishing;
+what was missing was the evaluation. New `eval_detector.py` reports two
+things:
+
+- **Tile-level** precision/recall/mAP through Ultralytics' validator. It
+  writes its own `data.yaml` rather than using the committed one, which has
+  absolute paths from the machine that built it
+  (`/Users/.../sum-surfers/...`) and therefore resolves on no other clone —
+  a reproducibility hole that had gone unnoticed because nothing outside
+  training ever read that file.
+- **Whole-frame count accuracy**, which is what the forecast actually
+  consumes. Tile metrics score boxes; the pipeline only uses the *number* of
+  surfers per 1280x180 crop after tiling, cross-tile NMS and
+  false-positive-zone filtering. This runs the production `run_inference()`
+  path against ground-truth box counts. Test: **MAE 1.30, mean bias −0.90,
+  139 predicted vs 148 labeled (−6.1%)**. Val: MAE 2.20, bias −0.73, −3.8%.
+  The undercount is consistent and shows on both splits, which is the same
+  bias the human-count studies found and the training-data expansion plan is
+  meant to address.
+
+**The README was quoting metrics for a checkpoint that was never
+deployed.** Running `--split val` returned precision 0.85634 / recall
+0.82047 against a published 0.87843 / 0.80618. The published pair is the
+**epoch-60** row of the training log; `best.pt` — the weights actually in
+production — is **epoch 51**, the best mAP@0.5:0.95 epoch, whose logged
+P/R is 0.85641 / 0.82094, matching the fresh measurement to ~5e-4. So the
+deployed detector is slightly less precise and slightly more sensitive than
+advertised, and every daily chart footer has carried the wrong pair.
+`DETECTOR_PRECISION`/`DETECTOR_RECALL` and the README now use the deployed
+checkpoint's numbers, with `eval_detector.py` named as the way to re-derive
+them.
+
+**The forecast model had nothing public**, so this needed a real release.
+`export_model_release.py` writes `data/model_release/`: the fitted point and
+q0.10/q0.90 models plus the train-set standardization statistics and feature
+order, the 292 held-out rows with **raw** (readable) predictor values, and
+split/version metadata. `eval_surf_count_model.py` is what a reader runs —
+it imports no training code and reads no training data, verified by moving
+`training_features.csv`, `predictions.csv` and `predictor_vars/` aside and
+running it clean.
+
+Shipping the fitted model, not just a scored CSV, was the deliberate part: a
+predictions-versus-actuals table is self-reported, and recomputing MAE from
+it proves nothing about whether the model saw those rows. With the model
+included, the rows it never trained on can be re-scored by anyone, and the
+1,165 training rows still stay unpublished. Held-out results: **MAE 6.33,
+RMSE 8.71, bias +0.01, 80% interval coverage 70.9%** — and bucketed by how
+crowded the day actually was, `+3.85` on 0-4 surfers against **−10.31 on
+30+**, the regression-to-the-mean the aggregate bias of +0.01 completely
+conceals.
+
+**The reproducibility self-check earned its place immediately.** The eval
+script re-predicts from the CSV and compares against the shipped
+predictions before reporting anything; on the first run it reported
+MISMATCH, max drift **0.89 surfers on 277 of 292 rows**. The feature matrix
+round-tripped to 1e-16, so the cause was not the data: pandas' default C
+float parser is not correctly rounded, and `HistGradientBoostingRegressor`
+**bins** its features, so a 1e-16 difference can push a value across a bin
+edge and change which leaf a row lands in. `float_precision="round_trip"` on
+the read fixes it exactly. Worth keeping in mind anywhere this project's
+tree models are fed data that has been through a text format.
+
+Two smaller things fixed while here: `is_night`/`is_weekend` were being
+written twice into the released CSV (once as context, once as features),
+which `read_csv` silently renames to `is_night.1` and makes column selection
+ambiguous; and the release reports 80% coverage as **70.9%** where the
+README's calibration chart says **71.6%** — both correct, since the chart
+fits a 9-level quantile ladder with monotonicity enforced across all levels
+while the release ships the q0.10/q0.90 pair alone. That is 2 rows out of
+292, and the reconciliation is recorded in `release_metadata.json` and
+printed by the eval script so the two numbers do not read as a
+contradiction.

@@ -1,0 +1,41 @@
+{
+  "generated_utc": "2026-09-11T22:16:38Z",
+  "split": {
+    "test_size": 0.2,
+    "random_state": 42,
+    "n_train": 1165,
+    "n_test": 292
+  },
+  "test_date_range": [
+    "2025-10-12",
+    "2026-09-10"
+  ],
+  "quantiles": {
+    "lower": 0.1,
+    "upper": 0.9,
+    "lower_min_samples_leaf": 20,
+    "upper_min_samples_leaf": 20
+  },
+  "point_model_kwargs": {
+    "max_iter": 300,
+    "learning_rate": 0.05,
+    "max_depth": 4,
+    "l2_regularization": 1.0,
+    "random_state": 42
+  },
+  "n_features": 31,
+  "holdout_metrics": {
+    "mae": 6.326077114050178,
+    "rmse": 8.705356988124752,
+    "mean_bias": 0.010200760971096196,
+    "interval_coverage_80pct": 0.708904109589041
+  },
+  "coverage_note": "Coverage here is computed from the shipped q0.10/q0.90 pair. The README's calibration chart reports 71.6% because it fits a 9-level quantile ladder and enforces monotonicity across all levels, which differs by 2 rows out of 292.",
+  "versions": {
+    "python": "3.13.5",
+    "scikit_learn": "1.9.0",
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "joblib": "1.5.3"
+  }
+}

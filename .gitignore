@@ -182,3 +182,10 @@ dmypy.json
 
 # watch_live.py output — demo/real-time collection run (regenerable, not source data)
 data/live_watch/
+
+# eval_detector.py scratch output from the Ultralytics validator (regenerable)
+data/eval_out/
+
+# Ultralytics label caches — regenerated on demand and they embed absolute paths
+data/cvat_out_yolo_rebuilt/labels/*.cache
+data/cvat_out_coco/splits/*.cache

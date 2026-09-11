@@ -63,8 +63,13 @@ CHARTS_DIR = _PROJECT_ROOT / "data" / "charts"
 # results.csv, final epoch 60), not estimated. "Specificity" isn't a standard
 # object-detection metric (no fixed universe of negative boxes to measure against,
 # unlike binary classification) — recall is the direct analog to sensitivity.
-DETECTOR_PRECISION = 0.87843
-DETECTOR_RECALL = 0.80618  # = sensitivity
+# Measured on the validation split for the checkpoint actually deployed —
+# best.pt, which is epoch 51, not the final epoch 60. These were previously the
+# epoch-60 numbers (0.87843 / 0.80618), which describe a checkpoint that was
+# never shipped; see PROJECT_HISTORY.md's 2026-09-11 entry. Reproduce with
+# `python code/eval_detector.py --split val`.
+DETECTOR_PRECISION = 0.85634
+DETECTOR_RECALL = 0.82047  # = sensitivity
 
 # Dataset-wide hour range the model has ANY training examples for (used only to flag
 # extrapolated hours below) — NOT the same thing as "is it light on this specific day",

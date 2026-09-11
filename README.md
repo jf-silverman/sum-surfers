@@ -110,8 +110,8 @@ Once enough hours and days were gathered along with weather and surf conditions,
   extrapolation, not a confident prediction.
 - **Caption** — the conditions driving that day's forecast, plus the
   detector's actual [precision](docs/HOW_IT_WORKS.md#term-precision) and
-  [recall](docs/HOW_IT_WORKS.md#term-recall) from its real training log
-  (not estimated).
+  [recall](docs/HOW_IT_WORKS.md#term-recall), measured on held-out images
+  for the checkpoint actually deployed (not estimated).
 
 See [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for a deeper walkthrough of
 the detection pipeline and a glossary of every term used on this page,
@@ -209,8 +209,15 @@ see through the epoch-to-epoch noise.
 
 ![YOLOv8s detector training metrics — loss, precision, recall, mAP over 60 epochs](analysis/detector_training_metrics/detector_training_metrics.png)
 
-Final epoch: precision 87.8%, recall 80.6%, mAP@0.5 84.4%, mAP@0.5:0.95
-37.3% — the same real numbers cited in the daily chart's caption. Note
+The charts run to epoch 60, but the checkpoint actually deployed is
+`best.pt` — **epoch 51**, the epoch with the best mAP@0.5:0.95, which is
+what the training run saves as "best". Measured on the validation set, that
+deployed checkpoint gets **precision 85.6%, recall 82.0%, mAP@0.5 85.6%,
+mAP@0.5:0.95 40.1%** — slightly less precise and slightly more sensitive
+than epoch 60's 87.8%/80.6%. These are the numbers cited in the daily
+chart's caption, and you can re-derive them yourself from this repo with
+`eval_detector.py` (see [Run It Yourself](#run-it-yourself-no-account-needed)).
+Note
 mAP@0.5:0.95 (37.3%) is much lower than mAP@0.5 (84.4%): it's an average
 over much stricter box-overlap requirements (up to near-perfect box
 placement), not a sign the model is actually worse than the headline
@@ -332,8 +339,12 @@ Both are safe to run manually any time; see each script for details.
 ## Run It Yourself (No Account Needed)
 
 Most of this repo's collection path depends on a paid camera account, which
-makes it hard for anyone else to reproduce. `watch_live.py` is the version
-that does not: it needs no account, no token, and no environment variables.
+makes it hard for anyone else to reproduce. Three things do not need one:
+collecting live data, checking the detector, and checking the forecast model.
+
+### Collect live data
+
+`watch_live.py` needs no account, no token, and no environment variables.
 
 While it is running, it records a few seconds off the camera's public live
 stream once every few minutes during daylight, cuts three frames from that
@@ -361,6 +372,53 @@ rewind, so this collects only while your computer is awake and the script is
 running. It cannot fill in the past. Outside the daylight window it waits
 rather than collecting frames the [image quality gate](docs/HOW_IT_WORKS.md#term-image-quality-gate)
 would reject anyway.
+
+### Check the detector against labeled images
+
+The labeled test split is in this repo — **10 whole frames carrying 148
+hand-drawn boxes**, plus the 40 tiles cut from them — and so are the trained
+weights. Nothing about the detector's reported accuracy has to be taken on
+faith:
+
+```bash
+python code/eval_detector.py                 # held-out test split
+python code/eval_detector.py --split val     # reproduces the numbers quoted above
+```
+
+It reports two different things. First, per-box precision, recall and
+[mAP](docs/HOW_IT_WORKS.md#term-map) on the tiles — the same measurement the
+training log made, which is why `--split val` reconciles against the
+published 85.6%/82.0%. Second, and more to the point, **count accuracy on
+whole frames**: it runs the real production inference path (tiling,
+cross-tile [NMS](docs/HOW_IT_WORKS.md#term-nms), false-positive filtering) on
+each test image and compares the surfer count to the number of labeled boxes.
+That second number is the one the forecast actually consumes, and a detector
+can look fine per-box while undercounting crowded frames.
+
+On the 10 held-out frames it comes to **MAE 1.30 surfers, mean bias −0.90**
+(139 predicted against 148 labeled, −6.1%) — a consistent, mild undercount.
+
+### Check the forecast model against held-out data
+
+`data/model_release/` holds the fitted forecast model, the **292 rows it was
+never trained on**, and the metadata to reproduce the split:
+
+```bash
+python code/eval_surf_count_model.py
+```
+
+This ships the fitted model rather than only a table of predictions on
+purpose. A predictions-versus-actuals file is self-reported — you can
+recompute the error from it, but not check that the model was not fit on
+those same rows. With the model included you can run it yourself on rows it
+never saw; the script re-predicts from the raw predictor values and verifies
+it reproduces the shipped numbers before reporting anything. The 1,165
+training rows stay unpublished.
+
+It reports MAE, RMSE and bias (broken out by how crowded the day actually
+was, which is where the model's weakness shows), and
+[prediction-interval](docs/HOW_IT_WORKS.md#term-prediction-interval) coverage
+with the two tail-miss rates kept separate.
 
 ## Local Setup
 
