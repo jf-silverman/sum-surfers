@@ -144,27 +144,71 @@ def load_gap_fill_tier(n_target, exclude_filenames, already_labeled):
 
     # Sample inversely to frequency: within each bucket, keep at most a small
     # quota, prioritizing rows from the rarest buckets overall until n_target
-    # is reached. Oversample explicitly-thin buckets (high count, tide tails,
-    # RAIN/FOG) by giving them a higher per-bucket quota.
+    # is reached. Explicitly-thin buckets get a higher per-bucket quota.
+    #
+    # The count-bucket boost used to go to 30-39/40+. That was backwards, and
+    # measuring it (2026-09-12, see PROJECT_HISTORY.md) is what showed it.
+    # Counting boxes rather than images — boxes being what the detector's loss
+    # actually sees — the existing labeled set breaks down as:
+    #
+    #   bucket   labeled images   of all boxes   of production frames
+    #   0-9          7 (12.3%)         2.8%              42.5%
+    #   10-19       16 (28.1%)        15.8%              22.6%
+    #   20-29       11 (19.3%)        17.8%              17.2%
+    #   30-39       11 (19.3%)        26.3%              10.9%
+    #   40+         12 (21.1%)        37.4%               6.9%
+    #
+    # Crowded frames are already the bulk of the training signal (63.7% of all
+    # boxes come from 30+ frames) while being a small minority of real
+    # conditions. The starved end is the quiet one: 2.8% of boxes against 42.5%
+    # of production, which leaves the detector with almost no supervision for
+    # the negative case — empty water, shadows, birds, glare with nothing in
+    # it. Quiet frames are also the cheapest possible labeling, a couple of
+    # boxes each against forty, so a larger quota costs little time.
+    #
+    # Crowded frames are not excluded here, just no longer boosted: the ~12
+    # crowded frames needed in test as a regression tripwire can be re-split
+    # out of the 23 already labeled, without drawing a single new box.
     def bucket_quota(key):
         _, tide_b, count_b, weather = key
         quota = 1
-        if count_b in ("30-39", "40+"):
-            quota += 2
+        if count_b == "0-9":
+            quota += 3
+        elif count_b == "10-19":
+            quota += 1
         if tide_b in ("<0ft", ">6ft"):
             quota += 1
         if weather in ("RAIN", "FOG"):
             quota += 2
         return quota
 
+    # Hard per-count-bucket caps, allocated to the production distribution.
+    #
+    # The per-key quota above is not enough on its own. Iterating rarest-key
+    # first is right for the condition axes (a rare weather/tide combination
+    # should get first pick of its few rows) but it inverts the count axis:
+    # composite keys containing 40+ are rare *because crowded sessions are
+    # rare*, so they were visited first and ate the budget. With the quota
+    # boost alone the picked mix was still 0-9=12 against 30+=22, the opposite
+    # of production. These caps bound each count bucket directly, so ordering
+    # can stay rarity-first where it helps without skewing the count mix.
+    count_share = {"0-9": 0.42, "10-19": 0.23, "20-29": 0.17, "30-39": 0.11, "40+": 0.07}
+    count_cap = {b: max(1, round(n_target * s)) for b, s in count_share.items()}
+    print(f"  Per-count-bucket caps (production-weighted): "
+          f"{', '.join(f'{b}={c}' for b, c in count_cap.items())}")
+
     picked = []
     picked_per_bucket = Counter()
+    picked_per_count = Counter()
     # Iterate rarest buckets first so thin buckets get first pick of their (few) rows.
     df_sorted = df.assign(_bucket_freq=df["bucket_key"].map(bucket_counts)).sort_values("_bucket_freq")
     for _, row in df_sorted.iterrows():
         if len(picked) >= n_target:
             break
         key = row["bucket_key"]
+        count_b = key[2]
+        if picked_per_count[count_b] >= count_cap.get(count_b, n_target):
+            continue
         if picked_per_bucket[key] >= bucket_quota(key):
             continue
         fname = row["filename"]
@@ -172,6 +216,7 @@ def load_gap_fill_tier(n_target, exclude_filenames, already_labeled):
             continue
         picked.append(row)
         picked_per_bucket[key] += 1
+        picked_per_count[count_b] += 1
 
     print(f"\n=== Gap-fill tier: picked {len(picked)} of {n_target} target ===")
     return picked, bucket_counts

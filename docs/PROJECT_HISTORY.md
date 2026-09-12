@@ -2721,3 +2721,49 @@ is coverage of each appearance regime with enough absolute examples, which
 for this set means adding quiet frames without removing crowded ones. The
 forecast model is unaffected either way: it trains on every production row,
 so it is production-weighted by construction.
+
+### Labeling-candidate selection re-weighted toward quiet frames (2026-09-12)
+
+Acting on the box-level finding above, `select_labeling_candidates.py`'s
+gap-fill tier no longer oversamples crowded frames. Two changes were needed,
+because the first one alone did not work.
+
+**1. The count-bucket quota boost moved from `30-39`/`40+` to `0-9` (+3) and
+`10-19` (+1).** The tide-tail and RAIN/FOG boosts are unchanged — those gap
+arguments were never in question.
+
+**2. A hard per-count-bucket cap, allocated to the production
+distribution.** The quota change alone barely moved the output: still
+`0-9=12` against `30+=22` out of 60. The cause is the selection loop's
+rarest-key-first ordering. That ordering is correct for the condition axes —
+a rare weather/tide combination should get first pick of its few rows — but
+it inverts the count axis, because composite keys containing `40+` are rare
+*precisely because crowded sessions are rare*, so they were visited first
+and consumed the budget before quiet keys were reached. Caps bound each
+count bucket directly, leaving the ordering alone where it helps.
+
+Gap-fill tier before and after, against production:
+
+| bucket | before | after | production |
+|---|---|---|---|
+| 0-9 | — | 19 (42%) | 42% |
+| 10-19 | — | 10 (22%) | 23% |
+| 20-29 | — | 8 (18%) | 17% |
+| 30-39 | — | 5 (11%) | 11% |
+| 40+ | — | 3 (7%) | 7% |
+
+(Combined picks by count bucket went from `0-9=12, 10-19=15, 20-29=11,
+30-39=9, 40+=13` to `0-9=22, 10-19=16, 20-29=10, 30-39=6, 40+=6`.)
+
+The error tier is deliberately left crowd-weighted — it ranks by a
+count-weighted score and its top two picks are the two catastrophic failures
+(30 counted as 3, 46 counted as 19). Those are the specific frames worth
+labeling regardless of distribution.
+
+Verified: 60 candidates, no duplicates, every filename present in
+`surf_crops/`.
+
+**Still stale:** the plan file at
+`~/.claude/plans/dazzling-rolling-lemon.md` continues to describe Phase 1 as
+"oversampling >30 count frames," and `build_stratified_splits.py` (Phase 4)
+does not exist yet. Neither was touched here.
