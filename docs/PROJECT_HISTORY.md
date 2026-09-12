@@ -2582,3 +2582,66 @@ biases compound rather than offset. Labeling more crowded frames is not the
 first move; the first move is getting crowded frames into val/test so the
 failure is measurable at all, which is what Phase 4's stratified re-split
 was already meant to do.
+
+### The forecast model is predictor-limited, not algorithm-limited (2026-09-11)
+
+Joel asked whether other model families or data transforms were worth
+trying, and whether the GBT's hyperparameters had ever been tuned. The
+second question had a short factual answer: **no**. There is no grid search,
+no cross-validation and no sweep anywhere in the repo — the production
+hyperparameters were hand-picked once and never revisited. New
+`analysis/surf_count_model_selection/` settles the rest, selecting by 5-fold
+CV on train only and scoring the held-out rows once at the end. Full numbers
+in that directory's `results.md`.
+
+- **Tuning is exhausted.** 72 combinations of depth / learning rate /
+  iterations / L2 improved CV MAE from 6.238 to **6.201** — 0.6% — and that
+  winner is *worse* on held-out data (6.385 vs 6.326). The hand-picked
+  parameters were already on the plateau.
+- **No family helps.** sqrt(y) ties at 6.213; log1p, squared_error,
+  absolute_error, RandomForest and ExtraTrees are all worse; the linear
+  models are far worse (8.802 / 9.078 against a mean-baseline of 11.559,
+  recovering less than half the signal the GBT does).
+- **Nothing touches the crowd bias.** Every variant tested lands between
+  **-10.31 and -13.48** on 30+ hours. The under-prediction documented in the
+  fit-scatter entry is not a hyperparameter, loss-function or target-scale
+  artifact — it survives every algorithm change.
+- **And it is not label noise.** Within-clip measurement noise
+  (`frame_count_stdev` over the three frames of one clip, n=1,144) averages
+  **0.97 surfers** — 0.37 on quiet hours, 1.66 on 30+. The target is
+  measured several times more precisely than the model predicts it, so the
+  ~6.3 gap is real unexplained variance.
+
+Everything converging on MAE 6.2-6.4 against an 11.6 mean-baseline is the
+signature of predictors that have been fully exploited. The lever is new
+information, not new algorithms — with the swell re-backfill as the
+precedent, where correcting a single feature moved period's correlation with
+count from r=+0.015 to +0.158.
+
+**Bearing on Phase 4 of the training-data plan.** Re-splitting does not
+improve predictions; it only makes the detector's crowd failure measurable.
+But the two are linked in one direction worth stating: the forecast model
+trains on **detector counts**, and those counts run ~14% low above 30
+surfers, so part of the forecast's -10 crowd bias is a label problem
+inherited from the detector rather than a modeling problem. Fixing the
+detector at high crowd would move the forecast; re-splitting alone would
+not.
+
+Two concrete adjustments the crowding audit implies for Phase 4's selection
+step, both contradicting what that plan currently says:
+
+1. **The gap-fill priority is inverted.** The plan oversamples high-count
+   frames. The labeled set already has 40% at 30+ (production: 18%) and
+   12.3% at 45+ (production: 4.3%). What it has almost none of is the quiet
+   end — **2 images** below 5 surfers against 28% of production. Sampling
+   should target 0-14, not 30+.
+2. **Stratifying the existing 57 by crowd bucket costs real training
+   signal.** A proportional 56/26/18 split would put 4 of the 7 45+ images
+   and 9 of the 16 30-44 images in train, moving the rest to val/test. That
+   is the right call for measurement, but it strips the only crowded
+   examples the detector has to learn from, so it should be paired with
+   newly labeled crowded frames to backfill train — not done alone.
+
+Also worth noting for whatever gets labeled: the labeled set tops out at 54
+boxes while production frames reach **74**, so the busiest real conditions
+have never been labeled at all.
