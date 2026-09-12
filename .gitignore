@@ -189,3 +189,6 @@ data/eval_out/
 # Ultralytics label caches — regenerated on demand and they embed absolute paths
 data/cvat_out_yolo_rebuilt/labels/*.cache
 data/cvat_out_coco/splits/*.cache
+
+# Regenerable from splits/ by build_stratified_splits.py (deterministic given --seed)
+data/cvat_out_coco/splits_v2/

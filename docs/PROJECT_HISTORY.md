@@ -2767,3 +2767,58 @@ Verified: 60 candidates, no duplicates, every filename present in
 `~/.claude/plans/dazzling-rolling-lemon.md` continues to describe Phase 1 as
 "oversampling >30 count frames," and `build_stratified_splits.py` (Phase 4)
 does not exist yet. Neither was touched here.
+
+### Phase 4 built: splits stratified by crowding (2026-09-12)
+
+`code/build_stratified_splits.py` now exists, and the plan file's Phase 1 and
+Phase 4 sections have been corrected to match what was actually learned.
+
+On the current 57 images, with nothing new labeled yet:
+
+| bucket | total | train | val | test |
+|---|---|---|---|---|
+| 0-9 | 7 | 4 | 2 | 1 |
+| 10-19 | 16 | 9 | 4 | 3 |
+| 20-29 | 11 | 6 | 3 | 2 |
+| 30-39 | 11 | 5 | 3 | 3 |
+| 40+ | 12 | 7 | 3 | 2 |
+| **TOTAL** | **57** | **31** | **15** | **11** |
+
+Test now spans every crowding bucket, with a maximum of **48 boxes on a
+frame against 24 before**, while 12 crowded frames stay in train. The
+detector's crowded-frame behaviour becomes measurable without stripping the
+regime out of training.
+
+Three design points worth recording, all of which differ from what the plan
+originally specified:
+
+- **Crowding is read from the labels, not from `training_features.csv`.**
+  The original 57 are pre-pipeline manual captures from Jul-Aug 2025 with no
+  row in the feature table, so the metadata join the plan called for could
+  not have stratified them at all. Boxes per image is ground truth for every
+  labeled image by definition, and it removes the join entirely.
+- **Count-bucket is the only balanced axis**; month is printed but not
+  balanced on. With 57-140 images, two axes leave buckets of one. (In the
+  current pool this shows immediately: only two months exist, and test draws
+  entirely from 2025-08.)
+- **`--test-crowded-min` had to be made authoritative.** First implementation
+  pinned N crowded frames to test and then let the proportional split
+  allocate the *rest* of the crowded buckets normally on top — asking for 4
+  produced 7. Crowded buckets are now allocated train/val-only beyond the
+  pinned frames, so the flag means what it says. Every crowded frame not
+  needed for the tripwire is worth more as training signal, being the
+  scarcest regime in the set.
+
+Default is 5 crowded test frames (~72% odds of containing at least one
+catastrophic case at the measured ~22% rate) rather than the 12 that would
+reach ~95%, since 12 is more than half of every crowded frame labeled.
+
+Verified: 57 images and 1,451 boxes in, 57 and 1,451 out, none dropped;
+contiguous image ids per split; no dangling annotation references; image
+files on disk match the JSON records in every split; output layout matches
+what `train_model.py --cvat-coco-dir` expects. `splits_v2/` is gitignored —
+it is regenerable from `splits/` and deterministic given `--seed`.
+
+Not done: no retrain has been run against it. That is Phase 5, and it is
+worth waiting for the new labels rather than spending a training run on a
+re-split of the same 57 images.
