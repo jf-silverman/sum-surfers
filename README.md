@@ -399,10 +399,14 @@ On the 10 held-out frames it comes to **MAE 1.30 surfers, mean bias −0.90**
 (139 predicted against 148 labeled, −6.1%) — a consistent, mild undercount.
 
 Read that with its limit in mind, which the script now prints: **those 10
-frames span 7 to 24 surfers**, so they say nothing about crowded scenes. On
-real frames with human counts, the undercount stays near −0.6 up to 29
-surfers and widens to **−5.4 above 30**. Anything the test split reports is
-a statement about ordinary conditions only.
+frames span 7 to 24 surfers**, so they say nothing about crowded scenes.
+That matters, because crowded frames fail differently. On real frames with
+human counts, the detector is accurate up to 29 surfers (bias −0.6) and
+stays accurate on most crowded frames too — but on 2 of 9 frames above 30 it
+missed almost everything (30 counted as 3; 46 counted as 19). The other
+seven average +0.7. The failure there is rare and total rather than a
+gradual drift, which is exactly the kind a 10-frame test split capped at 24
+surfers cannot see.
 
 ### Check the forecast model against held-out data
 

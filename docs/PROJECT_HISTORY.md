@@ -2645,3 +2645,79 @@ step, both contradicting what that plan currently says:
 Also worth noting for whatever gets labeled: the labeled set tops out at 54
 boxes while production frames reach **74**, so the busiest real conditions
 have never been labeled at all.
+
+### Crowd failure is rare-and-catastrophic, not gradual; and what that costs to measure (2026-09-12)
+
+Joel asked whether labeled crops should be sampled equally across crowding
+levels or matched to production frequency. Working the numbers for that
+answer corrected a characterization made here yesterday.
+
+**Image counts are not the training signal — boxes are.** The labeled set
+looks roughly spread across crowding by image, but the detector's loss
+operates per box:
+
+| bucket | images | img % | boxes | box % |
+|---|---|---|---|---|
+| 0-4 | 2 | 3.5% | 4 | **0.3%** |
+| 5-14 | 12 | 21.1% | 116 | 8.0% |
+| 15-29 | 20 | 35.1% | 408 | 28.1% |
+| 30-44 | 16 | 28.1% | 587 | 40.5% |
+| 45+ | 7 | 12.3% | 336 | 23.2% |
+
+**63.7% of all training boxes come from 30+ frames**, and quiet frames
+contribute **4 boxes out of 1,451**. So the set is far more crowd-weighted
+than the image split suggests, and it has almost no supervision for the
+negative case — empty water, shadows, birds, glare with nothing in it. That
+is an argument for labeling quiet frames that does not depend on matching
+production frequency at all.
+
+**The correction.** Yesterday's entries recorded the detector's 30+ bias as
+**-5.4 surfers**, described as an undercount that widens with crowding. The
+mean is right; the description is wrong. Broken out, all nine human-counted
+30+ frames:
+
+| | error |
+|---|---|
+| `crop2026-08-03_10-02-00` (human 30, model 3) | **-27** |
+| `crop2026-08-09_07-29-00` (human 46, model 19) | **-27** |
+| the other seven | -3, -2, -2, +2, +3, +3, +4 |
+
+Excluding those two: **mean +0.71, sd 2.93**. The detector is not
+degrading gradually with crowding — it is accurate at 30+ in 7 of 9 cases
+and **catastrophically wrong in the other 2**, both of which are the same
+frames the training-data expansion plan already flagged as its hardest known
+cases. The failure mode is rare-and-total, not gradual-and-systematic. The
+README's wording has been corrected.
+
+**This changes what there is to measure, and the cost.** Estimating a mean
+bias against sd 12.48 needs ~30 crowded test frames for a +/-4.5 CI — about
+half the entire current labeled corpus. Estimating a *failure rate* is a
+different and much cheaper question:
+
+- Catastrophic rate at 30+ is **2/9 = 22%** (Wilson 95% CI 6-55%, so the
+  rate itself is barely pinned down by n=9).
+- Probability that a test set of n crowded frames contains at least one
+  catastrophic case, if the true rate is 22%: n=5 -> 72%, n=8 -> 87%,
+  **n=12 -> 95%**, n=20 -> 99%.
+- Pinning the rate itself to +/-10 percentage points would need n ~= 66.
+
+So **~12 crowded test frames buys a 95% chance of catching the failure mode
+at all**, which is a regression tripwire and is affordable. Pinning down how
+often it happens is not affordable from labeling, and should come from the
+human-count review sets instead — those are already production-distributed
+and far cheaper per frame than drawing boxes.
+
+**Theory, for the original question.** The two halves have different
+answers. For **test**, neither pure option is right: stratify to sample
+(so rare buckets are individually measurable) and reweight per-bucket
+metrics by production frequency to recover an unbiased deployment estimate,
+reporting both the reweighted aggregate and the per-bucket table. Equal
+weighting alone answers a question about a distribution that does not exist;
+production weighting alone puts zero frames in the rare buckets, which is
+precisely how the current test split ended up capped at 24 surfers. For
+**training**, frame-level frequency matching has little theoretical payoff
+here — a detector learns appearance, not a prior over counts — so the goal
+is coverage of each appearance regime with enough absolute examples, which
+for this set means adding quiet frames without removing crowded ones. The
+forecast model is unaffected either way: it trains on every production row,
+so it is production-weighted by construction.
