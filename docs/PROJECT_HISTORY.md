@@ -2518,3 +2518,67 @@ band, but clears CVD separation (dE 15.9 protan), normal-vision separation
 colors would be worse than one slightly off-band. First render put the
 crossover callouts behind the legend; they now anchor to the empty strip
 above the x-axis.
+
+### The labeled set's crowding distribution: the gap is in val/test, not in labeling (2026-09-11)
+
+Joel asked whether the labeled crops are evenly distributed across low,
+medium and high crowding, up to and past 45 surfers. Counted directly from
+`instances_{train,val,test}.json` (57 images, 1,451 boxes), against the
+production corpus (1,457 quality_ok frames in `predictions.csv`):
+
+| boxes/frame | labeled images | % | production frames | % |
+|---|---|---|---|---|
+| 0-4 | 2 | 3.5% | 410 | 28.1% |
+| 5-14 | 12 | 21.1% | 394 | 27.0% |
+| 15-29 | 20 | 35.1% | 393 | 27.0% |
+| 30-44 | 16 | 28.1% | 198 | 13.6% |
+| 45+ | 7 | 12.3% | 62 | 4.3% |
+
+Labeled mean 25.5, median 24, max 54. Production mean 15.7, median 12, max
+74.
+
+**So the answer is no, but not in the direction the training-data expansion
+plan assumed.** That plan recorded high-crowd frames as an under-represented
+gap to fill. They are not under-represented in the labeled set — they are
+*over*-represented: 40% of labeled images are 30+ against 18% of production,
+and 12.3% are 45+ against 4.3%. What the labeled set is actually starved of
+is the quiet end: **2 images** in the 0-4 bucket against 28% of production.
+The plan's Phase 1 gap-fill priorities should be revisited before labeling
+time is spent on them.
+
+**The real problem is the split, and it invalidates a claim made earlier
+today.** Crowding is distributed across train/val/test as badly as it could
+be:
+
+| split | n | mean | max | >=45 |
+|---|---|---|---|---|
+| train | 32 | 31.7 | 54 | 7 |
+| val | 15 | 19.2 | 35 | 0 |
+| test | 10 | 14.8 | 24 | 0 |
+
+Every crowded frame is in train. The test split **tops out at 24 surfers**
+and has nothing above 30 at all. So `eval_detector.py`'s MAE 1.30 / bias
+-0.90, added to the README this morning, is measured entirely on ordinary
+conditions and says nothing about the crowded frames where the detector is
+suspected to fail. The README now states that limit, and the script prints
+the split's actual count range plus a per-bucket breakdown, with an explicit
+warning when a split contains no frames above 30 — so the same claim cannot
+be made unqualified again.
+
+**The evidence that it does fail there comes from elsewhere.** Two real
+measurements bracket it:
+
+- On the **train** split, where all the crowded frames live, counts are
+  near-exact even at 45-54 (MAE 1.19, bias +1.00 across 32 frames). The
+  architecture can count crowded scenes — on images it memorized.
+- On `model_spotcheck_50`'s **human-counted production frames** (43 numeric
+  rows, never trained on), bias by crowding is **+0.1 / -0.6 / -0.6 / -5.4**
+  across 0-4 / 5-14 / 15-29 / 30+. Mean human 39.8 vs model 34.3 on the 30+
+  group — a ~14% undercount that appears only above 30.
+
+That -5.4 is the same direction as the forecast model's -8.4 to -14.8 on the
+same crowd levels (recorded in the fit-scatter entry above), so the two
+biases compound rather than offset. Labeling more crowded frames is not the
+first move; the first move is getting crowded frames into val/test so the
+failure is measurable at all, which is what Phase 4's stratified re-split
+was already meant to do.

@@ -145,6 +145,11 @@ def print_count_table(rows):
     bias = statistics.mean(errors)
     total_actual, total_pred = sum(actuals), sum(r["predicted"] for r in rows)
     print(f"\n  n frames        : {len(rows)}")
+    # The range this split actually covers. Printed because it is a real limit
+    # on what the numbers below can claim: the CVAT test split tops out at 24
+    # surfers, so it says nothing about crowded frames, which is exactly where
+    # the human-count studies find the detector degrading.
+    print(f"  actual range    : {min(actuals)} to {max(actuals)} surfers")
     print(f"  total actual    : {total_actual}")
     print(f"  total predicted : {total_pred}")
     print(f"  MAE             : {mae:.2f} surfers")
@@ -154,6 +159,23 @@ def print_count_table(rows):
     print(f"  mean bias       : {bias:+.2f} surfers ({'under' if bias < 0 else 'over'}counting)")
     if total_actual:
         print(f"  total-count err : {(total_pred - total_actual) / total_actual:+.1%}")
+
+    print(f"\n  By actual count:")
+    print(f"    {'bucket':<10} {'frames':>7} {'MAE':>8} {'bias':>9}")
+    any_crowded = False
+    for lo, hi, label in [(0, 5, "0-4"), (5, 15, "5-14"), (15, 30, "15-29"),
+                          (30, 45, "30-44"), (45, 10 ** 6, "45+")]:
+        sel = [r for r in rows if lo <= r["actual"] < hi]
+        if not sel:
+            continue
+        if lo >= 30:
+            any_crowded = True
+        e = [r["error"] for r in sel]
+        print(f"    {label:<10} {len(sel):>7} {statistics.mean(abs(x) for x in e):>8.2f} "
+              f"{statistics.mean(e):>+9.2f}")
+    if not any_crowded:
+        print(f"\n  No frames above 30 surfers in this split — the numbers above say\n"
+              f"  nothing about crowded scenes. See PROJECT_HISTORY.md (2026-09-11).")
 
 
 def parse_args():
