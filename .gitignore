@@ -195,3 +195,6 @@ data/cvat_out_coco/splits_v2/
 
 # Raw CVAT export; its normalized contents live in data/cvat_out_coco/posture_57/
 data/cvat_out_coco/posture_export_57_coco.zip
+
+# Labeling batches staged for CVAT upload (copies of surf_crops)
+data/cvat_out_coco/labeling_batch_*
