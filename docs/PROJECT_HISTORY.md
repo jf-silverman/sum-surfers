@@ -2910,3 +2910,40 @@ This confirms, with labels rather than inference, what the 2026-08-29
 flat-water case suggested: prone surfers are a real, measurable blind spot.
 `standing`, `SUP` and `wipeout` are too rare (8, 2 and 0 held-out boxes) to
 say anything about.
+
+### Batch 01 staged for CVAT: 60 candidates plus 13 verified-empty frames (2026-09-14)
+
+`labeling_batch_01_images.zip` (73 images, 10.7 MB) is ready for a new task
+in the existing CVAT project.
+
+**Three candidates replaced.** Joel rejected `crop2025-11-05_07-29-00`
+(fogged lens), `crop2026-07-22_06-17-00` (dense fog) and
+`crop2026-08-02_05-32-00` (pre-dawn noise). **All three had passed the
+automatic quality gate** — brightness 99.5 / 119.7 / 75.5 and Laplacian
+variance 332.8 / 16.3 / 1045.0 against thresholds of 75.4 and 12.7 — so the
+gate does not catch a fogged lens, dense fog, or a noisy pre-dawn frame. Not
+changed yet; worth revisiting after labeling. Replacements
+(`crop2025-11-05_15-35-00`, `crop2025-10-22_09-17-00`,
+`crop2026-08-28_10-38-00`) were checked by eye before swapping in, and
+rejections now live in `analysis/training_data_expansion/rejected_candidates.txt`,
+which `select_labeling_candidates.py` excludes on every run.
+
+**Empty frames added.** None of the 57 labeled frames is empty, and only 11
+of 228 tiles (4 of 128 in train) are background, while the model counts
+zero on about 10% of production frames. Ultralytics recommends roughly 0-10%
+background images to suppress false positives. Joel reviewed 16 clear
+daylight frames and kept 13 as genuinely empty:
+
+- all **8 of 8** the model counted as 0;
+- **5 of 8** the model counted as 1-2 — `crop2025-10-12_12-44-00` (1),
+  `crop2025-11-05_16-29-00` (2), `crop2025-11-14_08-32-00` (2),
+  `crop2026-08-13_13-47-00` (1), `crop2026-09-04_17-50-00` (1). These are
+  **verified false positives** on empty water, the most useful negatives to
+  train on.
+
+These carry `source_tier=empty-verified` in the candidate CSV, so a frame
+with zero boxes in the export reads as confirmed-empty rather than
+forgotten. Assuming every one of the other 60 has at least one surfer, the
+combined 130-frame pool tiles to at least 63 of 520 background tiles
+(12.1%) — slightly above the guideline, which `build_stratified_splits.py`
+can trim if it matters.
