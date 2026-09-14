@@ -1,0 +1,6 @@
+# Candidates Joel reviewed and rejected as unusable for labeling.
+# select_labeling_candidates.py never picks these again. One filename per line;
+# text after the filename is a note.
+crop2025-11-05_07-29-00.jpg  water/fog on the camera lens, frame blurred (2026-09-14)
+crop2026-07-22_06-17-00.jpg  dense fog, water surface washed out (2026-09-14)
+crop2026-08-02_05-32-00.jpg  pre-dawn, dark and noisy (2026-09-14)

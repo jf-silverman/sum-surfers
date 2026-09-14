@@ -54,6 +54,23 @@ def bucket(value, buckets):
     return "unknown"
 
 
+REJECTED_FILE = Path(__file__).resolve().parent.parent / "analysis" / "training_data_expansion" / "rejected_candidates.txt"
+
+
+def rejected_filenames():
+    """Frames a human already reviewed and ruled unusable (fogged lens, dense
+    fog, pre-dawn noise). The automatic quality gate passed all three of the
+    first batch's rejects, so its verdict is not enough to keep them out."""
+    if not REJECTED_FILE.exists():
+        return set()
+    names = set()
+    for line in REJECTED_FILE.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            names.add(line.split()[0])
+    return names
+
+
 def existing_cvat_filenames():
     """Filenames already labeled, across all three current splits. The old
     export uses a different naming convention (jacks_YYYYMMDD_HHMM.jpg /
@@ -241,7 +258,9 @@ def main():
                         "included regardless of how small the miss is)")
     args = p.parse_args()
 
-    already_labeled = existing_cvat_filenames()
+    # Rejected frames are folded into the labeled set's exclusion, which both
+    # tiers already honor.
+    already_labeled = existing_cvat_filenames() | rejected_filenames()
     print(f"Existing CVAT export has {len(already_labeled)} labeled images.")
 
     error_rows = load_error_tier(already_labeled, args.error_tier_n)
