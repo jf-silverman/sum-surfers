@@ -58,7 +58,9 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_INPUT = _PROJECT_ROOT / "data" / "cvat_out_coco" / "splits"
+# The pose-tagged, box-corrected export of the original 57 (2026-09-14)
+# supersedes splits/ as the labeled pool.
+DEFAULT_INPUT = _PROJECT_ROOT / "data" / "cvat_out_coco" / "posture_57"
 DEFAULT_OUTPUT = _PROJECT_ROOT / "data" / "cvat_out_coco" / "splits_v2"
 
 SPLITS = ["train", "val", "test"]
@@ -148,6 +150,10 @@ def load_pool(input_dirs):
                 by_image[ann["image_id"]].append(ann)
 
             for img in data["images"]:
+                # A raw CVAT COCO export prefixes file_name with images/default/.
+                # Everything downstream joins file_name onto a split's image dir,
+                # so keep the bare filename.
+                img = dict(img, file_name=Path(img["file_name"]).name)
                 name = img["file_name"]
                 if name in pool:
                     sys.exit(f"{name} appears in more than one input export — "

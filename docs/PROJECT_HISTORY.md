@@ -2822,3 +2822,91 @@ it is regenerable from `splits/` and deterministic given `--seed`.
 Not done: no retrain has been run against it. That is Phase 5, and it is
 worth waiting for the new labels rather than spending a training run on a
 re-split of the same 57 images.
+
+### Pose tags on the original 57, corrected boxes, and the prone-surfer gap confirmed (2026-09-14)
+
+Joel finished Phase 2's retro-tag in CVAT and exported COCO 1.0
+(`posture_export_57_coco.zip`, gitignored; normalized contents in
+`data/cvat_out_coco/posture_57/`).
+
+**What came back.** Same 57 images, filenames matching the originals
+exactly. The attribute is named `pose` and has six values rather than the
+four the plan specified. Joel's definitions, all counted as `Surfer`:
+
+| pose | boxes | meaning |
+|---|---|---|
+| sitting | 617 | |
+| prone | 512 | |
+| unknown | 295 | pose unclear, but definitely a surfer |
+| standing | 31 | |
+| SUP | 4 | stand-up paddleboarder |
+| wipeout | 4 | sometimes just a board (surfer underwater), or a surfer in the water holding the board |
+
+Every box carries a pose; no box is rotated.
+
+**Boxes were corrected in the same pass.** 1,451 → 1,463: nine images
+gained 1-2 boxes and one lost one (`jacks_20250809_0854`, 46 → 45). Of the
+1,449 boxes that still match an original one-to-one, 1,313 are identical and
+**136 were redrawn** — median area 0.77x the original, 78% smaller, mean IoU
+0.70 against the old box. That is tightening, as Joel described, not
+relocation.
+
+**Handling.** CVAT prefixes `file_name` with `images/default/`; every
+consumer here joins `file_name` onto an image directory, so the stored copy
+uses bare filenames, and `build_stratified_splits.py` now strips the prefix
+itself too. `posture_57/` is the new default input for that script; `splits/`
+stays untouched because it records the split the deployed `best.pt` was
+trained on. `splits_v2/` was rebuilt: 31/15/11 with 1,463 boxes conserved,
+test still spanning every crowding bucket.
+
+**Deployed detector re-scored against the corrected boxes.** This has to
+keep the *original* split membership — the weights trained on the original
+train split, so scoring them on a re-split would partly score them on their
+own training images. `eval_detector.py` gained `--coco-dir`/`--yolo-dir` for
+this; the corrected labels were re-tiled with `train_model.py`'s own
+functions.
+
+| | old labels | corrected labels |
+|---|---|---|
+| val precision | 0.85634 | 0.86221 |
+| val recall | 0.82047 | 0.81240 |
+| val mAP@0.5 | 0.85552 | 0.84259 |
+| val mAP@0.5:0.95 | 0.40053 | 0.39615 |
+| test precision | 0.84668 | 0.86975 |
+| test recall | 0.78723 | 0.80423 |
+| test mAP@0.5 | 0.82351 | 0.85317 |
+| test mAP@0.5:0.95 | 0.32921 | 0.33739 |
+| test count MAE / bias | 1.30 / -0.90 | 1.40 / -1.00 |
+| val count MAE / bias | 2.20 / -0.73 | 2.40 / -1.07 |
+
+Small shifts in both directions; nothing changes the picture. Counts move
+slightly more negative because the added boxes were surfers the detector
+also missed. Published figures (README, `plot_daily_prediction.py`) still
+cite the old-label numbers and have not been changed.
+
+**The point of the exercise: recall by pose.** Greedy one-to-one matching of
+production-path predictions to labeled boxes, on the 25 held-out images
+(original val + test):
+
+| pose | boxes | recall@0.5 | recall@0.3 | mean conf |
+|---|---|---|---|---|
+| sitting | 202 | 87.1% | 92.6% | 0.694 |
+| prone | 151 | **75.5%** | 81.5% | 0.659 |
+| unknown | 79 | **75.9%** | 79.7% | 0.653 |
+| standing | 8 | 87.5% | 100.0% | 0.564 |
+| SUP | 2 | 100.0% | 100.0% | 0.714 |
+| wipeout | 0 | — | — | — |
+
+The detector misses prone surfers about twice as often as sitting ones (24.5%
+vs 12.9%). Because boxes within one frame are not independent, the gap was
+checked with an **image-level bootstrap** (5,000 resamples of whole images;
+24 of the 25 contain both poses): sitting-minus-prone recall gap **95% CI
++4.9 to +18.9 points**, gap <= 0 in 0.1% of resamples. `unknown` shows a
+similar shortfall (CI +0.4 to +24.1 against sitting). On the training images
+all poses sit at 93-100%, so the held-out gap is a generalization problem,
+not something the model never saw.
+
+This confirms, with labels rather than inference, what the 2026-08-29
+flat-water case suggested: prone surfers are a real, measurable blind spot.
+`standing`, `SUP` and `wipeout` are too rare (8, 2 and 0 held-out boxes) to
+say anything about.

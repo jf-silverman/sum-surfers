@@ -183,6 +183,12 @@ def parse_args():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--split", action="append", choices=["train", "val", "test"],
                    help="Split to evaluate; repeatable (default: test)")
+    p.add_argument("--coco-dir", type=Path, default=None,
+                   help="Whole-frame COCO splits to score counts against "
+                        f"(default {COCO_SPLITS_DIR.relative_to(_PROJECT_ROOT)})")
+    p.add_argument("--yolo-dir", type=Path, default=None,
+                   help="Tiled YOLO dataset for tile metrics "
+                        f"(default {YOLO_DIR.relative_to(_PROJECT_ROOT)})")
     p.add_argument("--skip-tile-metrics", action="store_true",
                    help="Only run the whole-frame count evaluation")
     return p.parse_args()
@@ -191,6 +197,17 @@ def parse_args():
 def main():
     args = parse_args()
     splits = args.split or ["test"]
+
+    # Evaluating against corrected labels only means something if split
+    # membership is unchanged: the deployed weights trained on the original
+    # train split, so scoring them on a re-split would score them partly on
+    # their own training images.
+    global COCO_SPLITS_DIR, YOLO_DIR
+    if args.coco_dir:
+        COCO_SPLITS_DIR = args.coco_dir.resolve()
+    if args.yolo_dir:
+        YOLO_DIR = args.yolo_dir.resolve()
+    print(f"Labels  : {COCO_SPLITS_DIR}")
 
     if not YOLO_DIR.exists():
         sys.exit(f"Tiled YOLO dataset not found at {YOLO_DIR}")

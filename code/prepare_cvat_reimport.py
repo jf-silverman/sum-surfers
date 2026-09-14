@@ -106,6 +106,8 @@ def main():
    redefining it. Free tier allows 1 project / 3 tasks total, so this
    fits with room to spare.
 2. In the project, define the "Surfer" label with a "posture" attribute:
+   (As actually labeled 2026-09-14: attribute named "pose" with six values —
+   sitting, prone, unknown, standing, SUP, wipeout. See PROJECT_HISTORY.md.)
    type "select" (radio/dropdown), values: standing, sitting, prone,
    unknown.
 3. Create a Task inside that project (e.g. "existing-57-retrofit") and
