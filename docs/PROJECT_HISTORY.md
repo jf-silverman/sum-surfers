@@ -3009,3 +3009,47 @@ Open risk: Full Disk Access. The grants for `/usr/sbin/cron` and the real
 Python binary do not obviously cover a job launched by launchd through
 `/bin/bash`; a TCC denial would appear as `Operation not permitted` in
 `data/local_pipeline.log`. One manual `launchctl kickstart` answers it.
+
+### The 10% band is genuinely zero; chart no longer dies on it (2026-09-16)
+
+The 2026-09-15 run produced no chart at all. Step 9 fired correctly at 20:31 —
+the chaining worked — but `plot_daily_prediction.py` raised out of
+`fit_quantile_model_robust(quantile=0.1)`, then retried four times over 50
+minutes and failed identically each time.
+
+**This one is the data, not a bad fit.** At 1,533 rows, **11.8% of hours have
+zero surfers**, which puts the true 10th percentile of `surfer_count` at
+exactly **0.00**. "Predict 0 everywhere" is therefore the correct answer at
+that level. A sweep of `min_samples_leaf` from 20 to 600 returns a flat zero
+at every value except 400, a fluke that scrapes past the 0.5 std threshold
+with a maximum of 2 surfers. The 20th percentile is 2.0 and fits normally
+(std ~6.1-6.9), so only the bottom band is affected.
+
+That makes it unlike the two earlier collapses, which were hyperparameter
+problems (l2, depth) hiding real signal. The guard was right to refuse a
+silent trivial model then, and is wrong to kill the chart now.
+
+Changes, per Joel's call:
+
+- **`ConstantQuantileModel` + `allow_degenerate=True`** in
+  `fit_surfer_count_model.py`. Opt-in, and only display code opts in:
+  calibration and coverage reporting keep the default and still raise, since a
+  flat band would quietly flatter those numbers. The constant comes from the
+  collapsed fit's own mean prediction rather than being hardcoded to zero, so
+  a future collapse at some other value is visible.
+- **The chart says so on its face.** A third footer line reads "10% band flat:
+  12% of recorded hours had no surfers, so that percentile is 0". A band
+  pinned flat is a statement about the data, not a fitted curve, and should
+  not read as one. The hourly range table now shows `0-N` for every hour,
+  which is what the model is actually claiming.
+- **Deterministic failures no longer retry.** `plot_daily_prediction.py` exits
+  **3** on a `RuntimeError`, and `daily_chart.sh` breaks out of its retry loop
+  on that code instead of burning the full 50-minute window. The retry ladder
+  still covers the transient network case it was built for (2026-08-31).
+- **Footer margin now scales with line count.** The third line collided with
+  the "Time" axis label. `tight_layout`'s `rect` is ignored on this figure (it
+  warns that the twinx and table axes are incompatible), so the bottom margin
+  is set explicitly with `subplots_adjust` afterwards.
+
+Verified by generating the chart: the 0.1 level reports as degenerate, the
+band renders flat at zero, the footer note appears, and nothing overlaps.

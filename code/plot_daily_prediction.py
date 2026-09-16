@@ -148,7 +148,17 @@ def main():
     # as a continuous-looking gradient by interpolating between them at plot
     # time (see the fill loop below) rather than fitting dozens of models.
     # FAN_LEVELS[4] (0.50) is the median / point estimate.
-    quantile_models = {level: fit_quantile_model_robust(X_std, y, level)[0] for level in FAN_LEVELS}
+    # allow_degenerate=True: with ~12% of hours at zero surfers the true 10th
+    # percentile is 0.00, so that level collapses to a flat zero by rights, not
+    # by mis-fitting (see fit_surfer_count_model.ConstantQuantileModel). Before
+    # 2026-09-16 that raised and killed the whole chart — the 09-15 run produced
+    # nothing at all. A display chart can draw a flat band honestly; calibration
+    # code still uses the default and still raises.
+    quantile_models = {level: fit_quantile_model_robust(X_std, y, level, allow_degenerate=True)[0]
+                       for level in FAN_LEVELS}
+    degenerate_levels = [lv for lv, m in quantile_models.items() if getattr(m, "degenerate", False)]
+    if degenerate_levels:
+        print(f"  Degenerate quantile level(s): {degenerate_levels} — drawn as flat bands.")
 
     by_hour = sp.build_predictor_map()
     local_tz = pytz.timezone(gc.LOCATION["timezone"])
@@ -281,6 +291,14 @@ def main():
         f"|  Surfer detector (YOLOv8s, train13 — actual training log): "
         f"precision {DETECTOR_PRECISION:.1%}, recall {DETECTOR_RECALL:.1%}"
     )
+    if degenerate_levels:
+        # Say so on the chart itself: a band pinned flat is a real statement
+        # about the data, and a reader should not mistake it for a fitted curve.
+        zero_pct = (y == 0).mean()
+        info_text += (
+            f"\n{', '.join(f'{lv:.0%}' for lv in degenerate_levels)} band flat: "
+            f"{zero_pct:.0%} of recorded hours had no surfers, so that percentile is 0"
+        )
     fig.text(0.5, 0.01, info_text, fontsize=8, ha="center", va="bottom", color=MUTED_TEXT)
 
     ax2 = ax.twinx()
@@ -340,7 +358,12 @@ def main():
             cell.set_facecolor(AXES_BG)
             cell.set_text_props(color=TEXT_COLOR)
 
+    # tight_layout's rect is ignored on this figure (it warns that the twinx and
+    # table axes are incompatible), so the bottom margin is set explicitly
+    # afterwards. Needed once the degenerate-band note added a third footer
+    # line, which ran straight into the "Time" axis label.
     fig.tight_layout(rect=[0, 0.06, 1, 1])
+    fig.subplots_adjust(bottom=0.10 + 0.03 * (info_text.count("\n") - 1))
 
     CHARTS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = CHARTS_DIR / f"surfer_count_{target_date.isoformat()}.png"
@@ -523,4 +546,12 @@ def update_readme(target_date, detection_capture=None):
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except RuntimeError as e:
+        # Exit 3 marks a deterministic modelling failure, as opposed to the
+        # transient network errors daily_chart.sh retries. Retrying this kind
+        # just burns 50 minutes and fails identically — which is what happened
+        # on 2026-09-15.
+        print(f"DETERMINISTIC FAILURE (not retryable): {e}", file=sys.stderr)
+        sys.exit(3)

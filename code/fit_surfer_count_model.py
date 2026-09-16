@@ -238,8 +238,31 @@ QUANTILE_MIN_LEAF_CANDIDATES = (20, 30, 40, 50, 75, 100, 150, 200)
 QUANTILE_DEGENERATE_STD_THRESHOLD = 0.5
 
 
+class ConstantQuantileModel:
+    """Stand-in for a quantile level that is genuinely degenerate in this data.
+
+    Not a workaround for a bad fit. With ~12% of hours at exactly zero surfers,
+    the true 10th percentile of surfer_count IS 0.00, so "predict 0 everywhere"
+    is the correct answer at that level rather than a failed one — verified
+    2026-09-16 by sweeping min_samples_leaf from 20 to 600, where every value
+    returns a flat zero except one fluke at 400 that tops out at 2 surfers.
+    Callers that need a real, varying model (calibration, coverage reporting)
+    must keep the default and let the error raise; only display code that can
+    honestly draw a flat band should opt in.
+    """
+
+    def __init__(self, value, quantile):
+        self.value = float(value)
+        self.quantile = quantile
+        self.degenerate = True
+
+    def predict(self, X):
+        return np.full(len(X), self.value)
+
+
 def fit_quantile_model_robust(X_train, y_train, quantile, base_kwargs=None,
-                               min_leaf_candidates=QUANTILE_MIN_LEAF_CANDIDATES):
+                               min_leaf_candidates=QUANTILE_MIN_LEAF_CANDIDATES,
+                               allow_degenerate=False):
     """Fits a quantile-loss GBT with a self-check against silent collapse to a
     near-constant prediction — a real, repeatedly-observed failure mode for this
     dataset's extreme (zero-inflated) quantiles, NOT something one fixed
@@ -266,6 +289,13 @@ def fit_quantile_model_robust(X_train, y_train, quantile, base_kwargs=None,
         train_std = model.predict(X_train).std()
         if train_std > QUANTILE_DEGENERATE_STD_THRESHOLD:
             return model, min_leaf
+    if allow_degenerate:
+        # Report the constant the collapsed fit actually settled on rather than
+        # assuming zero, so a future collapse at some other value is visible.
+        constant = float(model.predict(X_train).mean())
+        print(f"  NOTE: quantile={quantile} is degenerate in this data — every min_samples_leaf "
+              f"candidate collapsed to ~{constant:.2f}. Using a constant {constant:.2f} for this level.")
+        return ConstantQuantileModel(constant, quantile), None
     raise RuntimeError(
         f"Quantile GBT (quantile={quantile}) collapsed to a near-constant prediction "
         f"for every min_samples_leaf candidate tried {min_leaf_candidates} — needs "

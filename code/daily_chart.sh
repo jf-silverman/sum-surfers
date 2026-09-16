@@ -54,11 +54,21 @@ for delay in "${RETRY_DELAYS_MIN[@]}"; do
         log "Retrying in ${delay} minute(s)..."
         sleep "$((delay * 60))"
     fi
-    if "$PYTHON" code/plot_daily_prediction.py; then
+    set +e
+    "$PYTHON" code/plot_daily_prediction.py
+    rc=$?
+    set -e
+    if [[ "$rc" -eq 0 ]]; then
         generation_ok=true
         break
+    elif [[ "$rc" -eq 3 ]]; then
+        # Exit 3 = deterministic modelling failure, not a network blip. Retrying
+        # produces the identical failure; on 2026-09-15 it burned the full 50
+        # minutes doing exactly that.
+        log "ERROR: plot_daily_prediction.py failed deterministically (exit 3) — not retrying."
+        break
     else
-        log "WARNING: plot_daily_prediction.py failed (see traceback above)."
+        log "WARNING: plot_daily_prediction.py failed (exit $rc, see traceback above)."
     fi
 done
 
