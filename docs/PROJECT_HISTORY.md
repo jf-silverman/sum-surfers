@@ -2947,3 +2947,33 @@ forgotten. Assuming every one of the other 60 has at least one surfer, the
 combined 130-frame pool tiles to at least 63 of 520 background tiles
 (12.1%) — slightly above the guideline, which `build_stratified_splits.py`
 can trim if it matters.
+
+### Daily chart chained onto the pipeline instead of its own cron entry (2026-09-15)
+
+The chart job silently produced nothing on the night of 2026-09-14: no chart
+file, no commit, and **no log lines at all** for its 21:15 slot, which means
+cron never started it rather than starting it and failing. The pipeline's own
+20:30 run that night completed normally at 20:31, and the power log shows the
+machine heading for sleep around 20:42 — Joel had packed the laptop up for a
+trip.
+
+The structural problem, not the closed lid: the two jobs sat 45 minutes
+apart, the pipeline held the Mac awake with `caffeinate -i` only while it ran,
+and cron can neither wake a sleeping machine nor catch up a run it missed
+(launchd can; cron cannot). Any sleep inside that gap dropped a day's chart.
+
+`daily_chart.sh` is now Step 9 of `local_pipeline.sh` and its 21:15 crontab
+entry is removed. It runs inside the pipeline's existing `caffeinate` wrapper,
+so the gap no longer exists, and as a side benefit it now trains on detections
+written minutes earlier instead of the previous night's. It stays runnable by
+hand, and its failure is non-fatal to the pipeline — a chart is regenerable,
+the clip and detection data above it is not.
+
+Crontab is now a single line at 20:30. Staged for Joel to apply; this process
+is blocked from writing the crontab (macOS TCC).
+
+Worth noting for the trip: clip collection is the only step with a deadline.
+`get_clips.py` backfills `CLIP_LOOKBACK_DAYS` (default 5) days, so up to five
+missed nights are recoverable by the next run; past that the footage is gone
+unless the camera still serves it at a larger lookback. Predictors backfill
+from history, detection rebuilds from clips, and charts are regenerable.

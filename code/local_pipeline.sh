@@ -66,28 +66,28 @@ log "=== Local pipeline starting ==="
 cd "$PROJECT_ROOT"
 
 # ── Step 1: Download clips ────────────────────────────────────────────────────
-log "Step 1/8 — Downloading Surfline clips..."
+log "Step 1/9 — Downloading Surfline clips..."
 "$PYTHON" code/get_clips.py
 log "Step 1 done."
 
 # ── Step 2: Extract crop frames ───────────────────────────────────────────────
-log "Step 2/8 — Extracting crop frames..."
+log "Step 2/9 — Extracting crop frames..."
 "$PYTHON" code/get_cropped_frame.py
 log "Step 2 done."
 
 # ── Step 3: Check local clips storage ────────────────────────────────────────
 # Emails a warning if clips folder exceeds CLIPS_DIR_LIMIT_GB; never fails the pipeline.
-log "Step 3/8 — Checking clips storage..."
+log "Step 3/9 — Checking clips storage..."
 "$PYTHON" code/manage_clips.py --check || true
 log "Step 3 done."
 
 # ── Step 4: Run detection locally ────────────────────────────────────────────
-log "Step 4/8 — Running YOLOv8 detection locally..."
+log "Step 4/9 — Running YOLOv8 detection locally..."
 "$PYTHON" code/detect_surfers.py
 log "Step 4 done."
 
 # ── Step 5: Pull Surfline predictors (weather/rating/tide/swell) for Jack's ──
-log "Step 5/8 — Pulling Surfline predictors for Jack's..."
+log "Step 5/9 — Pulling Surfline predictors for Jack's..."
 "$PYTHON" code/get_surf_predictors.py
 log "Step 5 done."
 
@@ -98,20 +98,35 @@ log "Step 5 done."
 # training_features.csv below, and so the daily chart's model) freeze at
 # 2026-08-28 while 161 new quality_ok rows piled up unused. Never fail the
 # pipeline over it — the detection data above is the irreplaceable part.
-log "Step 6/8 — Backfilling real observed weather (Open-Meteo)..."
+log "Step 6/9 — Backfilling real observed weather (Open-Meteo)..."
 "$PYTHON" code/backfill_openmeteo_weather.py || log "WARNING: Open-Meteo backfill failed, continuing."
 log "Step 6 done."
 
 # ── Step 7: Rebuild the model's training table ───────────────────────────────
 # Joins predictions (target) with all predictor sources (features). Also
 # manual-only until 2026-09-09 — see Step 6. Rebuilt from scratch each run.
-log "Step 7/8 — Rebuilding training features table..."
+log "Step 7/9 — Rebuilding training features table..."
 "$PYTHON" code/build_training_features.py || log "WARNING: training-features rebuild failed, continuing."
 log "Step 7 done."
 
 # ── Step 8: Record success timestamp locally ─────────────────────────────────
 LAST_SUCCESS_FILE="$PROJECT_ROOT/data/.last_local_success"
 date -u +"%Y-%m-%dT%H:%M:%SZ" > "$LAST_SUCCESS_FILE"
-log "Step 8/8 — Local success timestamp recorded: $(cat "$LAST_SUCCESS_FILE")"
+log "Step 8/9 — Local success timestamp recorded: $(cat "$LAST_SUCCESS_FILE")"
+
+# ── Step 9: Build the daily prediction chart ─────────────────────────────────
+# Chained here rather than run from its own cron entry (moved 2026-09-15). As a
+# separate 21:15 job it silently missed nights whenever the Mac slept in the gap
+# after this pipeline finished — cron cannot wake a sleeping machine and, unlike
+# launchd, never catches up a missed run. Real case: 2026-09-14, pipeline ran at
+# 20:30, laptop packed up, no chart at all that night and no log line to show it.
+# Running it here puts it inside the same `caffeinate -i` wrapper that is already
+# holding the machine awake for this job, and means the chart always trains on
+# detections that were written minutes earlier rather than last night's.
+# Non-fatal: the chart is regenerable, the clip/detection data above is not.
+log "Step 9/9 — Building daily prediction chart..."
+bash "$PROJECT_ROOT/code/daily_chart.sh" >> "$PROJECT_ROOT/data/daily_chart.log" 2>&1 \
+    || log "WARNING: daily_chart.sh failed, see data/daily_chart.log. Continuing."
+log "Step 9 done."
 
 log "=== Local pipeline complete ==="

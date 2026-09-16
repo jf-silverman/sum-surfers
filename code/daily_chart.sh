@@ -3,17 +3,15 @@
 # prediction chart for tomorrow (data/charts/surfer_count_YYYY-MM-DD.png) plus
 # a detection-review image from today's own ~8am crop.
 #
-# Independent of local_pipeline.sh's twice-weekly clip-collection cron — this
-# only needs the live Surfline forecast + the already-trained model, not new
-# clips or detection.
+# Invoked as the last step of local_pipeline.sh (changed 2026-09-15); it no
+# longer has its own cron entry. On a separate timer it was silently skipped on
+# any night the Mac slept between the two jobs — cron cannot wake a sleeping
+# machine. Chaining it puts it inside the pipeline's `caffeinate -i` wrapper and
+# lets it use detections written minutes earlier.
 #
-# Cron entry (daily at 7pm local time):
-#   0 19 * * * /Users/YOUR_USERNAME/Documents/DS/sum-surfers/code/daily_chart.sh \
-#       >> /Users/YOUR_USERNAME/Documents/DS/sum-surfers/data/daily_chart.log 2>&1
-#
-# First-time setup:
-#   chmod +x code/daily_chart.sh
-#   crontab -e   # paste the line above
+# Still safe to run by hand any time — it needs only the live Surfline forecast
+# and the trained model, not fresh clips:
+#   bash code/daily_chart.sh
 
 set -euo pipefail
 
