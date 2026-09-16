@@ -3179,3 +3179,29 @@ recorded as "exit 0". Assigning on the failure path (`"$@" || rc=$?`) fixes it.
 Verified: a full `local_pipeline.sh` run completed all nine steps, exit 0, sent
 no email; the chart renders with one band and the new table column; the
 animation is 15 frames, 1536x406, 3.6 MB.
+
+### The detection animation now requires a busy day (2026-09-16)
+
+The first animation landed on 2026-09-15 — a foggy, near-empty day where only
+**13% of frames had more than 2 surfers**. It demonstrated nothing about
+detection, which is the whole point of the image.
+
+A day now has to clear two bars to be animated: at least 6 usable frames, and
+**more than 2 surfers in at least 60% of them**. Looking back from 2026-09-16,
+that skips 09-16 (3 frames) and 09-15 (13%) and lands on **2026-09-14** (15
+frames, 60% — exactly at the bar). Lookback widened from 7 to 14 days so a
+flat spell cannot run the search off the end.
+
+**A day that misses the bar leaves the existing animation alone** rather than
+replacing it with a worse one, which is what Joel asked for. That needed a
+sidecar: `data/charts/latest_detection.json` records which day the published
+GIF covers, so a run that finds no qualifying day can skip regeneration and
+still caption the README truthfully with the older day's date instead of
+dropping the image or mislabelling it. Verified by stubbing `find_day_crops` to
+return nothing: the run reported it was keeping 2026-09-14, returned that date,
+and left the GIF byte-identical.
+
+Worth noting the bar is deliberately about the *subject*, not the model: it
+selects days with surfers in the water, not days the detector did well on. A
+day where the detector plainly misses people is still fair game, and still
+worth showing.

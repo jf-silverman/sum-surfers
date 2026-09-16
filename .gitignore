@@ -199,3 +199,6 @@ data/cvat_out_coco/posture_export_57_coco.zip
 
 # Labeling batches staged for CVAT upload (copies of surf_crops)
 data/cvat_out_coco/labeling_batch_*
+
+# Sidecar recording which day the published animation covers (local state)
+data/charts/latest_detection.json

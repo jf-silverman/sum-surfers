@@ -30,6 +30,7 @@ day (e.g. for backfill/testing a specific past date).
 
 import argparse
 import csv
+import json
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -411,7 +412,15 @@ SIDE_CROP_FRAC = 0.20
 GIF_UPSCALE = 2.0
 GIF_FRAME_MS = 1000
 GIF_MAX_COLORS = 128          # palette size — the strip is mostly water, so this is plenty
-GIF_LOOKBACK_DAYS = 7
+GIF_LOOKBACK_DAYS = 14
+# A day also has to be busy enough to be worth showing: more than
+# BUSY_COUNT_MIN surfers in at least MIN_BUSY_FRACTION of its frames. Added
+# 2026-09-16 after the animation landed on a foggy, near-empty day (2026-09-15:
+# 13% of frames above 2 surfers) which demonstrated nothing about detection. A
+# day that misses the bar leaves the existing animation in place rather than
+# replacing it with a worse one.
+BUSY_COUNT_MIN = 2
+MIN_BUSY_FRACTION = 0.60
 # A day needs at least this many usable frames to be worth animating. The
 # scheduled run is at 20:30, by which point the current day is complete, but an
 # off-hours run would otherwise pick up a half-collected day — a 7am test run
@@ -435,12 +444,21 @@ def find_day_crops(detection_date, lookback_days=GIF_LOOKBACK_DAYS):
         rows = [r for r in all_rows
                 if r["date"] == check_date.isoformat() and r["quality_ok"] == "True"
                 and (ds.CROPS_DIR / r["filename"]).exists()]
-        if len(rows) >= MIN_GIF_FRAMES:
-            rows.sort(key=lambda r: r["time_local"])
-            return check_date, rows
-        if rows:
-            print(f"  {check_date} has only {len(rows)} usable frame(s) "
-                  f"(need {MIN_GIF_FRAMES}) — looking further back.")
+        if not rows:
+            continue
+        if len(rows) < MIN_GIF_FRAMES:
+            print(f"  {check_date}: only {len(rows)} usable frame(s), need {MIN_GIF_FRAMES} — skipping.")
+            continue
+        counts = [float(r["surfer_count"]) for r in rows if r["surfer_count"] not in ("", "None")]
+        busy = sum(1 for c in counts if c > BUSY_COUNT_MIN)
+        share = busy / len(counts) if counts else 0.0
+        if share < MIN_BUSY_FRACTION:
+            print(f"  {check_date}: only {share:.0%} of frames have more than {BUSY_COUNT_MIN} "
+                  f"surfers, need {MIN_BUSY_FRACTION:.0%} — skipping.")
+            continue
+        rows.sort(key=lambda r: r["time_local"])
+        print(f"  {check_date}: {len(rows)} frames, {share:.0%} above {BUSY_COUNT_MIN} surfers — using this day.")
+        return check_date, rows
     return None, []
 
 
@@ -480,6 +498,22 @@ def render_detection_frame(img_path, model):
     return out, visible
 
 
+def keep_existing_gif():
+    """(date, n_frames) for the animation already on disk, or None.
+
+    Read from a sidecar written next to the GIF, so a run that finds no
+    qualifying day can leave the file alone and still caption it correctly.
+    """
+    meta_path = CHARTS_DIR / "latest_detection.json"
+    if not (CHARTS_DIR / "latest_detection.gif").exists() or not meta_path.exists():
+        return None
+    try:
+        meta = json.loads(meta_path.read_text())
+        return datetime.strptime(meta["date"], "%Y-%m-%d").date(), int(meta["n_frames"])
+    except (ValueError, KeyError, json.JSONDecodeError):
+        return None
+
+
 def generate_detection_gif(detection_date):
     """Animates a full day of detections, one frame per clip, 1s each.
 
@@ -490,8 +524,19 @@ def generate_detection_gif(detection_date):
     """
     day, rows = find_day_crops(detection_date)
     if not rows:
-        print(f"No usable crops found at or before {detection_date} — skipping detection animation.")
-        return None
+        # Keep whatever is already published rather than dropping the animation
+        # from the README: a stale-but-representative day beats no image, and
+        # beats a flat day that shows nothing. The sidecar carries the date the
+        # existing file covers, so the caption stays truthful about which day
+        # is on screen.
+        existing = keep_existing_gif()
+        if existing:
+            print(f"No day met the bar at or before {detection_date} — keeping the "
+                  f"existing animation ({existing[0]}, {existing[1]} frames).")
+        else:
+            print(f"No day met the bar at or before {detection_date} and no existing "
+                  f"animation to keep — skipping.")
+        return existing
 
     model = ds.load_model()
     frames = []
@@ -526,6 +571,8 @@ def generate_detection_gif(detection_date):
     latest_path = CHARTS_DIR / "latest_detection.gif"
     palette_frames[0].save(latest_path, save_all=True, append_images=palette_frames[1:],
                            duration=GIF_FRAME_MS, loop=0, optimize=True, disposal=2)
+    (CHARTS_DIR / "latest_detection.json").write_text(
+        json.dumps({"date": day.isoformat(), "n_frames": len(frames)}) + "\n")
     dated_path = CHARTS_DIR / f"detection_{day.isoformat()}.gif"
     dated_path.write_bytes(latest_path.read_bytes())
     size_mb = latest_path.stat().st_size / 1e6
