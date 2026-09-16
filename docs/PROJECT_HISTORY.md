@@ -3053,3 +3053,34 @@ Changes, per Joel's call:
 
 Verified by generating the chart: the 0.1 level reports as degenerate, the
 band renders flat at zero, the footer note appears, and nothing overlaps.
+
+### LaunchAgent spawn failure: two separate TCC denials (2026-09-16)
+
+The first `launchctl kickstart` of `com.jfs.sumsurfers` returned silently and
+wrote nothing anywhere. `launchctl print` told the real story: **exit code 78
+(EX_CONFIG), "job state = spawn failed", runs = 1**. Nothing reached
+`data/local_pipeline.log` because the job never started.
+
+Probed with a throwaway agent (`/bin/bash -c`, output to `/tmp`), which
+isolated two independent problems:
+
+1. **launchd cannot open a `StandardOutPath` under `~/Documents`.** The test
+   agent with a `/tmp` log spawned cleanly (exit 0) while the real one failed
+   before running. The file open happens in launchd, not in the job, so
+   granting the *job* Full Disk Access does not help. Fixed in the plist: the
+   job is now `bash -c 'exec >> .../data/local_pipeline.log 2>&1; exec
+   local_pipeline.sh'`, so bash opens the log, and `StandardOutPath` points at
+   `/tmp/sumsurfers_launchd.log` purely to catch pre-redirect failures — the
+   exact case that was silent this time.
+2. **A launchd-spawned bash cannot read `~/Documents` either.** The probe
+   printed `CANNOT_READ_DOCS` (it could `touch` a new file but not `ls` the
+   directory). The pipeline globs those directories constantly, so it would
+   have failed immediately even once spawned. This needs a Full Disk Access
+   grant for `/bin/bash`, which is separate from the existing grants for
+   `/usr/sbin/cron` and the real Python binary — three distinct grants, none
+   implying the others.
+
+Worth keeping in mind generally: cron's grant does not carry to launchd, and a
+LaunchAgent whose log lives in a protected folder fails in the most unhelpful
+way available — no log line, no stderr, just an exit code visible only via
+`launchctl print`.

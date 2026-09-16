@@ -24,9 +24,16 @@
   Verify it is registered:
     launchctl print gui/$(id -u)/com.jfs.sumsurfers | head -20
 
-  Run it once by hand (this is the Full Disk Access test — a TCC denial shows
-  up as "Operation not permitted" in data/local_pipeline.log):
+  REQUIRES Full Disk Access for /bin/bash. Verified 2026-09-16: without it a
+  launchd-spawned bash cannot even list ~/Documents/DS/sum-surfers/data. Grant
+  it in System Settings > Privacy & Security > Full Disk Access > + >
+  Cmd-Shift-G > /bin/bash. This is separate from the existing grants for
+  /usr/sbin/cron and the Python binary.
+
+  Run it once by hand (the Full Disk Access test):
     launchctl kickstart -k gui/$(id -u)/com.jfs.sumsurfers
+    tail -5 /tmp/sumsurfers_launchd.log          # spawn-time errors
+    tail -5 data/local_pipeline.log              # the run itself
 
   Uninstall:
     launchctl bootout gui/$(id -u)/com.jfs.sumsurfers
@@ -36,12 +43,21 @@
     <key>Label</key>
     <string>com.jfs.sumsurfers</string>
 
+    <!--
+      The log is opened by bash inside the job, not by launchd via
+      StandardOutPath. launchd could not open a file under ~/Documents at all
+      (TCC), and that failed the job before it started: exit 78 EX_CONFIG,
+      "spawn failed", with nothing written anywhere. bash holding Full Disk
+      Access can open it, so the log stays in the repo where it has always
+      lived.
+    -->
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/caffeinate</string>
         <string>-i</string>
         <string>/bin/bash</string>
-        <string>/Users/jfs-m3/Documents/DS/sum-surfers/code/local_pipeline.sh</string>
+        <string>-c</string>
+        <string>exec &gt;&gt; /Users/jfs-m3/Documents/DS/sum-surfers/data/local_pipeline.log 2&gt;&amp;1; exec /Users/jfs-m3/Documents/DS/sum-surfers/code/local_pipeline.sh</string>
     </array>
 
     <key>StartCalendarInterval</key>
@@ -52,11 +68,16 @@
         <integer>30</integer>
     </dict>
 
-    <!-- launchd appends to these, matching what the crontab line did with >>. -->
+    <!--
+      Deliberately in /tmp, outside every TCC-protected folder: this only
+      catches failures that happen before bash redirects, which is exactly the
+      case that produced a silent spawn failure. Real pipeline output goes to
+      data/local_pipeline.log via the redirect above.
+    -->
     <key>StandardOutPath</key>
-    <string>/Users/jfs-m3/Documents/DS/sum-surfers/data/local_pipeline.log</string>
+    <string>/tmp/sumsurfers_launchd.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/jfs-m3/Documents/DS/sum-surfers/data/local_pipeline.log</string>
+    <string>/tmp/sumsurfers_launchd.log</string>
 
     <key>EnvironmentVariables</key>
     <dict>
