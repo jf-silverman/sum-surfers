@@ -76,7 +76,7 @@ tuned over time, and [PROJECT_FILES.md](docs/PROJECT_FILES.md) for a map
 of what every file in this repo does.
 
 <!-- DAILY_CHART_START -->
-#### A Recent Surfer Detection Count: Tuesday, September 15, 2026, 8:05 AM
+#### A Recent Surfer Detection Count: Wednesday, September 16, 2026, 6:26 AM
 
 Each green box below contains a surfer, according to the object detection model.  Each number above a box indicates the probability that the object is a surfer.  Look carefully and you may find additional surfers that the model missed or other objects which are misclassified as surfers - like the wind sock at the bottom center of the photo.
 ![Latest detection review](data/charts/latest_detection.png)
