@@ -3084,3 +3084,39 @@ Worth keeping in mind generally: cron's grant does not carry to launchd, and a
 LaunchAgent whose log lives in a protected folder fails in the most unhelpful
 way available — no log line, no stderr, just an exit code visible only via
 `launchctl print`.
+
+### TCC attributes a LaunchAgent's access to the lead process, not to bash (2026-09-16)
+
+After granting Full Disk Access to `/bin/bash`, the job still failed:
+
+    /bin/bash: .../data/local_pipeline.log: Operation not permitted
+    bash: .../code/local_pipeline.sh: Operation not permitted
+
+— denied on both the log and the script itself. Meanwhile the throwaway probe
+agent, re-run unchanged, now printed `CAN_READ_DOCS` / `CAN_WRITE_DOCS`. So the
+grant had taken effect; something about the real job was different.
+
+The difference was the lead process. The real job was
+`/usr/bin/caffeinate -i /bin/bash -c ...`, so launchd started **caffeinate**,
+and TCC attributes a job's file access to the executable launchd starts — not
+to whatever runs later in the chain. The Full Disk Access on `/bin/bash` was
+irrelevant; `caffeinate` had none. The probe worked precisely because it ran
+bash directly.
+
+Fixed by making bash the lead process and keeping the sleep assertion as a
+backgrounded child that waits on it:
+
+    /bin/bash -c 'exec >> <log> 2>&1; /usr/bin/caffeinate -i -w $$ & exec <pipeline>'
+
+`caffeinate -i -w $$` holds off idle sleep until the bash process exits,
+covering the whole run exactly as the old `caffeinate -i <script>` crontab
+wrapper did, while leaving bash as the process TCC judges. Backgrounded rather
+than exec'd, since exec would put caffeinate back in front.
+
+Verified end to end: `launchctl kickstart` ran all nine steps, wrote 1,534
+training rows, generated the chart, committed and pushed it, **exit code 0**,
+with `/tmp/sumsurfers_launchd.log` empty and `caffeinate -i -w <pid>` visible
+in `ps` for the duration.
+
+Three grants now exist and none implies the others: `/usr/sbin/cron` (legacy,
+no longer used), the real Python binary, and `/bin/bash`.

@@ -51,13 +51,24 @@
       Access can open it, so the log stays in the repo where it has always
       lived.
     -->
+    <!--
+      bash is the lead process, not caffeinate. TCC attributes a job's file
+      access to the executable launchd starts, so with caffeinate leading, the
+      Full Disk Access granted to /bin/bash did not apply and every path under
+      ~/Documents came back "Operation not permitted" — including the script
+      itself. Verified 2026-09-16: a probe agent running bash directly reads
+      the same paths fine.
+
+      Idle sleep is still held off, by `caffeinate -i -w $$`: it waits on this
+      bash process and exits with it, covering the whole run exactly as the old
+      `caffeinate -i <script>` crontab wrapper did. It is backgrounded rather
+      than exec'd so that bash stays the lead process.
+    -->
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/caffeinate</string>
-        <string>-i</string>
         <string>/bin/bash</string>
         <string>-c</string>
-        <string>exec &gt;&gt; /Users/jfs-m3/Documents/DS/sum-surfers/data/local_pipeline.log 2&gt;&amp;1; exec /Users/jfs-m3/Documents/DS/sum-surfers/code/local_pipeline.sh</string>
+        <string>exec &gt;&gt; /Users/jfs-m3/Documents/DS/sum-surfers/data/local_pipeline.log 2&gt;&amp;1; /usr/bin/caffeinate -i -w $$ &amp; exec /Users/jfs-m3/Documents/DS/sum-surfers/code/local_pipeline.sh</string>
     </array>
 
     <key>StartCalendarInterval</key>
