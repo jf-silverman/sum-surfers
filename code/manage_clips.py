@@ -7,7 +7,7 @@ Modes:
   python code/manage_clips.py --check   Non-interactive: send a warning email if over limit.
 
 Environment variables (read from .env or shell):
-  CLIPS_DIR_LIMIT_GB   Storage limit in GB before warning (default: 1.0)
+  CLIPS_DIR_LIMIT_GB   Storage limit in GB before warning (default: 5.0)
     SMTP_USER            Gmail sender address for warning emails
     SMTP_APP_PASSWORD    Gmail App Password for warning emails
     EMAIL_TO             Recipient (default: SMTP_USER)
@@ -22,7 +22,7 @@ from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CLIPS_DIR = _PROJECT_ROOT / "data" / "not_needed_in_repo" / "surf_clips"
-LIMIT_GB = float(os.environ.get("CLIPS_DIR_LIMIT_GB", "1.0"))
+LIMIT_GB = float(os.environ.get("CLIPS_DIR_LIMIT_GB", "5.0"))
 
 
 def get_dir_size_gb(path: Path) -> float:

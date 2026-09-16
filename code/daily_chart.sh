@@ -92,7 +92,7 @@ fi
 # detection image yet some days) fails the ENTIRE add and blocks staging the
 # others too if done as one command; per-file `|| true` avoids that.
 git add data/charts/latest.png 2>&1 || true
-git add data/charts/latest_detection.png 2>&1 || true
+git add data/charts/latest_detection.gif 2>&1 || true
 git add README.md 2>&1 || true
 if git diff --cached --quiet; then
     log "No changes to commit (chart/table/README identical to last run)."

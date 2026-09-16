@@ -9,7 +9,7 @@ model/detector info footer) to data/charts/surfer_count_YYYY-MM-DD.png,
 plus a detection-review image (real bounding boxes + labels on the day's
 ~8am crop, with the
 model's predicted range/median for that hour overlaid) to
-data/charts/latest_detection.png. Both get a stable, git-tracked "latest"
+data/charts/latest_detection.gif. Both get a stable, git-tracked "latest"
 copy and are embedded in README.md between the DAILY_CHART markers.
 
 Meant to run once per day (not tied to the twice-weekly clip-collection
@@ -42,6 +42,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 import numpy as np
 import pandas as pd
+from PIL import Image
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.inspection import permutation_importance
 from sklearn.model_selection import train_test_split
@@ -84,7 +85,10 @@ TRAINED_HOUR_MIN, TRAINED_HOUR_MAX = 5, 20
 # continuous gradient by interpolating between them (see main()). Chosen as
 # a 10%-90% span (an 80% central prediction interval) per Joel's request,
 # in place of the old fixed 33%/66% bands.
-FAN_LEVELS = [0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90]
+# Just the three levels the chart actually draws: the 80% interval's two
+# edges and the median. It used to fit nine and render a 40-band gradient;
+# Joel found that too busy (2026-09-16), and nine fits cost nine models a run.
+FAN_LEVELS = [0.10, 0.50, 0.90]
 
 WEATHER_COLORS = {"CLEAR": "#f2c14e", "CLOUDY_OVERCAST": "#9aa0a6", "RAIN": "#4fa3d1", "FOG": "#c9c9c9"}
 WEATHER_MARKERS = {"CLEAR": "o", "CLOUDY_OVERCAST": "s", "RAIN": "^", "FOG": "D"}
@@ -173,10 +177,8 @@ def main():
             return None
         feat_row = build_feature_row(hk, predictors, numeric_cols, weather_categories,
                                       train_mean, train_std, X_std.columns)
-        # Predict all 9 fan levels, then force monotonicity (each level's value
-        # >= the previous one's) -- independently fit quantile models have no
-        # built-in guarantee they won't cross, same reasoning as the old
-        # 5-quantile chaining this replaces.
+        # Force monotonicity (each level >= the previous) -- independently fit
+        # quantile models have no built-in guarantee they won't cross.
         quantiles = {}
         running_min = 0.0
         for level in FAN_LEVELS:
@@ -228,26 +230,15 @@ def main():
             ax.axvspan(row["hour"] - timedelta(minutes=30), row["hour"] + timedelta(minutes=30),
                        facecolor=CORAL, alpha=0.12, hatch="xx", edgecolor=CORAL, linewidth=0, zorder=0)
 
-    # Continuous-looking prediction-interval fan: interpolate between the 9
-    # real fitted quantiles (FAN_LEVELS, 10%-90%) at each hour to get a much
-    # finer grid of levels, then draw many thin stacked bands whose alpha
-    # peaks at the median and fades toward the 10%/90% edges -- a smooth
-    # gradient built from real model output, not fit from dozens of models.
-    RENDER_LEVELS = np.linspace(FAN_LEVELS[0], FAN_LEVELS[-1], 41)  # 40 bands
-    quantile_matrix = np.array([
-        np.interp(RENDER_LEVELS, FAN_LEVELS, [q[lv] for lv in FAN_LEVELS])
-        for q in d["quantiles"]
-    ])  # shape (n_hours, len(RENDER_LEVELS))
-    MAX_BAND_ALPHA, MIN_BAND_ALPHA = 0.55, 0.04
-    for i in range(len(RENDER_LEVELS) - 1):
-        level_center = (RENDER_LEVELS[i] + RENDER_LEVELS[i + 1]) / 2
-        dist_from_median = abs(level_center - 0.50) / 0.40  # 0 at median, 1 at the 10%/90% edge
-        alpha = MAX_BAND_ALPHA - dist_from_median * (MAX_BAND_ALPHA - MIN_BAND_ALPHA)
-        ax.fill_between(d["hour"], quantile_matrix[:, i], quantile_matrix[:, i + 1],
-                         color=AQUA, alpha=alpha, linewidth=0, zorder=2)
-    # One representative legend entry for the whole gradient (can't label 40
-    # individual bands) -- details go in README's "How to read this chart".
-    fan_patch = Patch(facecolor=AQUA, alpha=0.35, label="10-90% prediction interval (darker = more likely)")
+    # One shaded 80% prediction interval, q0.10 to q0.90. This replaced a
+    # 40-band alpha gradient interpolated across nine fitted quantiles
+    # (2026-09-16): it looked like more information than the model has, and
+    # the extra bands were reading as busy rather than informative.
+    ax.fill_between(d["hour"],
+                    d["quantiles"].apply(lambda q: q[0.10]),
+                    d["quantiles"].apply(lambda q: q[0.90]),
+                    color=AQUA, alpha=0.22, linewidth=0, zorder=2)
+    fan_patch = Patch(facecolor=AQUA, alpha=0.22, label="80% prediction interval")
     ax.plot(d["hour"], d["point"], color=AQUA, linewidth=2.5, zorder=3, label="Median")
 
     for wx in ["CLEAR", "CLOUDY_OVERCAST", "RAIN", "FOG"]:
@@ -333,15 +324,18 @@ def main():
         text.set_color(TEXT_COLOR)
     ax.grid(alpha=0.25, color=GRID_COLOR)
 
-    # Table panel: hour -> 80% range (10th-90th percentile) only (no median —
-    # Joel asked for range without the point estimate here), rendered as part
-    # of the same figure/image rather than a separate markdown table, so
-    # chart and table always render side by side.
+    # Table panel: hour -> point prediction -> 80% range, rendered as part of
+    # the same figure/image rather than a separate markdown table, so chart and
+    # table always render side by side. The point column was added 2026-09-16;
+    # before that the table showed only the range, which left the reader no
+    # single number to act on.
     ax_table.axis("off")
-    ax_table.set_title("80% Range", fontsize=10, pad=10, color=TEXT_COLOR)
-    cell_text = [[row["hour"].strftime("%-I:%M %p"), f"{row['quantiles'][0.10]:.0f}–{row['quantiles'][0.90]:.0f}"]
+    ax_table.set_title("Predicted count and 80% range", fontsize=10, pad=10, color=TEXT_COLOR)
+    cell_text = [[row["hour"].strftime("%-I:%M %p"),
+                  f"{row['point']:.0f}",
+                  f"{row['quantiles'][0.10]:.0f}–{row['quantiles'][0.90]:.0f}"]
                  for _, row in d.iterrows()]
-    tbl = ax_table.table(cellText=cell_text, colLabels=["Time", "Range"],
+    tbl = ax_table.table(cellText=cell_text, colLabels=["Time", "Predicted", "Range"],
                           cellLoc="center", loc="upper center")
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(9)
@@ -376,7 +370,7 @@ def main():
     latest_path = CHARTS_DIR / "latest.png"
     fig.savefig(latest_path, dpi=150, facecolor=fig.get_facecolor())
 
-    detection_capture = generate_detection_image(detection_date, predict_nearest_hour)
+    detection_capture = generate_detection_gif(detection_date)
     update_readme(target_date, detection_capture)
 
 
@@ -406,78 +400,137 @@ def find_nearest_hour_crop(target_date, target_hour=8, lookback_days=7):
     return None
 
 
-def generate_detection_image(detection_date, predict_nearest_hour):
-    """Draws real detection boxes + confidence labels on the most recent ~8am
-    crop at or before detection_date (the actual production tiling/NMS/false-
-    positive-filter pipeline via detect_surfers.run_inference_with_boxes —
-    not a simplified re-implementation), with the model's own predicted
-    range/median for that same hour (via predict_nearest_hour, independent
-    of whatever date the forecast chart is for) overlaid as text.
-    find_nearest_hour_crop falls back to earlier dates (local_pipeline.sh
-    runs twice a week, not daily, so detection_date itself — usually
-    "today" — frequently has no crop yet) rather than skipping outright, so
-    this only returns None if nothing usable exists within its lookback
-    window at all."""
-    row = find_nearest_hour_crop(detection_date, target_hour=8)
-    if row is None:
-        print(f"No usable ~8am crop found at or before {detection_date} — skipping detection image.")
+# --- Detection animation settings (2026-09-16) -------------------------------
+# Replaced the single ~8am still with an animation of a whole day of frames.
+# SIDE_CROP_FRAC trims this fraction off each end: the camera's full 1280px
+# strip makes surfers tiny once GitHub scales it to page width, so the outer
+# 40% is traded away to see the remaining 60% properly. GIF_UPSCALE then takes
+# the 768px crop past GitHub's ~880px content column so it renders full width
+# instead of being letterboxed at its natural size.
+SIDE_CROP_FRAC = 0.20
+GIF_UPSCALE = 2.0
+GIF_FRAME_MS = 1000
+GIF_MAX_COLORS = 128          # palette size — the strip is mostly water, so this is plenty
+GIF_LOOKBACK_DAYS = 7
+# A day needs at least this many usable frames to be worth animating. The
+# scheduled run is at 20:30, by which point the current day is complete, but an
+# off-hours run would otherwise pick up a half-collected day — a 7am test run
+# produced a one-frame "animation".
+MIN_GIF_FRAMES = 6
+
+
+def find_day_crops(detection_date, lookback_days=GIF_LOOKBACK_DAYS):
+    """All quality_ok crops for the most recent day at or before detection_date.
+
+    Falls back to earlier days rather than returning nothing, for the same
+    reason the single-frame version did: a run can happen before that day's
+    clips exist, and an empty animation in the README is worse than yesterday's.
+    Returns (date, [row, ...]) in time order, or (None, []).
+    """
+    with open(ds.PREDS_CSV, newline="") as f:
+        all_rows = list(csv.DictReader(f))
+
+    for days_back in range(lookback_days + 1):
+        check_date = detection_date - timedelta(days=days_back)
+        rows = [r for r in all_rows
+                if r["date"] == check_date.isoformat() and r["quality_ok"] == "True"
+                and (ds.CROPS_DIR / r["filename"]).exists()]
+        if len(rows) >= MIN_GIF_FRAMES:
+            rows.sort(key=lambda r: r["time_local"])
+            return check_date, rows
+        if rows:
+            print(f"  {check_date} has only {len(rows)} usable frame(s) "
+                  f"(need {MIN_GIF_FRAMES}) — looking further back.")
+    return None, []
+
+
+def render_detection_frame(img_path, model):
+    """One annotated frame: real detection boxes, cropped, upscaled, labelled.
+
+    Boxes come from the production path (tiling, cross-tile NMS,
+    false-positive filtering) via run_inference_with_boxes, not a
+    reimplementation. Cropping happens first and drawing second, so box
+    outlines and text are drawn at final resolution rather than being
+    upscaled into blurry lines.
+    """
+    boxes = ds.run_inference_with_boxes(model, img_path)
+    img = cv2.imread(str(img_path))
+    if img is None:
+        return None, 0
+
+    h, w = img.shape[:2]
+    x0, x1 = int(w * SIDE_CROP_FRAC), int(w * (1 - SIDE_CROP_FRAC))
+    cropped = img[:, x0:x1]
+    out = cv2.resize(cropped, None, fx=GIF_UPSCALE, fy=GIF_UPSCALE, interpolation=cv2.INTER_CUBIC)
+
+    BOX_COLOR = (90, 227, 157)  # BGR — lime green, matching LIME "#9de35a"
+    overlay = out.copy()
+    visible = 0
+    for bx1, by1, bx2, by2, conf in boxes:
+        # Drop boxes the crop removed; clip ones it cuts through.
+        if bx2 < x0 or bx1 > x1:
+            continue
+        visible += 1
+        p1 = (int(max(bx1 - x0, 0) * GIF_UPSCALE), int(by1 * GIF_UPSCALE))
+        p2 = (int(min(bx2 - x0, x1 - x0) * GIF_UPSCALE), int(by2 * GIF_UPSCALE))
+        cv2.rectangle(overlay, p1, p2, BOX_COLOR, 2)
+        cv2.putText(overlay, f"{conf:.2f}", (p1[0], max(p1[1] - 6, 14)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, BOX_COLOR, 1, cv2.LINE_AA)
+    out = cv2.addWeighted(overlay, 0.65, out, 0.35, 0)
+    return out, visible
+
+
+def generate_detection_gif(detection_date):
+    """Animates a full day of detections, one frame per clip, 1s each.
+
+    Replaces the single ~8am still (2026-09-16): one frame showed one hour's
+    crowd, while a day of them shows the shape the forecast model is actually
+    trying to predict — empty at dawn, building through the morning, thinning
+    out again. Returns (date, n_frames) or None.
+    """
+    day, rows = find_day_crops(detection_date)
+    if not rows:
+        print(f"No usable crops found at or before {detection_date} — skipping detection animation.")
         return None
 
-    img_path = ds.CROPS_DIR / row["filename"]
     model = ds.load_model()
-    boxes = ds.run_inference_with_boxes(model, img_path)
+    frames = []
+    for row in rows:
+        frame, count = render_detection_frame(ds.CROPS_DIR / row["filename"], model)
+        if frame is None:
+            continue
 
-    img = cv2.imread(str(img_path))
-    # Draw boxes/labels on a copy, then alpha-blend back so they read as
-    # translucent overlays rather than opaque marks on the surf photo.
-    overlay = img.copy()
-    BOX_COLOR = (90, 227, 157)  # BGR — lime green (matches LIME "#9de35a")
-    for x1, y1, x2, y2, conf in boxes:
-        p1, p2 = (int(x1), int(y1)), (int(x2), int(y2))
-        cv2.rectangle(overlay, p1, p2, BOX_COLOR, 1)
-        label = f"{conf:.2f}"
-        cv2.putText(overlay, label, (p1[0], max(p1[1] - 5, 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, BOX_COLOR, 1, cv2.LINE_AA)
-    BOX_ALPHA = 0.60
-    img = cv2.addWeighted(overlay, BOX_ALPHA, img, 1 - BOX_ALPHA, 0)
+        # Banner below the image, so the labels never cover water that might
+        # contain a surfer the reader is trying to spot.
+        banner_h = 46
+        h, w = frame.shape[:2]
+        canvas = np.zeros((h + banner_h, w, 3), dtype=np.uint8)
+        canvas[:h] = frame
+        hh, mm = map(int, row["time_local"].split(":")[:2])
+        stamp = datetime(day.year, day.month, day.day, hh, mm).strftime("%-I:%M %p")
+        # ASCII only: cv2's Hershey fonts have no glyph for an em dash and
+        # silently render it as "???".
+        cv2.putText(canvas, f"{stamp}   |   {count} surfers detected", (10, h + 33),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (235, 235, 235), 2, cv2.LINE_AA)
+        frames.append(Image.fromarray(cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)))
 
-    # Model's predicted range/median for this exact hour — looked up directly
-    # (not from a chart-date-scoped table), so it's correct even when the
-    # forecast chart is for a different date (e.g. tomorrow) than this image.
-    # Uses row["date"] (the crop's actual date, which find_nearest_hour_crop
-    # may have fallen back to an earlier day than detection_date) rather than
-    # detection_date itself -- by_hour only covers today+tomorrow's live
-    # forecast, so a past fallback date correctly comes back "not available"
-    # instead of silently showing a different day's predicted range.
-    row_date = datetime.strptime(row["date"], "%Y-%m-%d").date()
-    hh, mm = map(int, row["time_local"].split(":"))
-    pred_row = predict_nearest_hour(row_date, hh, mm)
-    if pred_row is not None:
-        q = pred_row["quantiles"]
-        pred_text = f"Predicted: {pred_row['point']:.0f} (80% range {q[0.10]:.0f}-{q[0.90]:.0f})"
-    else:
-        pred_text = "Predicted range/median: not available for this hour"
+    if not frames:
+        print("No frames rendered — skipping detection animation.")
+        return None
 
-    detected_text = f"Detected: {len(boxes)} surfer(s) at {row['time_local']}"
-    legend_text = (
-        f"Box = detected surfer, label = model confidence (0-1). "
-        f"Confidence threshold: {ds.CONF_THRESH:.3f} (boxes below this are dropped)."
-    )
-
-    # Black banner strip below the image so text never overlaps real image content.
-    banner_h = 62
-    h, w = img.shape[:2]
-    canvas = np.zeros((h + banner_h, w, 3), dtype=np.uint8)
-    canvas[:h] = img
-    cv2.putText(canvas, detected_text, (8, h + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (211, 211, 211), 1, cv2.LINE_AA)
-    cv2.putText(canvas, pred_text, (8, h + 36), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (211, 211, 211), 1, cv2.LINE_AA)
-    cv2.putText(canvas, legend_text, (8, h + 54), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (170, 170, 170), 1, cv2.LINE_AA)
-
-    dated_path = CHARTS_DIR / f"detection_{row_date.isoformat()}.png"
-    cv2.imwrite(str(dated_path), canvas)
-    latest_path = CHARTS_DIR / "latest_detection.png"
-    cv2.imwrite(str(latest_path), canvas)
-    print(f"Saved detection image to {dated_path}")
-    return row["date"], row["time_local"]
+    # Quantize to a shared adaptive palette: GIF is palette-based anyway, and
+    # letting each frame pick its own palette both bloats the file and makes
+    # the water shimmer between frames.
+    palette_frames = [f.convert("P", palette=Image.ADAPTIVE, colors=GIF_MAX_COLORS) for f in frames]
+    CHARTS_DIR.mkdir(parents=True, exist_ok=True)
+    latest_path = CHARTS_DIR / "latest_detection.gif"
+    palette_frames[0].save(latest_path, save_all=True, append_images=palette_frames[1:],
+                           duration=GIF_FRAME_MS, loop=0, optimize=True, disposal=2)
+    dated_path = CHARTS_DIR / f"detection_{day.isoformat()}.gif"
+    dated_path.write_bytes(latest_path.read_bytes())
+    size_mb = latest_path.stat().st_size / 1e6
+    print(f"Saved detection animation ({len(frames)} frames, {size_mb:.1f} MB) to {dated_path}")
+    return day, len(frames)
 
 
 README_START_MARKER = "<!-- DAILY_CHART_START -->"
@@ -504,7 +557,9 @@ def update_readme(target_date, detection_capture=None):
         "that the object is a surfer.  Look carefully and you may find "
         "additional surfers that the model missed or other objects which are "
         "misclassified as surfers - like the wind sock at the bottom center "
-        "of the photo.\n"
+        "of the photo.  Each frame is one hour of that day, one second apart, "
+        "and the ends of the camera's view are cropped off so the surfers are "
+        "big enough to see.\n"
     )
     FORECAST_CAPTION = (
         "Once enough hours and days were gathered along with weather and surf "
@@ -518,14 +573,13 @@ def update_readme(target_date, detection_capture=None):
     )
 
     detection_block = ""
-    if (CHARTS_DIR / "latest_detection.png").exists() and detection_capture is not None:
-        capture_date, capture_time = detection_capture
-        capture_dt = datetime.strptime(f"{capture_date} {capture_time}", "%Y-%m-%d %H:%M")
-        capture_str = capture_dt.strftime("%A, %B %d, %Y, %-I:%M %p")
+    if (CHARTS_DIR / "latest_detection.gif").exists() and detection_capture is not None:
+        capture_day, n_frames = detection_capture
+        capture_str = capture_day.strftime("%A, %B %d, %Y")
         detection_block = (
-            f"#### A Recent Surfer Detection Count: {capture_str}\n\n"
+            f"#### A Full Day of Surfer Detections: {capture_str}\n\n"
             f"{DETECTION_CAPTION}"
-            f"![Latest detection review](data/charts/latest_detection.png)\n\n"
+            f"![Detections through {capture_str}](data/charts/latest_detection.gif)\n\n"
         )
 
     target_date_str = target_date.strftime("%A, %B %d, %Y")

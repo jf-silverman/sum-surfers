@@ -3120,3 +3120,62 @@ in `ps` for the duration.
 
 Three grants now exist and none implies the others: `/usr/sbin/cron` (legacy,
 no longer used), the real Python binary, and `/bin/bash`.
+
+### README restructured; detection animation, simpler chart, failure-only email (2026-09-16)
+
+Four changes Joel asked for, plus one problem found while making them.
+
+**The README's auto-generated markers were wrapping hand-written prose.**
+Joel's edits had left `<!-- DAILY_CHART_START -->` / `END` enclosing not just
+the two images but the whole plain-language list and Technical Overview.
+`update_readme()` regenerates everything between those markers on every run,
+so the first chart run of the day deleted all of it — and did, three times,
+before this was noticed. The markers now wrap only the two image blocks, and
+every hand-written section lives outside them.
+
+**Overviews combined.** The separate plain-language and technical lists are now
+one nine-step section, each step a short key phrase, then a one-sentence
+plain-language description in bold italics, then the technical detail and a
+link to the relevant `HOW_IT_WORKS.md` section.
+
+**The single detection still is now a day-long animation.** One frame at ~8am
+showed one hour's crowd; fifteen frames show the shape the forecast model is
+trying to predict. Built from every quality-passed frame of the most recent
+complete day, one second each, looping. Two details worth recording:
+
+- **The outer 40% of the frame is cropped away** (20% per side) and the rest
+  upscaled 2x to 1536px. At full 1280px width, GitHub scales the strip down to
+  its content column and surfers become nearly invisible; trading away the
+  edges buys enough resolution to see the middle. Boxes are drawn *after*
+  cropping and upscaling so outlines and labels are crisp rather than
+  enlarged.
+- **A day needs at least 6 usable frames** to be animated, falling back to
+  earlier days otherwise. A 7am test run had produced a one-frame
+  "animation" from that morning's single clip.
+
+Also: `cv2`'s Hershey fonts are ASCII-only and silently rendered the em dash in
+the frame label as `???`.
+
+**Chart simplified to one 80% band.** The 40-band alpha gradient interpolated
+across nine fitted quantiles read as busier than the model is precise, so
+`FAN_LEVELS` is now just `[0.10, 0.50, 0.90]` — three fits per run instead of
+nine — drawn as a single shaded interval. The side table gained a `Predicted`
+column before `Range`; it previously showed only a range, leaving no single
+number to act on.
+
+**Email now fires only on failure.** Steps run through a `run_step` helper that
+records a failure and continues rather than aborting under `set -e` — a
+mid-script abort previously ended the run with no notification at all. Anything
+that failed is emailed once at the end, with the last 25 log lines, and the run
+exits non-zero. A clean run sends nothing, so an email always means something
+needs doing. The clips-storage limit moved from 2.0 GB to 5.0 GB in both `.env`
+and the code default; the folder is at 3.3 GB, so the old limit had been
+emailing on every run.
+
+One bug caught in that helper before it shipped: `local rc=$?` captures
+`local`'s own exit status, not the command's, so every real failure was
+recorded as "exit 0". Assigning on the failure path (`"$@" || rc=$?`) fixes it.
+
+Verified: a full `local_pipeline.sh` run completed all nine steps, exit 0, sent
+no email; the chart renders with one band and the new table column; the
+animation is 15 frames, 1536x406, 3.6 MB.

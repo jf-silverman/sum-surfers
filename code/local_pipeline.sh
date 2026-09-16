@@ -61,18 +61,39 @@ fi
 # ── Logging ───────────────────────────────────────────────────────────────────
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
+# ── Failure tracking ──────────────────────────────────────────────────────────
+# Every step runs through run_step, which records a failure and carries on
+# rather than aborting under `set -e`. Two reasons: a later step is often still
+# worth running (predictors do not depend on detection), and a mid-script abort
+# used to leave no notification at all — the run simply stopped. Anything that
+# failed is emailed once at the end. Added 2026-09-16, when Joel asked to be
+# emailed only on a failed pipeline or on storage passing 5 GB.
+FAILED_STEPS=()
+run_step() {
+    local label="$1"; shift
+    # `local rc=$?` would capture local's own status, not the command's — it
+    # reported "exit 0" for every real failure. Assign on the failure path.
+    local rc=0
+    "$@" || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        log "WARNING: ${label} failed (exit ${rc}) — continuing."
+        FAILED_STEPS+=("${label} (exit ${rc})")
+    fi
+    return 0
+}
+
 log "=== Local pipeline starting ==="
 
 cd "$PROJECT_ROOT"
 
 # ── Step 1: Download clips ────────────────────────────────────────────────────
 log "Step 1/9 — Downloading Surfline clips..."
-"$PYTHON" code/get_clips.py
+run_step "Step 1 (download clips)" "$PYTHON" code/get_clips.py
 log "Step 1 done."
 
 # ── Step 2: Extract crop frames ───────────────────────────────────────────────
 log "Step 2/9 — Extracting crop frames..."
-"$PYTHON" code/get_cropped_frame.py
+run_step "Step 2 (extract crops)" "$PYTHON" code/get_cropped_frame.py
 log "Step 2 done."
 
 # ── Step 3: Check local clips storage ────────────────────────────────────────
@@ -83,12 +104,12 @@ log "Step 3 done."
 
 # ── Step 4: Run detection locally ────────────────────────────────────────────
 log "Step 4/9 — Running YOLOv8 detection locally..."
-"$PYTHON" code/detect_surfers.py
+run_step "Step 4 (detection)" "$PYTHON" code/detect_surfers.py
 log "Step 4 done."
 
 # ── Step 5: Pull Surfline predictors (weather/rating/tide/swell) for Jack's ──
 log "Step 5/9 — Pulling Surfline predictors for Jack's..."
-"$PYTHON" code/get_surf_predictors.py
+run_step "Step 5 (surf predictors)" "$PYTHON" code/get_surf_predictors.py
 log "Step 5 done."
 
 # ── Step 6: Backfill real observed weather (Open-Meteo archive) ──────────────
@@ -99,14 +120,14 @@ log "Step 5 done."
 # 2026-08-28 while 161 new quality_ok rows piled up unused. Never fail the
 # pipeline over it — the detection data above is the irreplaceable part.
 log "Step 6/9 — Backfilling real observed weather (Open-Meteo)..."
-"$PYTHON" code/backfill_openmeteo_weather.py || log "WARNING: Open-Meteo backfill failed, continuing."
+run_step "Step 6 (Open-Meteo backfill)" "$PYTHON" code/backfill_openmeteo_weather.py
 log "Step 6 done."
 
 # ── Step 7: Rebuild the model's training table ───────────────────────────────
 # Joins predictions (target) with all predictor sources (features). Also
 # manual-only until 2026-09-09 — see Step 6. Rebuilt from scratch each run.
 log "Step 7/9 — Rebuilding training features table..."
-"$PYTHON" code/build_training_features.py || log "WARNING: training-features rebuild failed, continuing."
+run_step "Step 7 (training features)" "$PYTHON" code/build_training_features.py
 log "Step 7 done."
 
 # ── Step 8: Record success timestamp locally ─────────────────────────────────
@@ -125,8 +146,27 @@ log "Step 8/9 — Local success timestamp recorded: $(cat "$LAST_SUCCESS_FILE")"
 # detections that were written minutes earlier rather than last night's.
 # Non-fatal: the chart is regenerable, the clip/detection data above is not.
 log "Step 9/9 — Building daily prediction chart..."
-bash "$PROJECT_ROOT/code/daily_chart.sh" >> "$PROJECT_ROOT/data/daily_chart.log" 2>&1 \
-    || log "WARNING: daily_chart.sh failed, see data/daily_chart.log. Continuing."
+run_step "Step 9 (daily chart)" bash "$PROJECT_ROOT/code/daily_chart.sh" \
+    >> "$PROJECT_ROOT/data/daily_chart.log" 2>&1
 log "Step 9 done."
+
+# ── Notify only on failure ───────────────────────────────────────────────────
+# The only two things worth an email are a failed pipeline and storage over the
+# limit (that one is emailed by manage_clips.py in Step 3). A run that worked
+# sends nothing, so an email in the inbox always means something needs doing.
+if [[ ${#FAILED_STEPS[@]} -gt 0 ]]; then
+    log "=== Local pipeline finished with ${#FAILED_STEPS[@]} failed step(s) ==="
+    FAILURE_LIST=$(printf '  - %s\n' "${FAILED_STEPS[@]}")
+    "$PYTHON" code/send_email.py \
+        --subject "sum-surfers pipeline: ${#FAILED_STEPS[@]} step(s) failed $(date '+%Y-%m-%d')" \
+        --body "The nightly pipeline finished with failures:
+
+${FAILURE_LIST}
+Last 25 lines of data/local_pipeline.log:
+
+$(tail -25 "$PROJECT_ROOT/data/local_pipeline.log")" \
+        || log "WARNING: failure email could not be sent."
+    exit 1
+fi
 
 log "=== Local pipeline complete ==="
