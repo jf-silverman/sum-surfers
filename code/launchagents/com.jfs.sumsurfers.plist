@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.jfs.sumsurfers — nightly clip collection, detection, predictors and chart.
+
+  Replaces the 20:30 crontab entry. The reason for launchd over cron: if the
+  Mac is asleep at the scheduled time, launchd runs the job at the next wake,
+  while cron silently skips the day and waits 24 hours. That is exactly what
+  cost 2026-09-14's chart. Nothing wakes this Mac for 20:30 — the only
+  repeating wake is 18:25 on weekdays, paired with another project's agent —
+  so catch-up-on-wake is what makes this schedule dependable, especially at
+  weekends.
+
+  caffeinate -i holds off idle sleep for as long as the pipeline runs, which
+  now includes the chart as its last step.
+
+  Install (do this only after tonight's cron run has finished, and remove the
+  crontab line in the same sitting so the job cannot fire twice):
+
+    cp code/launchagents/com.jfs.sumsurfers.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.jfs.sumsurfers.plist
+    crontab /tmp/crontab.empty        # or: crontab -e, delete the 20:30 line
+
+  Verify it is registered:
+    launchctl print gui/$(id -u)/com.jfs.sumsurfers | head -20
+
+  Run it once by hand (this is the Full Disk Access test — a TCC denial shows
+  up as "Operation not permitted" in data/local_pipeline.log):
+    launchctl kickstart -k gui/$(id -u)/com.jfs.sumsurfers
+
+  Uninstall:
+    launchctl bootout gui/$(id -u)/com.jfs.sumsurfers
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jfs.sumsurfers</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/caffeinate</string>
+        <string>-i</string>
+        <string>/bin/bash</string>
+        <string>/Users/jfs-m3/Documents/DS/sum-surfers/code/local_pipeline.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>20</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <!-- launchd appends to these, matching what the crontab line did with >>. -->
+    <key>StandardOutPath</key>
+    <string>/Users/jfs-m3/Documents/DS/sum-surfers/data/local_pipeline.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/jfs-m3/Documents/DS/sum-surfers/data/local_pipeline.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <!-- Never run on load: loading it should not kick off a pipeline run. -->
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

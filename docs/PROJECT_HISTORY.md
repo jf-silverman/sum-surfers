@@ -2977,3 +2977,35 @@ Worth noting for the trip: clip collection is the only step with a deadline.
 missed nights are recoverable by the next run; past that the footage is gone
 unless the camera still serves it at a larger lookback. Predictors backfill
 from history, detection rebuilds from clips, and charts are regenerable.
+
+### LaunchAgent written to replace the pipeline's cron entry (2026-09-15)
+
+Checking whether to move the pipeline to launchd surfaced the more important
+fact: **nothing wakes this Mac for the 20:30 run.** The only repeating power
+event is `wakepoweron at 6:25PM weekdays only`, paired with another project's
+18:30 agent, and idle sleep is enabled. The pipeline has been running on the
+chance that the laptop happened to be awake — with no coverage at all at
+weekends.
+
+Retargeting the wake was rejected: `pmset repeat` holds a single repeating
+event, so moving it to 20:25 would remove the 18:25 wake the other project
+depends on.
+
+`code/launchagents/com.jfs.sumsurfers.plist` instead relies on launchd's
+behaviour of running a missed `StartCalendarInterval` job at the next wake,
+which cron does not do — the exact failure mode that lost 2026-09-14's chart.
+The job still runs at 20:30 when the machine is awake; otherwise it runs when
+the lid next opens, and clip backfill (`CLIP_LOOKBACK_DAYS`, default 5) covers
+the delay.
+
+Same `caffeinate -i` wrapper, same log file (launchd appends to
+`StandardOutPath`, matching the crontab `>>`), `RunAtLoad` false so installing
+it does not trigger a run. Install/verify/test/uninstall commands live in the
+plist's own comment. Not installed — Joel is loading it tonight after the
+existing cron run finishes, removing the crontab line in the same sitting so
+the job cannot fire twice.
+
+Open risk: Full Disk Access. The grants for `/usr/sbin/cron` and the real
+Python binary do not obviously cover a job launched by launchd through
+`/bin/bash`; a TCC denial would appear as `Operation not permitted` in
+`data/local_pipeline.log`. One manual `launchctl kickstart` answers it.
