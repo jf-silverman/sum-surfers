@@ -1,85 +1,18 @@
-# Sum Surfers
+# Sum Surfers - An Automated Surfer Crowd Size Forecasting Tool
 
-Automated surfer counting from a beach camera.
+## Project Summary
 
-## What This Project Does, In Plain Terms
+This project collects images from a shoreline video camera and tries to answer two questions:
+- **_How many surfers were out are out there each hour of each day in the past?_**
+- **_How many will there be at each hour of the day in the upcoming days?_**
 
-There's a live camera pointed at a surf spot in Santa Cruz, California. This project watches that camera and tries to answer two simple questions:
-1. **_How many surfers are out there?_**
-2. **_How many will there be at different times in the upcoming days?_**
-
-Why Does this matter?  
-
-**_As a surf spot gets more crowded, the competition for each wave becomes more intense.  For this reason many surfers like to know how crowded it will be and some may decide to go at less crowded times._**
-
-Here's the basic idea, step by step:
-
-1. **Gather video.** Each week, the project downloads short clips
-   from the camera.
-2. **Pull out a picture.** From each video clip, it grabs one still photo and
-   crops it down to just the part of the water where surfers actually
-   are.
-3. **Count the surfers in the picture.** This is the hard part, and it's
-   done by a computer-vision model — a program that has been trained on
-   thousands of hand-labeled examples to recognize what a surfer in the
-   water looks like, and draw a box around each one it finds. This is
-   the same basic kind of technology used in things like self-driving
-   cars (spotting pedestrians) or photo apps (finding faces). The more
-   examples the model has seen, the better it gets at telling a real
-   surfer apart from, say, a bird, a shadow, or a wave.
-4. **Keep score over time.** Every count gets logged with the date, time,
-   and conditions (tide, weather, etc.), building up a running history
-   of how many surfers show up throughout the day and across the year.
-5. **Make a forecast.** Using that history, a second, simpler model looks for patterns — for example, "it's a weekend, the tide is dropping, and it's sunny" tends to mean more surfers — and uses those patterns to predict roughly how crowded the spot will be later today, hour by hour. It's the same general idea as a weather forecast: not a  guarantee, just an educated, data-backed guess with a likely range attached to it.
-
-The rest of this README below goes into more technical details.
-
-## Technical Overview
-
-This project downloads short video clips around daylight hours, extracts still image frames, runs an object detector on tiled sections of each frame, stores per-clip surfer counts averaged across those frames, and forecasts future surf crowd levels using a variety of real-world conditions as inputs.  In brief, the project does the following:
-
-1. Downloads a short video clip from the camera from each hour during daylight hours (real dawn to dusk for that
-   date, not fixed clock times), into a dated folder.
-2. Extracts 3 cropped [regions of interest](docs/HOW_IT_WORKS.md#term-roi)
-   from each clip — a primary frame plus 2 "side" frames a few seconds
-   apart — so one count isn't at the mercy of a single unlucky frame
-   (someone briefly hidden behind a wave, a bird flying through, etc.).
-3. Checks the primary frame's brightness and blur before running
-   detection; frames too dark or too blurred (fog, dusk, a wet lens) are  skipped entirely rather than counted wrong. 
-4. Splits each frame into 4 overlapping horizontal tiles — small, distant surfers are easier for the detector to find within a tile than scattered across one wide frame — runs the object detection model [YOLOv8](docs/HOW_IT_WORKS.md#main-resources) on each tile, then
-   merges detections that land on a tile boundary back into one count
-   per frame.
-5. Averages the 3 per-frame counts into one per-clip count, and appends
-   the result — plus the 3 raw per-frame counts, for later analysis —
-   to `data/predictions/predictions.csv`.
-6. Collects the real-world conditions that help explain and forecast
-   crowd size — weather, tide height, swell, wind, and wave energy for
-   the spot, today and tomorrow — and matches each hour of that data to
-   the surfer counts already logged, building up a table the forecast
-   model can learn from.
-7. Feeds that combined table (past counts + the conditions at the time)
-   into a forecasting model, which learns which conditions tend to mean
-   more or fewer surfers, then uses tomorrow's forecasted conditions to
-   predict an hour-by-hour surfer count for the coming day, along with a
-   likely range around each prediction (see "Surfer Count Prediction
-   Model" below).
-8. Once a day, redraws the detection-review image (a recent camera frame
-   with the model's boxes drawn on it) and the daily forecast chart with
-   the latest data, and automatically commits both images to this
-   repository — which is why the two images below update on their own
-   each day without anyone manually running anything.
-
-See [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for a full walkthrough of the
-detection pipeline and a glossary of every term used in this repo,
-[PROJECT_HISTORY.md](docs/PROJECT_HISTORY.md) for how it was built and
-tuned over time, and [PROJECT_FILES.md](docs/PROJECT_FILES.md) for a map
-of what every file in this repo does.
+**_This matters to me as a surfer because the competition for each wave becomes more intense as the crowd size increases.  It helps me choose when to go and know what to expect. _**
 
 <!-- DAILY_CHART_START -->
-#### A Recent Surfer Detection Count: Wednesday, September 16, 2026, 6:26 AM
+#### A Full Day of Surfer Detections: Tuesday, September 15, 2026
 
-Each green box below contains a surfer, according to the object detection model.  Each number above a box indicates the probability that the object is a surfer.  Look carefully and you may find additional surfers that the model missed or other objects which are misclassified as surfers - like the wind sock at the bottom center of the photo.
-![Latest detection review](data/charts/latest_detection.png)
+Each green box below contains a surfer, according to the object detection model.  Each number above a box indicates the probability that the object is a surfer.  Look carefully and you may find additional surfers that the model missed or other objects which are misclassified as surfers - like the wind sock at the bottom center of the photo.  Each frame is one hour of that day, one second apart, and the ends of the camera's view are cropped off so the surfers are big enough to see.
+![Detections through Tuesday, September 15, 2026](data/charts/latest_detection.gif)
 
 #### The Surfer Crowd Forecast for: Thursday, September 17, 2026
 
@@ -88,17 +21,100 @@ Once enough hours and days were gathered along with weather and surf conditions,
 
 <!-- DAILY_CHART_END -->
 
+## How It Works, Step by Step
+
+Each step below starts with the plain-language version, then the technical
+detail and a link to the in-depth write-up.
+
+1. **Gather video clips.**
+   ***Every hour of daylight, the project downloads a short video clip from a camera pointed at the surf spot.***
+   Clip collection runs from real dawn to real dusk for that date — civil
+   twilight, taken from the camera provider's own sunlight forecast — rather
+   than fixed clock times, so it follows the seasons instead of wasting
+   requests on darkness. Clips land in a dated folder and are deleted once
+   frames have been pulled from them.
+   → [The pipeline, end to end](docs/HOW_IT_WORKS.md#the-pipeline-end-to-end)
+
+2. **Pull out still frames.**
+   ***From each clip it saves three snapshots taken a few seconds apart, cropped down to just the patch of water where surfers sit.***
+   The three frames sit at 1.0s, 2.5s and 4.0s into the clip, and each is
+   cropped to the same fixed [region of interest](docs/HOW_IT_WORKS.md#term-roi)
+   — a 1280×180 strip. Three frames rather than one because counts on the same
+   stretch of water swing by several surfers within seconds as waves pass and
+   people duck under; averaging cuts that noise.
+   → [Multi-frame count averaging](docs/HOW_IT_WORKS.md#multi-frame-count-averaging)
+
+3. **Screen out unusable pictures.**
+   ***Frames too dark or too blurry to count are thrown away rather than guessed at.***
+   Each primary frame is checked for brightness and for
+   [Laplacian variance](docs/HOW_IT_WORKS.md#term-laplacian-variance), a
+   standard measure of how much fine detail an image holds. Fog, dusk and a
+   wet lens all fail it. Rejected frames are still logged with their scores,
+   just never counted — a wrong number is worse than a missing one.
+   → [Image-quality gate](docs/HOW_IT_WORKS.md#image-quality-gate)
+
+4. **Find the surfers.**
+   ***A model trained on thousands of hand-labeled examples draws a box around every surfer it can find.***
+   Each frame is split into four overlapping horizontal tiles and
+   [YOLOv8](docs/HOW_IT_WORKS.md#term-yolo) runs on each one. Tiling matters
+   because a surfer is a handful of pixels in a 1280-pixel-wide strip; within a
+   tile, the same surfer is proportionally much larger. This is the same family
+   of technology behind pedestrian detection in self-driving cars.
+   → [The model: YOLOv8](docs/HOW_IT_WORKS.md#the-model-yolov8)
+
+5. **Merge the overlaps.**
+   ***A surfer sitting on the seam between two tiles would be counted twice, so overlapping boxes are merged back into one.***
+   Detections below a confidence threshold of 0.195 are dropped, then
+   [non-maximum suppression](docs/HOW_IT_WORKS.md#term-nms) merges boxes that
+   overlap across tile boundaries. Two zones that reliably produce false
+   positives — a tree branch and a wind sock — are filtered by position.
+   → [Confidence threshold and NMS, concretely](docs/HOW_IT_WORKS.md#confidence-threshold-and-nms-concretely)
+
+6. **Keep score over time.**
+   ***Each clip's three counts become one number, saved with its date and time.***
+   The mean of the three frames is stored as that hour's count, along with all
+   three raw values and their spread, so later analysis can tell a genuinely
+   busy hour from a noisy one. This growing history is what the forecast model
+   learns from — currently over 1,500 counted hours.
+   → [The pipeline, end to end](docs/HOW_IT_WORKS.md#the-pipeline-end-to-end)
+
+7. **Record the conditions.**
+   ***Tide, swell, wind, weather and wave energy for that hour are stored next to every count.***
+   Predictors come from the surf forecast provider's hourly endpoints, plus
+   observed weather from Open-Meteo's archive and tide heights from NOAA, each
+   matched to the nearest local hour of an existing count. Nearshore wave
+   energy turns out to be the second most useful predictor after tide.
+   → [Predictors: weather, tide, swell, wind, energy, consistency](docs/HOW_IT_WORKS.md#predictors-weather-tide-swell-wind-energy-consistency)
+
+8. **Forecast the crowd.**
+   ***A second model learns which conditions bring people out, then predicts tomorrow hour by hour with a likely range around each number.***
+   Gradient-boosted trees fit the counts against those conditions: one model
+   for the expected count, two more for the edges of an 80%
+   [prediction interval](docs/HOW_IT_WORKS.md#term-prediction-interval). It is
+   a forecast, not a guarantee — see [Model Calibration](#model-calibration)
+   for how often that range actually holds, measured rather than claimed.
+   → [Known limitations](docs/HOW_IT_WORKS.md#known-limitations-short-version)
+
+9. **Publish it automatically.**
+   ***Every night the animation and chart above are rebuilt and posted here on their own.***
+   A scheduled job runs the whole pipeline after dusk, rebuilds both images
+   from the day's fresh data, and commits them to this repository. Nobody runs
+   anything by hand, which is why the two images above are never more than a
+   day old.
+   → [The pipeline, end to end](docs/HOW_IT_WORKS.md#the-pipeline-end-to-end)
+
 ### How to Read the Daily Chart
 
 - **Aqua line** — the model's single best-guess ("median") count for each
   hour.
-- **Shaded gradient + side table ("80% Range")** — the model's
-  [prediction interval](docs/HOW_IT_WORKS.md#term-prediction-interval): the range the
-  real count is expected to fall in on most days, shown both as a
-  gradient around the line (darker = more likely, fading out toward the
-  10%/90% edges) and as plain numbers in the table. **It isn't perfectly
-  calibrated** — see [Model Calibration](#model-calibration) below for
-  the real, measured accuracy of this range, not just the claimed one.
+- **Shaded band + side table** — the model's
+  [prediction interval](docs/HOW_IT_WORKS.md#term-prediction-interval): the
+  range the real count is expected to fall in on most days, shown as a single
+  shaded 80% band around the line and repeated as plain numbers in the table,
+  where the "Predicted" column is that hour's single best guess and "Range" is
+  the band. **It isn't perfectly calibrated** — see
+  [Model Calibration](#model-calibration) below for the real, measured accuracy
+  of this range, not just the claimed one.
 - **Weather markers** (circle/square/triangle/diamond) — the model's
   predicted weather condition for that hour, plotted at the median
   count.
@@ -120,8 +136,8 @@ of how the forecast model was built, tested, and tuned.
 
 ## Object Detection: Model, Training Data & Tools
 
-The step that actually counts surfers in a picture — step 3 in the plain
-overview above — is an **object detection** model. Object detection is a
+The step that actually counts surfers in a picture — step 4 above — is an
+**object detection** model. Object detection is a
 computer-vision task: given an image, find every instance of a chosen
 object type and draw a box around each one, rather than just labeling
 the image as a whole ("this photo contains a surfer" vs. exactly where
