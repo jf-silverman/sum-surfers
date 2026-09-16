@@ -1,0 +1,15 @@
+# Filenames pinned to the TEST split by build_stratified_splits.py, on top of
+# its built-in defaults. One filename per line; text after it is a note.
+#
+# December 2025 is the only winter footage that exists (7 days, 2025-12-01 to
+# 12-07) and cannot be backfilled — the camera has no rewind that far back, so
+# it refills only when the calendar comes around again. Holding these in test
+# keeps a winter check in place instead of letting a random split bury the only
+# cold-water, big-swell frames in training.
+crop2025-12-01_16-02-00.jpg  Dec 2025 winter coverage (29 surfers, 16:02)
+crop2025-12-03_08-50-00.jpg  Dec 2025 winter coverage (1 surfers, 08:50)
+crop2025-12-03_12-26-00.jpg  Dec 2025 winter coverage (21 surfers, 12:26)
+crop2025-12-04_09-44-00.jpg  Dec 2025 winter coverage (49 surfers, 09:44)
+crop2025-12-05_10-38-00.jpg  Dec 2025 winter coverage (16 surfers, 10:38)
+crop2025-12-07_08-50-00.jpg  Dec 2025 winter coverage (18 surfers, 08:50)
+crop2025-12-07_16-02-00.jpg  Dec 2025 winter coverage (52 surfers, 16:02)

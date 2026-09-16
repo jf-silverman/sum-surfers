@@ -81,6 +81,17 @@ DEFAULT_FORCE_TEST = [
     "crop2026-08-09_07-29-00.jpg",
 ]
 
+# Additional pins, kept in a file so the list can grow without editing code.
+FORCE_TEST_FILE = (_PROJECT_ROOT / "analysis" / "training_data_expansion" / "force_test.txt")
+
+
+def force_test_from_file():
+    """Extra filenames pinned to test, one per line, '#' comments ignored."""
+    if not FORCE_TEST_FILE.exists():
+        return []
+    return [line.split()[0] for line in FORCE_TEST_FILE.read_text().splitlines()
+            if line.strip() and not line.lstrip().startswith("#")]
+
 DATE_PATTERNS = [
     re.compile(r"(\d{4})-(\d{2})-(\d{2})"),      # crop2026-08-03_10-02-00.jpg
     re.compile(r"(\d{4})(\d{2})(\d{2})"),        # jacks_20250810_0859.jpg / 20250719_1345.jpg
@@ -305,7 +316,9 @@ def parse_args():
 def main():
     args = parse_args()
     input_dirs = args.input_dir or [DEFAULT_INPUT]
-    force_test = DEFAULT_FORCE_TEST if args.force_test is None else args.force_test
+    # File pins always apply; --force-test replaces only the built-in defaults.
+    force_test = (DEFAULT_FORCE_TEST if args.force_test is None else args.force_test)
+    force_test = list(dict.fromkeys(force_test + force_test_from_file()))
 
     print(f"Inputs: {', '.join(str(d) for d in input_dirs)}")
     pool, categories = load_pool(input_dirs)

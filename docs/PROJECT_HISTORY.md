@@ -3205,3 +3205,44 @@ Worth noting the bar is deliberately about the *subject*, not the model: it
 selects days with surfers in the water, not days the detector did well on. A
 day where the detector plainly misses people is still fair game, and still
 worth showing.
+
+### Winter frames pinned to test; monthly crowd averages tabulated (2026-09-16)
+
+**Coverage audit.** Usable-frame coverage by calendar month: Jan, Feb, Apr and
+Jun have **no footage at all**; Dec (7 days), Mar (5) and May (5) exist only as
+single short bursts. Jul/Aug/Sep/Oct/Nov are healthy at 16-26 days each. 116
+days covered out of 341 elapsed since collection started. The gaps are three
+collection outages, not empty surf: 2025-12-07 → 2026-03-12 (95 days),
+2026-03-16 → 05-06 (51), 2026-05-10 → 07-03 (54).
+
+**Winter frames pinned to the test split.** December 2025 is the only cold-water
+footage that exists and cannot be backfilled — the camera has no rewind that far
+back, so it refills only as the calendar comes around. Three Dec frames were
+already in labeling batch 01; seven more were staged as
+`labeling_batch_02_winter_images.zip` (a separate CVAT task, since a task's
+images are fixed once created) spanning five different days and 1-52 surfers.
+
+`build_stratified_splits.py` now also reads
+`analysis/training_data_expansion/force_test.txt`, so the pin list can grow
+without editing code. The pins report as "not in the labeled pool" until the
+frames are actually labeled, which is correct — they take effect on the next
+rebuild after the export lands. Without them a random split would likely bury
+the only winter frames in training, leaving no cold-water check at all.
+
+One of the seven (`crop2025-12-03_08-50-00`, model count 1) is a hard case
+rather than a dud: low winter sun throws a bright glare path straight down the
+middle of the water. Kept deliberately — that is exactly the lighting the
+detector has almost no training data for.
+
+**Monthly averages table** in `data/tables/` (`monthly_surfer_averages.csv` +
+`.md`): average surfers per daylight hour (6am-7pm, quality-passed frames),
+split weekday vs weekend, with the four missing months interpolated from the
+nearest month either side and labelled as such.
+
+The weekday/weekend split is the striking part. Weekday averages swing hard
+with the season — 20.0 in March down to **8.3 in November** — while weekend
+averages barely move, 16.4 to 23.5 all year. Weekend crowds look close to
+season-independent; weekday crowds do not. Worth noting the same caveats apply
+as everywhere else: these are detector counts, which run low on crowded frames,
+and four of the twelve rows are interpolated from two adjacent months rather
+than measured.

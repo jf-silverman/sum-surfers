@@ -1,0 +1,20 @@
+# Average surfers per daylight hour, by month
+
+Counts are the detector's, on quality-passed frames between 6am and 7pm local.
+Months with no footage are interpolated from the nearest month before and after;
+the `hours` columns show how many real observations each average rests on.
+
+| Month | Weekday avg | Weekday hours | Weekend avg | Weekend hours | Source |
+|---|---:|---:|---:|---:|---|
+| January | 15.9 | 0 | 20.6 | 0 | interpolated (mean of December and March) |
+| February | 15.9 | 0 | 20.6 | 0 | interpolated (mean of December and March) |
+| March | 20.0 | 41 | 23.5 | 28 | measured |
+| April | 18.1 | 0 | 20.8 | 0 | interpolated (mean of March and May) |
+| May | 16.2 | 40 | 18.0 | 20 | measured |
+| June | 16.8 | 0 | 19.2 | 0 | interpolated (mean of May and July) |
+| July | 17.3 | 186 | 20.4 | 85 | measured |
+| August | 14.5 | 240 | 21.7 | 135 | measured |
+| September | 12.9 | 164 | 21.0 | 60 | measured |
+| October | 11.1 | 150 | 16.4 | 63 | measured |
+| November | 8.3 | 127 | 17.9 | 92 | measured |
+| December | 11.8 | 53 | 17.7 | 19 | measured |
