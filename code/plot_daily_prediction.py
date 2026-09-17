@@ -53,7 +53,7 @@ import get_clips as gc  # noqa: E402 — needed for get_light_window() (real daw
 import get_surf_predictors as sp  # noqa: E402
 import detect_surfers as ds  # noqa: E402
 from fit_surfer_count_model import load_and_prepare, fit_quantile_model_robust  # noqa: E402
-from predict_surf_count import build_feature_row, MEAN_KWARGS  # noqa: E402
+from predict_surf_count import build_feature_row, add_tide_daylight_features, MEAN_KWARGS  # noqa: E402
 from build_training_features import simplify_weather_condition  # noqa: E402
 import pytz  # noqa: E402
 
@@ -165,7 +165,7 @@ def main():
     if degenerate_levels:
         print(f"  Degenerate quantile level(s): {degenerate_levels} — drawn as flat bands.")
 
-    by_hour = sp.build_predictor_map()
+    by_hour = add_tide_daylight_features(sp.build_predictor_map())
     local_tz = pytz.timezone(gc.LOCATION["timezone"])
 
     def predict_for_hour(hk):

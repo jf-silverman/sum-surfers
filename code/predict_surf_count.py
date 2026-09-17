@@ -30,7 +30,9 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import get_surf_predictors as sp  # noqa: E402
 from fit_surfer_count_model import load_and_prepare, fit_quantile_model_robust  # noqa: E402
-from build_training_features import simplify_weather_condition  # noqa: E402
+from build_training_features import (  # noqa: E402
+    simplify_weather_condition, GOOD_TIDE_MAX_FT, daylight_hours_for,
+)
 
 DEFAULT_HOURS = ["07:00", "10:00", "13:00", "16:00"]
 
@@ -62,6 +64,36 @@ def train_production_models(X, y, weather_categories):
     upper_model, _ = fit_quantile_model_robust(X, y, 0.9)
     mean_model = HistGradientBoostingRegressor(loss="poisson", **MEAN_KWARGS).fit(X, y)
     return median_model, lower_model, upper_model, mean_model
+
+
+def add_tide_daylight_features(by_hour):
+    """Attach the day-level good-tide features to each live forecast hour.
+
+    Without this the model sees these columns as NaN at prediction time while
+    having trained on real values — it would take the "missing" branch on every
+    split that uses them, every day. Computed the same way
+    build_training_features.py computes them, from the same hourly tide, so the
+    live row matches the training row rather than merely having the column.
+    """
+    by_date = {}
+    for hk, preds in by_hour.items():
+        tide = preds.get("tide_ft")
+        if tide in (None, ""):
+            continue
+        first_hour, last_hour = daylight_hours_for(hk.date().isoformat())
+        if not (first_hour <= hk.hour <= last_hour):
+            continue
+        by_date.setdefault(hk.date(), {})[hk.hour] = float(tide)
+
+    for hk, preds in by_hour.items():
+        hours = by_date.get(hk.date())
+        if not hours:
+            continue
+        good = sorted(h for h, tide in hours.items() if tide < GOOD_TIDE_MAX_FT)
+        preds["good_tide_hours"] = len(good)
+        preds["good_tide_frac"] = round(len(good) / len(hours), 4)
+        preds["good_tide_hours_left"] = sum(1 for h in good if h >= hk.hour)
+    return by_hour
 
 
 def build_feature_row(target_dt, predictors, numeric_cols, weather_categories, train_mean, train_std, template_columns):
@@ -112,7 +144,7 @@ def main():
     hours = args.hours.split(",") if args.hours else DEFAULT_HOURS
 
     print(f"Fetching live forecast (today + tomorrow) for Jack's...")
-    by_hour = sp.build_predictor_map()
+    by_hour = add_tide_daylight_features(sp.build_predictor_map())
     if not by_hour:
         print("ERROR: no forecast data returned — check network/Surfline API status.")
         return

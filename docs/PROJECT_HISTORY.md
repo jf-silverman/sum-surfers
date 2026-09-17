@@ -3246,3 +3246,51 @@ season-independent; weekday crowds do not. Worth noting the same caveats apply
 as everywhere else: these are detector counts, which run low on crowded frames,
 and four of the twelve rows are interpolated from two adjacent months rather
 than measured.
+
+### Good-tide daylight feature added; surf height and rating already ranked (2026-09-16)
+
+**Asked and answered: surf height and condition rating were already predictors.**
+`rating_value`, `surf_min_ft` and `surf_max_ft` have been in the feature set all
+along, and they are near the bottom of it — permutation importance ranks them
+**17th (+0.059), 19th (+0.054) and 28th (+0.000)** of 31, against `tide_ft` at
+**+4.679**. `rating_value` barely varies (903 rows at 2, 584 at 3, 49 rows
+across 1 and 4 combined), which is most of why it carries so little.
+
+**New feature: good-tide daylight hours.** This spot surfs better under about
+3.5 ft, so `build_training_features.py` now derives three day-level columns —
+`good_tide_hours`, `good_tide_frac`, and `good_tide_hours_left` (hours still
+ahead at that moment). The point is that no per-hour column carries this: a
+tree can split `tide_ft` at 3.5 for the current hour, but cannot see that the
+good window runs eight hours today and two tomorrow.
+
+Three things were wrong on the first pass and worth recording:
+
+- **Counting rows, not hours.** Days with repeat clips in one hour (the
+  2026-08-27 variability study collected 31 frames) produced 20 "daylight
+  hours" in a 14-hour window. Keyed by hour now.
+- **A fixed 6:00-19:00 daylight window**, which Joel caught: it caps the count
+  at 14 and undercounts summer, where dawn-to-dusk runs past 15 hours. Now uses
+  the same `get_light_window()` the clip collector uses, so daylight means one
+  thing across the project. Observed daylight hours per day reach 16, so the
+  observed maximum of 12 good-tide hours is tide-limited, not window-limited.
+- **A silent train/serve mismatch.** `build_feature_row()` fills numeric
+  columns from the live predictor dict, which has no `good_tide_*` keys, so the
+  live model would have taken the "missing" branch on every split using them,
+  every day, while training on real values. `predict_surf_count.py` now
+  computes the same features from the live hourly tide.
+
+**The feature does not help, and that is the finding.** Across seven
+train/test splits, mean MAE change is **-0.038** — better on five, worse on
+two, which is noise. Permutation importance puts the three at 14th, 16th and
+20th. Kept, since the effect is neutral-to-marginally-positive and the columns
+are needed for the tables below, but it is not a win and should not be
+described as one.
+
+**Two tables in `data/tables/`.** `monthly_good_tide_hours.*` gives average
+daylight hours under 3.5 ft per month, weekday vs weekend: 10-11 hours in
+March-May falling to **4.0 in October** and 2.5 on December weekends. Set
+against `monthly_surfer_averages.*` from earlier today, the two do not move
+together — November has the fewest weekday surfers (8.3) but more good-tide
+hours than October, which has more surfers. Whatever drives the seasonal
+weekday collapse, it is not tide availability. Both tables carry small-sample
+caveats: March and May rest on 2-3 days each, and four months are interpolated.

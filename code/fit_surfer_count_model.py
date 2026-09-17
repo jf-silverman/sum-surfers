@@ -51,6 +51,11 @@ def load_and_prepare():
         # backfill_openmeteo_weather.py). real_humidity_pct is a validated (if
         # imperfect) proxy for the fog/blur conditions the quality gate already flags.
         "real_temperature_f", "real_humidity_pct", "real_cloud_cover_pct", "real_pressure_mb",
+        # Derived in build_training_features.py (2026-09-16): how much of the
+        # day's daylight sits under the tide this spot surfs best on. Day-level
+        # information that no per-hour column carries — tide_ft says what the
+        # tide is now, not how long the good window lasts.
+        "good_tide_hours", "good_tide_frac", "good_tide_hours_left",
     ]
     for c in numeric_cols:
         df[c] = pd.to_numeric(df[c], errors="coerce")

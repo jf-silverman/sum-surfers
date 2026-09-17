@@ -25,6 +25,10 @@ Usage:
 import argparse
 import csv
 from datetime import datetime
+
+import pytz
+
+import get_clips as gc
 from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -80,12 +84,41 @@ def simplify_weather_condition(raw):
     return WEATHER_SIMPLE_MAP.get(base, "OTHER"), is_night
 
 
+# Derived tide/daylight features (added 2026-09-16). This spot surfs better on
+# a lower tide, roughly under GOOD_TIDE_MAX_FT, so a day with a long low-tide
+# window during daylight gives people more chances to go. That is a property of
+# the whole day, not of the hour a frame was taken in, so no per-row column
+# (tide_ft included) carries it — a tree can split tide_ft at 3.5 for the
+# current hour, but cannot see that the window lasts eight hours today and two
+# tomorrow.
+GOOD_TIDE_MAX_FT = 3.5
+
+
+def daylight_hours_for(date_str, _cache={}):
+    """(first_hour, last_hour) of real daylight for a date, from dawn and dusk.
+
+    A fixed 6:00-19:00 window caps the count at 14 hours, which silently
+    undercounts summer: dawn-to-dusk here runs past 15 hours near the solstice,
+    so a day whose tide never came up could never score above 14. Uses the same
+    get_light_window() the clip collector uses, so "daylight" means one thing
+    across the project. Cached per date — astral is cheap but this is called
+    once per row.
+    """
+    if date_str not in _cache:
+        d = datetime.strptime(date_str, "%Y-%m-%d").date()
+        tz = pytz.timezone(gc.LOCATION["timezone"])
+        dawn, dusk = gc.get_light_window(d, tz)
+        _cache[date_str] = (dawn.hour, dusk.hour)
+    return _cache[date_str]
+TIDE_FEATURE_COLS = ["good_tide_hours", "good_tide_frac", "good_tide_hours_left"]
+
+
 OUT_HEADER = [
     "filename", "date", "time_local",
     "surfer_count", "used_multiframe",
     "hour_local", "day_of_week", "is_weekend", "month",
     "weather_simple", "is_night",
-] + PREDICTOR_FEATURE_COLS + OPENMETEO_FEATURE_COLS
+] + PREDICTOR_FEATURE_COLS + OPENMETEO_FEATURE_COLS + TIDE_FEATURE_COLS
 
 
 def parse_args():
@@ -135,6 +168,55 @@ def build_row(pred_row, predictor_row, openmeteo_row):
     return out
 
 
+def add_tide_daylight_features(rows):
+    """Per-day tide/daylight summaries, attached to every row of that day.
+
+    Counted over the daylight hours actually observed that date rather than a
+    full astronomical day: the pipeline samples roughly hourly from dawn to
+    dusk, so the observed hours are very nearly the daylight hours, and a
+    fraction alongside the raw count keeps a short collection day from looking
+    like a bad-tide day. Rows whose tide is blank are skipped in the counting
+    but still receive the day's values.
+    """
+    by_date = {}
+    for r in rows:
+        try:
+            hour = int(r["time_local"][:2])
+            tide = float(r["tide_ft"])
+        except (ValueError, KeyError, TypeError):
+            continue
+        first_hour, last_hour = daylight_hours_for(r["date"])
+        if not (first_hour <= hour <= last_hour):
+            continue
+        # Keyed by hour, not appended: some days carry several clips for the
+        # same hour (the 60-second variability study collected 31 frames on
+        # 2026-08-27), and counting rows produced 20 "daylight hours" in a
+        # 14-hour window.
+        by_date.setdefault(r["date"], {})[hour] = tide
+
+    good_by_date, frac_by_date = {}, {}
+    for date_str, hours in by_date.items():
+        good = sorted(h for h, tide in hours.items() if tide < GOOD_TIDE_MAX_FT)
+        good_by_date[date_str] = good
+        frac_by_date[date_str] = len(good) / len(hours) if hours else ""
+
+    for r in rows:
+        good = good_by_date.get(r["date"])
+        if good is None:
+            r["good_tide_hours"] = r["good_tide_frac"] = r["good_tide_hours_left"] = ""
+            continue
+        r["good_tide_hours"] = len(good)
+        r["good_tide_frac"] = round(frac_by_date[r["date"]], 4)
+        try:
+            hour = int(r["time_local"][:2])
+            # Good-tide daylight hours still ahead at this moment — the version a
+            # surfer deciding whether to go now would actually care about.
+            r["good_tide_hours_left"] = sum(1 for h in good if h >= hour)
+        except (ValueError, KeyError):
+            r["good_tide_hours_left"] = ""
+    return rows
+
+
 def main():
     args = parse_args()
     out_csv = Path(args.out)
@@ -159,6 +241,10 @@ def main():
               f"run backfill_openmeteo_weather.py to fill these in.")
 
     rows_out = [build_row(pr, pd_, openmeteo_by_filename.get(pr["filename"])) for pr, pd_ in matched]
+    rows_out = add_tide_daylight_features(rows_out)
+    with_tide = sum(1 for r in rows_out if r["good_tide_hours"] != "")
+    print(f"tide/daylight features attached to {with_tide} of {len(rows_out)} row(s) "
+          f"(good tide = under {GOOD_TIDE_MAX_FT} ft, daylight = real dawn to dusk per date)")
 
     with open(out_csv, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=OUT_HEADER)
