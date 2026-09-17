@@ -3294,3 +3294,45 @@ together — November has the fewest weekday surfers (8.3) but more good-tide
 hours than October, which has more surfers. Whatever drives the seasonal
 weekday collapse, it is not tide availability. Both tables carry small-sample
 caveats: March and May rest on 2-3 days each, and four months are interpolated.
+
+### Wind and air temperature: already predictors, weak, and badly confounded (2026-09-16)
+
+Joel asked whether wind speed, wind direction and air temperature had been
+checked. All six related columns have been in the feature set throughout;
+permutation importance, of 34 features:
+
+| rank | feature | importance |
+|---|---|---|
+| 10 | `real_temperature_f` | +0.166 |
+| 13 | `wind_dir_sin` | +0.108 |
+| 15 | `wind_dir_cos` | +0.064 |
+| 16 | `wind_speed_mph` | +0.062 |
+| 20 | `temperature_f` | +0.055 |
+| 27 | `wind_gust_mph` | +0.002 |
+
+For scale, `tide_ft` is +4.488. Raw correlations over 1,360 daylight rows are
+small but real: wind speed **r=-0.087**, gusts **-0.151**, observed air
+temperature **+0.124**.
+
+**The wind-direction result is a time-of-day artifact, not a finding.** Bucketed
+by octant, offshore directions look terrible for crowds — N 11.6, NE 9.7, E 9.5
+surfers against S 19.5 and SW 16.9. But the mean hour for those octants is
+**8.4-9.2**, against 12.7-12.8 for S/SW: offshore here happens at dawn, when
+almost nobody is out yet. Restricted to 10:00-15:00 the offshore octants
+essentially disappear (fewer than 20 rows each), so this dataset cannot say
+what offshore wind does to the crowd at a comparable hour. Any future
+onshore/offshore feature needs that stated up front.
+
+**Within-hour, wind speed has no stable sign**: r=-0.212 at 08:00, +0.183 at
+10:00, -0.258 at 14:00, -0.250 at 16:00. The afternoon negatives are consistent
+with wind chop thinning the crowd; the morning positive is not, and the whole
+thing is a small effect either way.
+
+**Air temperature holds up better**: within-hour r=+0.297 at 08:00, +0.272 at
+14:00, +0.194 at 16:00, near zero midday. Warmer weather brings more people out
+at the edges of the day. That is the strongest of the three and it is still an
+order of magnitude below tide.
+
+Nothing changed in the model — all six are already there. The takeaway is that
+none of them is an untapped lever, which matches the broader finding that this
+model is predictor-limited in a way new *weather* columns have not fixed.
