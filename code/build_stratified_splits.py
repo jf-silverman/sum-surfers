@@ -60,7 +60,9 @@ from pathlib import Path
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # The pose-tagged, box-corrected export of the original 57 (2026-09-14)
 # supersedes splits/ as the labeled pool.
-DEFAULT_INPUT = _PROJECT_ROOT / "data" / "cvat_out_coco" / "posture_57"
+# Both labeled exports. --input-dir overrides this; repeat it to add more.
+DEFAULT_INPUT = [_PROJECT_ROOT / "data" / "cvat_out_coco" / "posture_57",
+                 _PROJECT_ROOT / "data" / "cvat_out_coco" / "batch01_73"]
 DEFAULT_OUTPUT = _PROJECT_ROOT / "data" / "cvat_out_coco" / "splits_v2"
 
 SPLITS = ["train", "val", "test"]
@@ -299,7 +301,7 @@ def parse_args():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--input-dir", type=Path, action="append",
-                   help=f"COCO export directory; repeatable (default: {DEFAULT_INPUT})")
+                   help="COCO export directory; repeatable (default: every labeled export)")
     p.add_argument("--out-dir", type=Path, default=DEFAULT_OUTPUT)
     p.add_argument("--test-crowded-min", type=int, default=5,
                    help="Frames with >=30 boxes to place in test (default 5). "
@@ -315,7 +317,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    input_dirs = args.input_dir or [DEFAULT_INPUT]
+    input_dirs = args.input_dir or list(DEFAULT_INPUT)
     # File pins always apply; --force-test replaces only the built-in defaults.
     force_test = (DEFAULT_FORCE_TEST if args.force_test is None else args.force_test)
     force_test = list(dict.fromkeys(force_test + force_test_from_file()))
@@ -361,7 +363,7 @@ def main():
         sys.exit(f"CONSERVATION CHECK FAILED: in {len(pool)} images/{total_boxes} boxes, "
                  f"out {out_images}/{out_boxes}")
     print(f"  conservation check OK ({out_images} images, {out_boxes} boxes, none dropped)")
-    print(f"\n{DEFAULT_INPUT} is untouched. To train on this instead:\n"
+    print(f"\nThe source exports are untouched. To train on this instead:\n"
           f"  python code/train_model.py --cvat-coco-dir {args.out_dir} --run-name <date>_stratified")
 
 

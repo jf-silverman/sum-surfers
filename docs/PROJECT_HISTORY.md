@@ -3336,3 +3336,62 @@ order of magnitude below tide.
 Nothing changed in the model — all six are already there. The takeaway is that
 none of them is an untapped lever, which matches the broader finding that this
 model is predictor-limited in a way new *weather* columns have not fixed.
+
+### Batch 01 labeled: the pool is now 130 images, 2,599 boxes (2026-09-18)
+
+Joel finished labeling all 73 batch-01 frames with poses and exported COCO 1.0.
+Normalized into `data/cvat_out_coco/batch01_73/`, which is now a default input
+to `build_stratified_splits.py` alongside `posture_57/`.
+
+**The export is clean.** 73 images, **1,136 boxes**, every box carrying a pose,
+no rotation, 15 boxes flagged occluded (used in this batch only, as Joel said
+he might). All 73 staged frames came back — nothing lost.
+
+**Empty frames survived the export**, which was the open question: an image with
+no annotations does appear in COCO's `images` list, so all 13 `empty-verified`
+frames came through as genuine zero-box frames. That settles it for future
+batches.
+
+**Five more frames came back empty than were staged as empty**, and they are the
+most interesting rows in the batch — frames Joel judged to have no surfers that
+the detector had counted:
+
+| frame | model said | conditions |
+|---|---|---|
+| `crop2025-11-07_10-11-00` | **30** | clear, 10:11 |
+| `crop2025-11-08_11-14-00` | **18** | clear, 11:14 |
+| `crop2025-11-05_08-23-00` | 2 | rain |
+| `crop2025-11-05_09-17-00` | 1 | rain |
+| `crop2025-11-06_10-11-00` | 0 | fog |
+
+Checked the two big ones by eye rather than assuming a labeling slip: the 11-07
+frame is heavy sun glitter on chop with nothing in it, and the detector called
+**30 surfers** on sparkle. That is the single worst false positive on record
+here, and it is now a labeled negative. The 11-08 frame has two small dark
+shapes at the very bottom edge that may be people standing in the shore break —
+if they are not surfers on boards, empty is right, but it is the one call in
+the batch worth a second look.
+
+**Pose distribution across the whole pool:**
+
+| pose | the 57 | batch 01 | total |
+|---|---|---|---|
+| sitting | 617 | 507 | 1,124 |
+| prone | 512 | 379 | 891 |
+| unknown | 295 | 198 | 493 |
+| standing | 31 | 30 | 61 |
+| wipeout | 4 | 17 | 21 |
+| SUP | 4 | 5 | 9 |
+
+`wipeout` went from 4 to 21 and `standing` from 31 to 61 — both still far too
+thin to measure per-pose recall on, but no longer nonexistent.
+
+**Splits rebuilt: 75 train / 34 val / 21 test**, 2,599 boxes conserved with
+none dropped. Test now spans every crowding bucket (7 frames at 0-9 up to 2 at
+40+), 23 crowded frames remain in train, and **both catastrophic-failure frames
+are labeled and pinned to test** — `crop2026-08-03_10-02-00` at 30 boxes and
+`crop2026-08-09_07-29-00` at 46, matching the human counts from the
+spot-check study almost exactly (30 and 46).
+
+Not done: the seven winter frames are still unlabeled, so their `force_test.txt`
+pins report as not-in-pool. Splits will be rebuilt once that batch lands.
