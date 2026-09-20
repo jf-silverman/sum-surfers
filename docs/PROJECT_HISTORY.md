@@ -3485,3 +3485,46 @@ count in `predictions.csv`, and therefore in `training_features.csv` and the
 forecast model. Re-running detection over the archive with `DETECT_MODE=all`
 would rewrite those rows, and the October-December months are exactly the ones
 the crowd-average tables call thin. Worth doing before the next retrain.
+
+### Correction: glare is recorded, not gated (2026-09-19)
+
+The gate added earlier today was wrong and is reverted. Joel asked to see the
+frames it would reject and doubted both that they were uncountable and that the
+effect was seasonal. Checking both, he was right on the first count and partly
+right on the second.
+
+**The measure cannot separate glare from foam at the low end.** Staged twelve
+rejected frames across the range (`data/cvat_out_coco/glare_review/`) and looked
+at them:
+
+- `crop2026-03-12_11-59-00`, glare **0.0020**, model said 34 — sunlit
+  **whitewater** with about 30 plainly countable surfers. The gate would have
+  thrown this away.
+- `crop2025-10-23_10-11-00`, glare **0.0032**, model said 31 — a genuine sun
+  path with no surfer visible anywhere.
+- `crop2025-11-23_09-35-00`, glare **0.0189**, model said 23 — likewise.
+
+Two attempts to tell the cases apart both failed: small-blob share is **0.96**
+on the countable foam frame against 0.90-0.96 on glitter, and local-context
+brightness overlaps just as badly (foam 134.6/115.4 against glitter
+151.2/98.0). A cheap pixel statistic does not appear to distinguish "sun path
+on dark water" from "sunlit foam with people in it".
+
+**On seasonality the earlier claim was overstated.** Measured across all 1,622
+quality-passed frames rather than a 500-frame sample, flagged frames run Oct
+8.0%, Nov 27.3%, Dec 38.9%, Mar 4.3%, and **0% across May-September**. So it is
+concentrated in low-sun months *that data exists for* — and there is no
+January, February, April or June footage at all, so the true seasonal shape is
+unknown and Jan/Feb are likely worse than December. It is also strictly a
+morning phenomenon: every flagged frame falls between 07:00 and 11:00.
+
+**What shipped instead**, at Joel's direction: `compute_glare_frac()` writes a
+`glare_frac` column to `predictions.csv` and nothing acts on it.
+`compute_image_quality()` is back to its two original checks and its four-value
+return, deliberately, so the three `analysis/` scripts that unpack it keep
+working. The column was backfilled across all **1,807** existing rows — every
+crop is still on disk, so none is blank — and 110 rows exceed 0.002.
+
+The real fix is training data rather than filtering: 21 labeled empty glare
+frames are now in the pool, so a retrain can learn that sparkle is not a
+surfer. The column makes already-contaminated rows findable in the meantime.

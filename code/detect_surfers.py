@@ -69,32 +69,30 @@ CONF_THRESH_FLAG_MASK = 0.5
 # a solved problem, and re-tune as more labeled data comes in.
 QUALITY_BRIGHTNESS_THRESH = 75.4   # mean grayscale pixel value; below -> too dark
 QUALITY_LAPVAR_THRESH = 12.7       # Laplacian variance (blur/detail); below -> too foggy/blurred
-# Sun glare (added 2026-09-19). Low-angle autumn and winter sun lays a path of
-# specular glitter across the water, and the detector reads the sparkle as
-# heads: on labeled frames it claimed 49, 30, 18, 17, 16 and 15 surfers on water
-# that actually held 0, 0, 0, 5, 0 and 3. Neither existing check catches it —
-# glittery water is bright and sharp, so brightness and Laplacian variance both
-# pass comfortably.
+# Sun glare (added 2026-09-19, made measure-only the same day). Low-angle
+# autumn and winter sun lays a path of specular glitter across the water and
+# the detector reads the sparkle as heads: on labeled frames it claimed 49, 30,
+# 18, 17, 16 and 15 surfers on water holding 0, 0, 0, 5, 0 and 3. Brightness and
+# Laplacian variance both pass such frames — glittery water is bright and sharp.
 #
-# The measure is the fraction of pixels brighter than QUALITY_GLARE_LEVEL. On
-# the 80 labeled frames that also carry a model count, the six worst
-# over-counts all sit at 0.0029 or above while every other frame — including
-# the two worst UNDER-counts — sits at exactly 0.0000, so the separation is
-# clean rather than a judgement call. Corpus-wide it rejects 6.6% of
-# quality-passed frames, every one of them in October-December; no summer frame
-# is affected, which is what a low-sun explanation predicts.
+# This is RECORDED, NOT GATED. A first attempt rejected frames above a glare
+# fraction of 0.002 and was wrong: at the low end the measure cannot tell sun
+# glitter from sunlit whitewater. One frame at 0.0020 is ordinary foam with
+# ~30 plainly countable surfers in it, while 0.0032 is a glare path with none —
+# and neither small-blob share (0.96 vs 0.90-0.96) nor local-context brightness
+# separated the two. Rejecting on this number therefore throws away good
+# crowded frames to catch bad ones.
 #
-# Rejecting does lose real surfers on partly-glared frames (one labeled frame
-# held 3 real surfers, another 5). That is the intended trade: a missing count
-# is recoverable, a phantom 49 silently trains the forecast on a crowd that was
-# never there.
+# The real fix is training data, not a filter: 21 labeled empty glare frames now
+# exist, so a retrain can learn that sparkle is not a surfer. Until then the
+# column makes contaminated rows findable after the fact.
 QUALITY_GLARE_LEVEL = 240          # pixel value counted as specular glare
-QUALITY_GLARE_MAX_FRAC = 0.002     # above this fraction of glare pixels -> reject
+# No threshold constant on purpose — nothing acts on this value yet.
 # ----------------------------
 
 CSV_HEADER = [
     "date", "time_local", "filename", "surfer_count", "confidence_avg",
-    "quality_ok", "quality_reason", "brightness", "lap_var", "human_count",
+    "quality_ok", "quality_reason", "brightness", "lap_var", "glare_frac", "human_count",
     "frame_count_1", "frame_count_2", "frame_count_3", "frame_count_mean", "frame_count_stdev",
 ]
 
@@ -304,15 +302,27 @@ def compute_image_quality(img_path):
 
     brightness = float(img.mean())
     lap_var = float(cv2.Laplacian(img, cv2.CV_64F).var())
-    glare_frac = float((img > QUALITY_GLARE_LEVEL).mean())
-
     if brightness < QUALITY_BRIGHTNESS_THRESH:
         return False, "dark_or_night", brightness, lap_var
     if lap_var < QUALITY_LAPVAR_THRESH:
         return False, "foggy_or_blurred", brightness, lap_var
-    if glare_frac > QUALITY_GLARE_MAX_FRAC:
-        return False, "sun_glare", brightness, lap_var
     return True, "ok", brightness, lap_var
+
+
+def compute_glare_frac(img_path):
+    """Fraction of pixels brighter than QUALITY_GLARE_LEVEL — a specular-glare
+    measure, recorded per frame for later analysis.
+
+    Deliberately separate from compute_image_quality() rather than a fifth
+    return value: that function has four callers across code/ and analysis/,
+    and nothing here should reject a frame on this number anyway.
+    """
+    import cv2
+
+    img = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        return ""
+    return round(float((img > QUALITY_GLARE_LEVEL).mean()), 6)
 
 
 def already_processed(existing_rows, filename):
@@ -400,6 +410,7 @@ def main():
 
         try:
             quality_ok, reason, brightness, lap_var = compute_image_quality(img_path)
+            glare_frac = compute_glare_frac(img_path)
         except Exception as e:
             print(f"  ERROR (quality check) {img_path.name}: {e}")
             continue
@@ -411,6 +422,7 @@ def main():
                 "surfer_count": "", "confidence_avg": "",
                 "quality_ok": False, "quality_reason": reason,
                 "brightness": round(brightness, 1), "lap_var": round(lap_var, 1),
+                "glare_frac": glare_frac,
             })
             continue
 
@@ -436,6 +448,7 @@ def main():
             "confidence_avg": result["confidence_avg"],
             "quality_ok": True, "quality_reason": "ok",
             "brightness": round(brightness, 1), "lap_var": round(lap_var, 1),
+            "glare_frac": glare_frac,
             "frame_count_1": result["frame_count_1"], "frame_count_2": result["frame_count_2"],
             "frame_count_3": result["frame_count_3"], "frame_count_mean": result["frame_count_mean"],
             "frame_count_stdev": result["frame_count_stdev"],

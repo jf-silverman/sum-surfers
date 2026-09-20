@@ -185,6 +185,7 @@ def collect_once(model, stream_url, frames_dir, out_csv):
         clip_path.unlink(missing_ok=True)
 
     quality_ok, reason, brightness, lap_var = ds.compute_image_quality(primary_path)
+    glare_frac = ds.compute_glare_frac(primary_path)
     if quality_ok:
         counts = ds.run_inference_multi(model, primary_path)
     else:
@@ -203,6 +204,7 @@ def collect_once(model, stream_url, frames_dir, out_csv):
         "quality_reason": reason,
         "brightness": round(brightness, 2),
         "lap_var": round(lap_var, 2),
+        "glare_frac": glare_frac,
         "human_count": "",
         **{k: counts[k] for k in ("surfer_count", "confidence_avg", "frame_count_1",
                                   "frame_count_2", "frame_count_3",
