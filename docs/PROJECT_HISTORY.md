@@ -3528,3 +3528,49 @@ crop is still on disk, so none is blank — and 110 rows exceed 0.002.
 The real fix is training data rather than filtering: 21 labeled empty glare
 frames are now in the pool, so a retrain can learn that sparkle is not a
 surfer. The column makes already-contaminated rows findable in the meantime.
+
+### Glare batch labeled: the failure is hallucination, not degradation (2026-09-19)
+
+Twelve glare frames labeled and merged (`data/cvat_out_coco/glare_12/`). Joel
+uploaded the `glare_review/` diagnostic folder rather than the staged batch, so
+the filenames carried the `glare0.0020_model34_` prefixes I had added for
+review; stripped on import so they join `predictions.csv` and cannot
+double-count against the existing pool. No duplicates.
+
+**Pool: 149 images, 2,771 boxes.** Splits rebuilt to 82 train / 38 val / 29
+test, all conserved.
+
+**The result is cleaner than expected.** Of the twelve, nine are genuinely
+empty and three hold surfers — and on the three that hold surfers the detector
+is essentially right:
+
+| glare | labeled | model | error |
+|---:|---:|---:|---:|
+| 0.0020 | 36 | 34 | -2 |
+| 0.0070 | 21 | 21 | 0 |
+| 0.0815 | 9 | 9 | 0 |
+| 0.0032 | 0 | 31 | **+31** |
+| 0.0189 | 0 | 23 | **+23** |
+| 0.0277 | 0 | 40 | **+40** |
+| 0.0368 | 0 | 38 | **+38** |
+
+Across the twelve: **66 real boxes against 205 detections, +139**. But every
+bit of that error is on empty water. **Glare does not degrade counting when
+surfers are present — it invents surfers when they are absent.** That is a
+much more tractable failure than "the model can't see through glare", and it
+is exactly what a retrain on labeled empty glare frames should fix.
+
+It also retires the gate idea for good. A filter keyed on glare would have
+thrown away the 36-, 21- and 9-surfer frames the model already counts
+correctly, to suppress errors on frames that contain nothing worth counting.
+
+Joel also noted the 0.0020 frame is mostly **foam, not glare** — consistent
+with the earlier finding that the measure cannot separate the two, and with
+the detector handling it fine (34 against 36).
+
+**Balance in the pool is now 5 glare-with-surfers frames (74 boxes) against 16
+empty ones.** Still skewed toward empty, which is the direction that risks
+teaching suppression, but the 74 boxes now include a 36-surfer and a 21-surfer
+frame rather than the 8 boxes it held this morning. Worth re-checking after the
+retrain: if recall drops specifically on glare frames with surfers, the balance
+needs more of them.

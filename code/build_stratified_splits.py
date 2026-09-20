@@ -63,7 +63,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # Both labeled exports. --input-dir overrides this; repeat it to add more.
 DEFAULT_INPUT = [_PROJECT_ROOT / "data" / "cvat_out_coco" / "posture_57",
                  _PROJECT_ROOT / "data" / "cvat_out_coco" / "batch01_73",
-                 _PROJECT_ROOT / "data" / "cvat_out_coco" / "winter_7"]
+                 _PROJECT_ROOT / "data" / "cvat_out_coco" / "winter_7",
+                 _PROJECT_ROOT / "data" / "cvat_out_coco" / "glare_12"]
 DEFAULT_OUTPUT = _PROJECT_ROOT / "data" / "cvat_out_coco" / "splits_v2"
 
 SPLITS = ["train", "val", "test"]
