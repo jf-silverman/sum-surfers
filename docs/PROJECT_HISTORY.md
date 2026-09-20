@@ -3395,3 +3395,57 @@ spot-check study almost exactly (30 and 46).
 
 Not done: the seven winter frames are still unlabeled, so their `force_test.txt`
 pins report as not-in-pool. Splits will be rebuilt once that batch lands.
+
+### Winter batch labeled — and it exposed a glare false-positive mode (2026-09-19)
+
+The seven winter frames are labeled and merged (`data/cvat_out_coco/winter_7/`,
+now a default input to `build_stratified_splits.py`). CVAT had refused to export
+until Docker was restarted — worth remembering that "no data" from a
+self-hosted CVAT can mean the backend is down, not that the task is empty.
+
+**Pool: 137 images, 2,705 boxes.** Splits rebuilt to **75 train / 35 val / 27
+test**, conservation checked. All seven winter frames landed in test as pinned,
+putting December at 8 of 10 labeled frames in the held-out set — the only
+cold-water check that exists, and it is now genuinely held out.
+
+**Four of the seven came back with 0-3 boxes against model counts of 49, 18 and
+16.** Those were checked by eye rather than assumed to be skipped labeling: all
+are low winter sun throwing a broad glitter path across the water, with no
+surfers in them. The labels are right and the detector was hallucinating.
+
+**That is a second, opposite failure mode to the one already documented.**
+Across the 80 labeled frames that also have a model count:
+
+| frame | labeled | model | error |
+|---|---:|---:|---:|
+| `crop2025-12-04_09-44-00` | 0 | 49 | **+49** |
+| `crop2025-11-07_10-11-00` | 0 | 30 | **+30** |
+| `crop2025-11-08_11-14-00` | 0 | 18 | +18 |
+| `crop2025-12-02_10-38-00` | 5 | 22 | +17 |
+| `crop2025-12-05_10-38-00` | 0 | 16 | +16 |
+| `crop2025-12-07_08-50-00` | 3 | 18 | +15 |
+| `crop2025-11-04_17-23-00` | 9 | 15 | +6 |
+
+Every one is November or December, between 08:50 and 17:23 — low-angle sun.
+In total, **21 labeled frames are empty and the detector claimed 124 surfers on
+them**. Meanwhile the pool's overall totals nearly cancel: 1,242 real boxes
+against 1,262 detections, a net of **+20**. An aggregate check would have
+called this detector unbiased.
+
+So the detector has two separate problems pulling in opposite directions:
+**undercounting crowded summer lineups** (measured at -14% above 30 surfers)
+and **over-counting empty winter water** (up to +49 on a single frame). They
+were invisible together because the earlier human-count study sampled
+summer frames.
+
+**Consequences worth chasing later**, none acted on yet:
+
+- The forecast trains on these counts, so late-autumn and winter training rows
+  may be inflated by glare. `monthly_surfer_averages.*` reports November
+  weekday crowds at 8.3 and December at 11.8; if glare is inflating those,
+  the real winter drop is steeper than the table shows.
+- The image-quality gate passes these frames — brightness and Laplacian
+  variance both read fine on a sharp, bright, glittery sea. Glare is a
+  different defect from fog or darkness and the gate has no test for it.
+- These 21 empty frames are now labeled negatives, so a retrain gets its first
+  real chance to learn that sparkle is not a surfer.
