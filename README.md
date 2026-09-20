@@ -9,12 +9,12 @@ This project collects images from a shoreline video camera and tries to answer t
 **_This matters to me as a surfer because the competition for each wave becomes more intense as the crowd size increases.  It helps me choose when to go and know what to expect. _**
 
 <!-- DAILY_CHART_START -->
-#### A Full Day of Surfer Detections: Friday, September 18, 2026
+#### A Full Day of Surfer Detections: Saturday, September 19, 2026
 
 Each green box below contains a surfer, according to the object detection model.  Each number above a box indicates the probability that the object is a surfer.  Look carefully and you may find additional surfers that the model missed or other objects which are misclassified as surfers - like the wind sock at the bottom center of the photo.  Each frame is one hour of that day, one second apart, and the ends of the camera's view are cropped off so the surfers are big enough to see.
-![Detections through Friday, September 18, 2026](data/charts/latest_detection.gif)
+![Detections through Saturday, September 19, 2026](data/charts/latest_detection.gif)
 
-#### The Surfer Crowd Forecast for: Saturday, September 19, 2026
+#### The Surfer Crowd Forecast for: Sunday, September 20, 2026
 
 Once enough hours and days were gathered along with weather and surf conditions, a surf count prediction model was built to forecast how many surfers would be present at each hour for the coming day.  This is useful for surfers to plan to avoid busy times or at least know what to expect.  Recently the predictions have been low compared to actual counts, so more images are being collected to improve the object detection model's ability to find surfers in a variety of light and water conditions, like fog or choppy water surfaces.
 ![Latest daily prediction chart](data/charts/latest.png)
