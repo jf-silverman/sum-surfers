@@ -3449,3 +3449,39 @@ summer frames.
   different defect from fog or darkness and the gate has no test for it.
 - These 21 empty frames are now labeled negatives, so a retrain gets its first
   real chance to learn that sparkle is not a surfer.
+
+### Glare check added to the image-quality gate (2026-09-19)
+
+Acting on the previous entry's finding. `compute_image_quality()` now measures
+the fraction of pixels brighter than 240 and rejects a frame above 0.002 with
+the reason `sun_glare`.
+
+**Calibrated, not guessed.** Across the 80 labeled frames that also carry a
+model count, the six worst over-counts sit at 0.0029, 0.0070, 0.0075, 0.0122,
+0.0315 and 0.0841, while **every other frame reads exactly 0.0000** — including
+the two worst under-counts (-27 each). Correlation between glare fraction and
+count error is +0.42. Sparkle-density and window-brightness measures were tried
+first and separated worse: one clean frame scored the highest sparkle value of
+the whole set.
+
+**Cost, measured on 500 random quality-passed frames:** the threshold rejects
+**6.6%**, and every rejected frame falls in October-December. No summer frame is
+touched, which is what a low-sun explanation predicts and a generic
+"too bright" rule would not have produced.
+
+**What it costs in real data**, stated plainly: two labeled frames that trip the
+gate did hold real surfers (3 and 5). Those counts are now lost rather than
+wrong. That is the intended trade — a missing hour is recoverable, a phantom 49
+trains the forecast on a crowd that never existed.
+
+Verified: all six known glare frames now fail with `sun_glare`, and five known
+good frames still pass — including `crop2025-12-07_16-02-00` (56 labeled boxes)
+and `crop2025-12-01_16-02-00` (28), so genuine winter afternoons are not
+collateral damage.
+
+**Not done: the history is still contaminated.** The gate only runs on frames
+detected from now on. Every already-counted glare frame keeps its inflated
+count in `predictions.csv`, and therefore in `training_features.csv` and the
+forecast model. Re-running detection over the archive with `DETECT_MODE=all`
+would rewrite those rows, and the October-December months are exactly the ones
+the crowd-average tables call thin. Worth doing before the next retrain.

@@ -88,7 +88,7 @@ generate any candidate boxes there at all, so there's nothing to recover
 by tuning thresholds after the fact (see `PROJECT_HISTORY.md`'s
 confidence-threshold experiment). Rather than count those frames
 unreliably, `code/detect_surfers.py`'s `compute_image_quality()` checks
-two cheap image statistics before detection ever runs:
+three cheap image statistics before detection ever runs:
 
 - **Brightness** (mean grayscale pixel value) — too low means the frame is
   effectively night, even accounting for ambient light like streetlight
@@ -96,6 +96,15 @@ two cheap image statistics before detection ever runs:
 - **Laplacian variance** (`lap_var`, a standard blur/detail proxy — see
   glossary) — too low means the frame is too foggy, blurred, or lens-
   condensation-affected to trust, independent of brightness.
+- **Glare fraction** — the share of pixels brighter than
+  `QUALITY_GLARE_LEVEL` (240). Low-angle autumn and winter sun lays a path
+  of specular glitter across the water and the detector reads the sparkle
+  as heads: on labeled frames it reported 49, 30, 18, 17, 16 and 15
+  surfers on water holding 0, 0, 0, 5, 0 and 3. The other two checks pass
+  such frames comfortably — glittery water is both bright and sharp — so
+  this failure had no test until 2026-09-19. On the labeled frames the six
+  worst over-counts all sit at 0.0029 or above while every other frame,
+  including the two worst *under*-counts, sits at exactly 0.0000.
 
 A frame fails the gate if brightness is below `QUALITY_BRIGHTNESS_THRESH`
 **or** `lap_var` is below `QUALITY_LAPVAR_THRESH` (both in
