@@ -3615,3 +3615,19 @@ from 2 frames and 8 boxes two days ago. That is a reasonable footing for a
 retrain: enough empty glare to teach "sparkle is not a surfer", and enough
 populated glare — including 37-, 31- and 30-surfer frames — to stop it learning
 "glare means nobody is there".
+
+### Birds stay unboxed; first one recorded (2026-09-20)
+
+Joel found a bird at the top of `crop2026-08-09_08-23-00.jpg` and asked whether
+it needed a pose value or its own CVAT label. Neither: every box exports as
+class `Surfer` regardless of attributes, so a `bird` pose would train the
+detector that birds are surfers, and a separate `Bird` label would make this a
+two-class problem that `detect_surfers.py` would count anyway. Leaving it
+unboxed makes it background, which is exactly the lesson wanted from a known
+false-positive source.
+
+Recorded in `analysis/training_data_expansion/known_bird_frames.txt` so a
+retrain can be checked for bird false positives on a frame where one is known
+to be. The bird is **foreground-sized at top-right**, consistent with the
+earlier finding that birds here are not reliably small — so a box-size filter
+would not catch it.

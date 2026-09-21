@@ -1,0 +1,8 @@
+# Labeled frames known to contain a bird, recorded so a retrain can be checked
+# for bird false positives. Birds are deliberately left UNBOXED: every box
+# exports as class "Surfer", so boxing one would train the detector that birds
+# are surfers. Unlabeled pixels train as background, which is the lesson wanted.
+#
+# After a retrain, run the detector on these frames and check whether any box
+# lands on the bird's position.
+crop2026-08-09_08-23-00.jpg  bird at top-right, foreground-sized (not a distant speck); hazy frame, lap_var 18.5, model counted 24; in fog batch 04
