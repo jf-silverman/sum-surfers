@@ -14,7 +14,7 @@ This project collects images from a shoreline video camera and tries to answer t
 Each green box below contains a surfer, according to the object detection model.  Each number above a box indicates the probability that the object is a surfer.  Look carefully and you may find additional surfers that the model missed or other objects which are misclassified as surfers - like the wind sock at the bottom center of the photo.  Each frame is one hour of that day, one second apart, and the ends of the camera's view are cropped off so the surfers are big enough to see.
 ![Detections through Sunday, September 20, 2026](data/charts/latest_detection.gif)
 
-#### The Surfer Crowd Forecast for: Monday, September 21, 2026
+#### The Surfer Crowd Forecast for: Tuesday, September 22, 2026
 
 Once enough hours and days were gathered along with weather and surf conditions, a surf count prediction model was built to forecast how many surfers would be present at each hour for the coming day.  This is useful for surfers to plan to avoid busy times or at least know what to expect.  Recently the predictions have been low compared to actual counts, so more images are being collected to improve the object detection model's ability to find surfers in a variety of light and water conditions, like fog or choppy water surfaces.
 ![Latest daily prediction chart](data/charts/latest.png)
@@ -189,7 +189,8 @@ itself.
 ### Detector Training Metrics
 
 Real per-[epoch](docs/HOW_IT_WORKS.md#term-epoch) training log for the
-production YOLOv8s surfer detector (60 epochs) — 10 charts tracking how
+production YOLOv8s surfer detector — the September 2026 retrain, which added
+labeled fog, glare and pose data (60 epochs) — 10 charts tracking how
 training went, not estimated after the fact. The white dotted line on
 each chart is a 5-epoch rolling average, to make the trend easier to
 see through the epoch-to-epoch noise.
@@ -203,16 +204,17 @@ see through the epoch-to-epoch noise.
   three loss measurements, but on the held-out validation images the
   model never trains on. This is the more meaningful set of loss
   charts, since it shows how the model does on images it hasn't
-  memorized. They trend downward too, with more visible noise
-  (validation is a much smaller set of images than training) but no
-  sign of the val loss rising while train loss keeps falling, which
-  would signal overfitting.
+  memorized. Box and class loss trend downward with more visible noise (validation
+  is a much smaller set than training). **DFL loss creeps back up after
+  about epoch 40** while the training DFL loss keeps falling — a mild
+  sign of overfitting, and the reason the deployed checkpoint is taken
+  from epoch 46 rather than the end of training.
 - **Top row, last 2 charts (lime): [precision](docs/HOW_IT_WORKS.md#term-precision)
   and [recall](docs/HOW_IT_WORKS.md#term-recall)** — both computed on
   the validation set each epoch, not the training data, so they reflect
   genuine model performance rather than how well it memorized what it
-  trained on. Both climb from noisy, mediocre starting values toward
-  their final ~88%/~81%, with a rough patch in the first ~15 epochs
+  trained on. Both climb from noisy, mediocre starting values to about 88% and
+  81%, with a rough patch in the first ~15 epochs
   where the model still hasn't learned much and both metrics swing
   widely epoch to epoch.
 - **Bottom row, last 2 charts (lime): [mAP](docs/HOW_IT_WORKS.md#term-map)@0.5
@@ -226,18 +228,26 @@ see through the epoch-to-epoch noise.
 ![YOLOv8s detector training metrics — loss, precision, recall, mAP over 60 epochs](analysis/detector_training_metrics/detector_training_metrics.png)
 
 The charts run to epoch 60, but the checkpoint actually deployed is
-`best.pt` — **epoch 51**, the epoch with the best mAP@0.5:0.95, which is
-what the training run saves as "best". Measured on the validation set, that
-deployed checkpoint gets **precision 85.6%, recall 82.0%, mAP@0.5 85.6%,
-mAP@0.5:0.95 40.1%** — slightly less precise and slightly more sensitive
-than epoch 60's 87.8%/80.6%. These are the numbers cited in the daily
-chart's caption, and you can re-derive them yourself from this repo with
-`eval_detector.py` (see [Run It Yourself](#run-it-yourself-no-account-needed)).
-Note
-mAP@0.5:0.95 (37.3%) is much lower than mAP@0.5 (84.4%): it's an average
-over much stricter box-overlap requirements (up to near-perfect box
-placement), not a sign the model is actually worse than the headline
-84.4% number suggests.
+`best.pt` — **epoch 46** (dashed line), the epoch with the best
+mAP@0.5:0.95, which is what the training run saves as "best". On the
+validation set it gets **precision 88.5%, recall 81.3%, mAP@0.5 86.8%,
+mAP@0.5:0.95 38.5%**. These are the numbers cited in the daily chart's
+caption. They are measured on a harder validation set than the previous
+model's, which now includes hazy fog frames, so they don't compare directly
+with its 85.6%/82.0%.
+
+The comparison that matters is whole-frame surfer counts on frames neither
+model trained on. On hazy frames the new model finds **98%** of the real
+surfers, against **59%** for the previous one; across all held-out frames
+the average error per frame fell from 5.16 surfers to 0.94. Against
+independent hand counts, its average error per frame halved (2.61 → 1.28).
+The one regression: on ordinary clear-day frames it now counts slightly
+high, about 3–7%.
+
+Note that mAP@0.5:0.95 (38.5%) is much lower than mAP@0.5 (86.8%): it's an
+average over much stricter box-overlap requirements (up to near-perfect box
+placement), not a sign the model is worse than the headline number
+suggests.
 
 ## Surfer Count Prediction Model
 
@@ -404,7 +414,9 @@ python code/eval_detector.py --split val     # reproduces the numbers quoted abo
 It reports two different things. First, per-box precision, recall and
 [mAP](docs/HOW_IT_WORKS.md#term-map) on the tiles — the same measurement the
 training log made, which is why `--split val` reconciles against the
-published 85.6%/82.0%. Second, and more to the point, **count accuracy on
+previous model's published 85.6%/82.0% — the weights committed to this repo
+are still the October 2025 model; the retrained production weights have not
+been published yet. Second, and more to the point, **count accuracy on
 whole frames**: it runs the real production inference path (tiling,
 cross-tile [NMS](docs/HOW_IT_WORKS.md#term-nms), false-positive filtering) on
 each test image and compares the surfer count to the number of labeled boxes.

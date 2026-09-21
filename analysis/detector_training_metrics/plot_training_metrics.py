@@ -2,11 +2,17 @@
 plot_training_metrics.py
 ---------------------------
 Dark-themed remake of Ultralytics' own results.png for the production
-YOLOv8s detector's training run, using the same real per-epoch log
-(data/model_out/20251013/train/runs/detect/train13/results.csv, 60 epochs)
--- no re-training, no re-estimating, just restyling real numbers that were
-already sitting unused in a light-background file that didn't match the
-rest of the project's dark aqua/lime theme.
+YOLOv8s detector's training run, from its real per-epoch log -- no
+re-training, no re-estimating, just restyling real numbers.
+
+Points at whichever run is in production (RESULTS_CSV below). Since
+2026-09-21 that is the fog retrain; the original October 2025 run
+(train13) is the previous production model and remains in git history.
+
+The chart marks the DEPLOYED checkpoint (best.pt, the epoch with the best
+mAP@0.5:0.95) rather than quoting the final epoch: quoting epoch 60 for a
+best.pt that was really epoch 51 is exactly the reporting error found on
+2026-09-11.
 
 Usage:
     python analysis/detector_training_metrics/plot_training_metrics.py
@@ -19,7 +25,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 PROJECT_ROOT = HERE.parent.parent
-RESULTS_CSV = PROJECT_ROOT / "data" / "model_out" / "20251013" / "train" / "runs" / "detect" / "train13" / "results.csv"
+RESULTS_CSV = PROJECT_ROOT / "data" / "model_out" / "20260921_fog" / "train" / "results.csv"
+RUN_LABEL = "2026-09-21 fog retrain"
 
 AQUA = "#3ab4c9"
 LIME = "#9de35a"
@@ -65,17 +72,22 @@ for ax, (col, title) in zip(axes, PANELS):
     for spine in ax.spines.values():
         spine.set_color(GRID)
 
+n_epochs = int(df["epoch"].max())
+best = df.loc[df["metrics/mAP50-95(B)"].idxmax()]
+best_epoch = int(best["epoch"])
+for ax in fig.axes:
+    ax.axvline(best_epoch, color=LIME, linestyle="--", linewidth=1.0, alpha=0.7)
 fig.suptitle(
-    "YOLOv8s surfer-detector training run (train13, 60 epochs) — real per-epoch log, "
+    f"YOLOv8s surfer-detector training run ({RUN_LABEL}, {n_epochs} epochs) — real per-epoch log, "
     "not estimated", color=TEXT, fontsize=13, y=0.99,
 )
-final = df.iloc[-1]
 fig.text(
     0.5, 0.935,
-    f"Final (epoch 60): precision={final['metrics/precision(B)']:.3f}  "
-    f"recall={final['metrics/recall(B)']:.3f}  "
-    f"mAP@0.5={final['metrics/mAP50(B)']:.3f}  "
-    f"mAP@0.5:0.95={final['metrics/mAP50-95(B)']:.3f}",
+    f"Deployed checkpoint (best.pt = epoch {best_epoch}, dashed line): "
+    f"precision={best['metrics/precision(B)']:.3f}  "
+    f"recall={best['metrics/recall(B)']:.3f}  "
+    f"mAP@0.5={best['metrics/mAP50(B)']:.3f}  "
+    f"mAP@0.5:0.95={best['metrics/mAP50-95(B)']:.3f}",
     color="#bbbbbb", fontsize=9.5, ha="center",
 )
 
@@ -83,6 +95,6 @@ fig.tight_layout(rect=[0, 0, 1, 0.89])
 out_path = HERE / "detector_training_metrics.png"
 fig.savefig(out_path, dpi=150)
 print(f"Saved {out_path}")
-print(f"\nFinal epoch (60) real values: precision={final['metrics/precision(B)']:.5f} "
-      f"recall={final['metrics/recall(B)']:.5f} mAP50={final['metrics/mAP50(B)']:.5f} "
-      f"mAP50-95={final['metrics/mAP50-95(B)']:.5f}")
+print(f"\nDeployed checkpoint (epoch {best_epoch}) real values: "
+      f"precision={best['metrics/precision(B)']:.5f} recall={best['metrics/recall(B)']:.5f} "
+      f"mAP50={best['metrics/mAP50(B)']:.5f} mAP50-95={best['metrics/mAP50-95(B)']:.5f}")

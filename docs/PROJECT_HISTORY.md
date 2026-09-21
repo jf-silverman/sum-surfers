@@ -3771,3 +3771,34 @@ model merely learning the current labeling style:
    predicted, at small scale.
 
 Not adopted yet: production `MODEL_PATH` is unchanged pending Joel's decision.
+
+### Retrained detector adopted into production (2026-09-21)
+
+Joel approved the switch. `MODEL_PATH` in `.env` now points at
+`data/model_out/20260921_fog/train/weights/best.pt`, so tonight's LaunchAgent
+run — `local_pipeline.sh` and `daily_chart.sh` both load `.env` — detects with
+the retrained model. Confirmed the pipeline resolves that path.
+
+Also updated to describe the model actually running:
+
+- **Chart footer** constants: precision 0.88461 / recall 0.81342 (epoch 46,
+  training log), replacing the October model's 0.85634 / 0.82047. The footer
+  names the Sept 2026 retrain.
+- **README "Detector Training Metrics"**, including the chart, regenerated from
+  the new run's log. The chart script now marks the *deployed* checkpoint with a
+  dashed line and quotes its numbers rather than the final epoch's — the same
+  epoch-60-vs-best.pt confusion fixed on 2026-09-11. The README also now
+  records what the new chart shows: **validation DFL loss creeps up after about
+  epoch 40** while training DFL keeps falling, a mild overfitting signal the
+  October run did not have, and why the checkpoint comes from epoch 46.
+- **Today's chart and detection animation** regenerated on the new model, so
+  what the README shows matches what production runs.
+
+**Deliberately not changed, pending Joel:** the code default `MODEL_PATH` and
+the weights committed to the public repo are still the October 2025 model. The
+retrained weights have not been published, and the README says so where it
+explains `eval_detector.py`'s reconciliation. That decision is tied to a
+dataset-publication problem found during this change (next entry).
+
+`CLAUDE.md` gained a rule: never change a `.env` value without Joel's explicit
+approval, every time.

@@ -65,13 +65,15 @@ CHARTS_DIR = _PROJECT_ROOT / "data" / "charts"
 # results.csv, final epoch 60), not estimated. "Specificity" isn't a standard
 # object-detection metric (no fixed universe of negative boxes to measure against,
 # unlike binary classification) — recall is the direct analog to sensitivity.
-# Measured on the validation split for the checkpoint actually deployed —
-# best.pt, which is epoch 51, not the final epoch 60. These were previously the
-# epoch-60 numbers (0.87843 / 0.80618), which describe a checkpoint that was
-# never shipped; see PROJECT_HISTORY.md's 2026-09-11 entry. Reproduce with
-# `python code/eval_detector.py --split val`.
-DETECTOR_PRECISION = 0.85634
-DETECTOR_RECALL = 0.82047  # = sensitivity
+# Validation metrics for the checkpoint actually deployed: best.pt of the
+# 2026-09-21 fog retrain, which is epoch 46 of 60 (training log,
+# data/model_out/20260921_fog/train/results.csv). Adopted 2026-09-21, replacing
+# the October 2025 model (0.85634 / 0.82047, its epoch 51). Measured on a
+# harder validation split than the previous model's — it now includes hazy fog
+# frames — so the two pairs are not directly comparable; see PROJECT_HISTORY.md
+# 2026-09-21 for the like-for-like whole-frame count comparison.
+DETECTOR_PRECISION = 0.88461
+DETECTOR_RECALL = 0.81342  # = sensitivity
 
 # Dataset-wide hour range the model has ANY training examples for (used only to flag
 # extrapolated hours below) — NOT the same thing as "is it light on this specific day",
@@ -281,7 +283,7 @@ def main():
         f"Model: gradient-boosted trees (quantile regression), point estimate = median model  "
         f"|  Top predictors (live fit): {predictors_str}\n"
         f"Refit this run on {len(df):,} detection-hours, {df['date'].min()} to {df['date'].max()}  "
-        f"|  Surfer detector (YOLOv8s, train13 — actual training log): "
+        f"|  Surfer detector (YOLOv8s, Sept 2026 fog retrain — actual training log): "
         f"precision {DETECTOR_PRECISION:.1%}, recall {DETECTOR_RECALL:.1%}"
     )
     if degenerate_levels:
