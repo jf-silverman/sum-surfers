@@ -3705,3 +3705,69 @@ never trained on enhanced images. So training on plain images first is a valid
 step. It measures what the fog labels alone buy; CLAHE at inference can then be
 tested on the 10 held-out hazy frames with no further training, and training
 *with* CLAHE is only worth doing if that test still shows a gain.
+
+### Fog retrain results: the fog undercount is fixed; one mild regression (2026-09-21)
+
+Trained `data/model_out/20260921_fog/` on the 172-image pool (96 train, with 11
+hazy frames), same recipe as production (YOLOv8s, 60 epochs, 640px, same
+augmentation), plain images with no CLAHE. Best checkpoint epoch 46; validation
+precision 0.885 / recall 0.814 / mAP@0.5 0.868 / mAP@0.5:0.95 0.386 — on a
+harder validation split than production's, so not comparable to its 0.856 /
+0.820.
+
+**Whole-frame counts, held-out frames neither model trained on (63 frames):**
+
+| frames | n | real | old | new | MAE old → new |
+|---|---:|---:|---:|---:|---|
+| hazy (lap_var < 50) | 10 | 260 | 154 (59%) | 256 (98%) | 10.60 → 1.80 |
+| glare | 10 | 45 | 153 (340%) | 37 (82%) | 11.20 → 0.80 |
+| everything else | 43 | 723 | 652 (90%) | 728 (101%) | 2.49 → 0.77 |
+| all | 63 | 1,028 | 959 (93%) | 1,021 (99%) | 5.16 → 0.94 |
+
+**Test split only** — frames used neither for training nor for choosing the
+checkpoint: hazy 48% → **95%** (MAE 14.60 → 2.20), all test frames MAE 8.00 →
+0.88. The two catastrophic frames: `crop2026-08-09_07-29-00`, 46 real, old 19 →
+new **48**; `crop2026-08-03_10-02-00`, 30 real, old 3 → new **24**.
+
+**Other goals, held out:**
+
+- **Prone recall 66.6% → 90.4%**; sitting 89.3% → 96.9%. The prone-sitting gap
+  closed from 22.7 points to 6.5.
+- **Recall improved in every image row**; the bottom (whitewater) band 45.3% →
+  77.4% is still the weakest, the top band 77.2% → 89.9%.
+- **Glare phantoms gone**: every empty glare frame now reads 0 (old model:
+  +52, +15, +6 on three of them).
+- **CLAHE is no longer needed.** At inference on the new model, hazy frames
+  score 97% with CLAHE against 98% plain (MAE 2.00 vs 1.80). The fog labels did
+  what enhancement used to, so neither inference-time nor train-time CLAHE is
+  worth adding.
+- **Bird frame**: neither model fires on the bird — but the frame is in the new
+  model's training set, so this is not a generalization test.
+
+**Independent human counts** — not CVAT labels, so they guard against the new
+model merely learning the current labeling style:
+
+- `model_spotcheck_50`, 36 frames excluding any in the new training set: human
+  total 526, old 446 (85%), new **540 (103%)**. MAE 2.61 → **1.28**, bias
+  -2.22 → **+0.39**. On 30+ surfer frames, bias -11.80 → **-0.80**.
+- `count_60sec_var`, 70 frames — **the new model is worse here**: human 1,274,
+  old 1,249 (98%), new 1,365 (107%). MAE 1.24 → **1.90**, bias -0.36 →
+  **+1.30**. Per clip the new model runs +1.6 to +3.4 high on 5 of 7, where the
+  old stayed within ±1.6. All 7 clips come from one clear day (2026-08-27), so
+  this is effectively seven ordinary-condition scenes, not 70 independent
+  frames.
+
+**Two regressions, both mild:**
+
+1. **A small overcount in clear, ordinary conditions**, ~+3-7% (103% on the
+   spot-check set, 107% on the 60-second set). The old model sat *under* in the
+   same conditions (85%, 98%), so the net error is still much smaller, but the
+   sign flipped. The 0.195 confidence threshold was tuned for the old weights;
+   re-tuning it on these weights is already on the list (per-row and per-hour
+   threshold sweep) and is the natural fix.
+2. **Slight suppression on glare frames that do contain surfers**: 37 real →
+   31 (old 35); 3 real → 1 (old 20, which was mostly phantoms). The imbalance
+   concern — 16 empty glare frames against 9 populated — showing up as
+   predicted, at small scale.
+
+Not adopted yet: production `MODEL_PATH` is unchanged pending Joel's decision.
