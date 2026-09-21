@@ -3631,3 +3631,52 @@ retrain can be checked for bird false positives on a frame where one is known
 to be. The bird is **foreground-sized at top-right**, consistent with the
 earlier finding that birds here are not reliably small — so a box-size filter
 would not catch it.
+
+### Perspective: surfers are 2x bigger at the bottom, and recall is worst at both edges (2026-09-20)
+
+Joel asked whether the depth/scale gradient in the frame could be exploited,
+and noted that detail is also lower toward the top. Measured on the 2,880
+labeled boxes.
+
+**The scale gradient is real and large.** Median box height runs 7.3px in the
+top 30 rows to 13.5px in the bottom 30 — roughly double. `sqrt(area)`
+correlates with row at **r=+0.612**, fitting
+`sqrt(area) = 0.0652*y + 7.78` with a residual sd of 3.19px.
+
+**Using it as a false-positive filter is a dead end.** Scoring each detection
+by how far its size departs from the expected size for its row, then running
+the detector over the 30 labeled empty frames (every box a false positive): a
+`|z|>2` rule removes **21 of 264** false positives, 8%, while also discarding
+4.8% of genuine labeled boxes. The phantoms are not anomalously sized — median
+z is -0.76, well within the normal spread. Glare sparkle apparently looks like
+a plausibly-sized surfer for wherever it happens to fall.
+
+**Recall by row is the useful result, and it is U-shaped** — held-out frames
+only, IoU >= 0.3:
+
+| rows | depth | boxes | recall |
+|---|---|---:|---:|
+| 0-30 | far | 52 | **61.5%** |
+| 30-60 | far | 416 | 91.1% |
+| 60-90 | mid | 359 | 91.6% |
+| 90-120 | mid | 193 | 81.9% |
+| 120-150 | near | 132 | 71.2% |
+| 150-180 | near | 57 | **64.9%** |
+
+Both edges fail and the middle is fine. The top band is what Joel described —
+smallest targets and least detail, 7px objects in haze. The bottom band is the
+**whitewater zone**, and this is an independent confirmation of the 2026-08-29
+finding, where a line of surfers sitting in or against the breaking-wave foam
+had almost no boxes on them. That observation was a single frame; it now has
+57 held-out boxes behind it at 64.9%.
+
+Both edges are also where the training data is thinnest: of 2,880 labeled
+boxes, 233 fall in the top band and 139 in the bottom, against 969 in the
+30-60 band alone. Thin data and hard conditions coincide, so the two
+explanations are not separable from this evidence alone.
+
+**Ranking against the standing priorities:** fog remains first (hazy frames
+detect at 0.30 of truth, and the fog batch is staged but unlabeled). The
+row-edge weakness is second and partly overlaps it — the top band's problem is
+partly haze. No action taken; ideas recorded in
+`model_and_feature_ideas.md`.
