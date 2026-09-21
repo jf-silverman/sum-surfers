@@ -3574,3 +3574,44 @@ teaching suppression, but the 74 boxes now include a 36-surfer and a 21-surfer
 frame rather than the 8 boxes it held this morning. Worth re-checking after the
 retrain: if recall drops specifically on glare frames with surfers, the balance
 needs more of them.
+
+### Five more glare-with-surfers frames; yesterday's clean story was too clean (2026-09-20)
+
+Joel picked the five frames from batch 03 that actually contained surfers and
+labeled them (`data/cvat_out_coco/glare_more_5/`, **145 boxes**). One,
+`crop2026-03-12_11-59-00`, had already been labeled in the glare_12 batch; the
+newer pass (37 boxes against 36) supersedes it and the older copy was removed,
+so the pool holds no duplicate.
+
+**Pool: 153 images, 2,880 boxes.** Splits 85 / 39 / 29.
+
+**The correction.** Yesterday's entry concluded from three frames that glare
+"does not degrade counting when surfers are present — it invents surfers when
+they are absent". With 25 glare frames now labeled, that is too clean. Mean
+detector error on glare frames, by how many surfers are really there:
+
+| real surfers | frames | mean error |
+|---|---:|---:|
+| 0 | 16 | **+15.9** |
+| 1-15 | 4 | **+15.2** |
+| 16+ | 5 | +3.2 |
+
+For contrast, non-glare labeled frames average **-1.8**.
+
+So glare adds a roughly fixed quantity of phantom detections — on the order of
+15 — regardless of whether anyone is out. It looks harmless on a crowded frame
+because 15 phantoms against 37 real surfers is swamped, and catastrophic on an
+empty one. The worst case in the new batch is
+`crop2025-11-10_10-20-00`: **10 real surfers, 39 detected, +29**.
+
+Two things that do *not* explain it: glare fraction itself (correlation with
+error **-0.175**, i.e. none) and anything monotonic — the two heaviest-glare
+frames in the pool, at 0.0815 and 0.0841, score errors of **0** and +15. The
+measure says how much bright water is in frame, not how much the detector will
+hallucinate on it.
+
+**Balance is now 9 glare-with-surfers frames (183 boxes) against 16 empty**, up
+from 2 frames and 8 boxes two days ago. That is a reasonable footing for a
+retrain: enough empty glare to teach "sparkle is not a surfer", and enough
+populated glare — including 37-, 31- and 30-surfer frames — to stop it learning
+"glare means nobody is there".
