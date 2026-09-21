@@ -202,3 +202,6 @@ data/cvat_out_coco/labeling_batch_*
 
 # Sidecar recording which day the published animation covers (local state)
 data/charts/latest_detection.json
+
+# Old-vs-new detector comparisons (recounted history, local only — not for publication)
+data/compare_detector_*/

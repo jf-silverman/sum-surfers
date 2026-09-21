@@ -3802,3 +3802,37 @@ dataset-publication problem found during this change (next entry).
 
 `CLAUDE.md` gained a rule: never change a `.env` value without Joel's explicit
 approval, every time.
+
+### Old vs new detector on Sept 14 detections and the Sept 17 forecast (2026-09-21)
+
+Joel asked to re-run the Sept 14 detection animation and the Sept 17 forecast
+on the new detector, to look for undercount fixes and tighter forecast ranges.
+Comparison-only, in `data/compare_detector_20260921/` (gitignored): production
+`predictions.csv`, the training table and the README are untouched.
+
+A forecast does not change just because the detector does — the forecast model
+learns from `predictions.csv`, whose counts all came from the old detector. So
+the full history (1,637 quality-passed frames, 11 minutes) was recounted with
+the new detector, a second training table built from it, and both forecast
+models trained on data through Sept 16 only, so the detector is the only
+difference.
+
+**Sept 14:** old 72 surfers across the day, new 66. A quiet day, so the fog and
+crowding fixes do not show. At 12:35 PM the new model keeps 3 of the far-lineup
+specks where the old kept 9; there appear to be more specks than either boxed.
+Unresolved without a human count.
+
+**Forecast ranges got wider, not tighter.** Sept 17: mean 80% width 17.3 → 23.7
+(+37%), unchanged relative to the predicted count, point predictions nearly
+identical (mean error 7.8 vs 7.7). Across the whole dataset, width 20.9 → 22.9
+(+10%) while coverage goes **73.1% → 83.1%** against a claimed 80%. Two
+mechanisms: removing glare phantoms raises genuine zero-surfer hours from 11.9%
+to 15.4%, pinning the lower edge at 0; and fewer misses on busy hours raise the
+upper edge. The old ranges were overconfident; the new ones are calibrated.
+
+**Collection quirk found:** Sept 16 and 17 each have 30 frames — two clips per
+hour, 9 minutes apart (06:17 and 06:26, 07:11 and 07:20, …). Sept 16 had several
+manual pipeline runs during the LaunchAgent fixes, and each run chose its own
+clip times; the extra frames have no predictor rows and drop out of training.
+Clip times depend on when a run starts rather than a fixed schedule. Not acted
+on.
