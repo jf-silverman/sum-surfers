@@ -98,7 +98,7 @@ def daylight_hours_for(date_str, _cache={}):
     """(first_hour, last_hour) of real daylight for a date, from dawn and dusk.
 
     A fixed 6:00-19:00 window caps the count at 14 hours, which silently
-    undercounts summer: dawn-to-dusk here runs past 15 hours near the solstice,
+    undercounts summer: first light to last light here runs past 15 hours near the solstice,
     so a day whose tide never came up could never score above 14. Uses the same
     get_light_window() the clip collector uses, so "daylight" means one thing
     across the project. Cached per date — astral is cheap but this is called
@@ -172,8 +172,8 @@ def add_tide_daylight_features(rows):
     """Per-day tide/daylight summaries, attached to every row of that day.
 
     Counted over the daylight hours actually observed that date rather than a
-    full astronomical day: the pipeline samples roughly hourly from dawn to
-    dusk, so the observed hours are very nearly the daylight hours, and a
+    full astronomical day: the pipeline samples roughly hourly from first
+    light to last light, so the observed hours are very nearly the daylight hours, and a
     fraction alongside the raw count keeps a short collection day from looking
     like a bad-tide day. Rows whose tide is blank are skipped in the counting
     but still receive the day's values.
@@ -244,7 +244,7 @@ def main():
     rows_out = add_tide_daylight_features(rows_out)
     with_tide = sum(1 for r in rows_out if r["good_tide_hours"] != "")
     print(f"tide/daylight features attached to {with_tide} of {len(rows_out)} row(s) "
-          f"(good tide = under {GOOD_TIDE_MAX_FT} ft, daylight = real dawn to dusk per date)")
+          f"(good tide = under {GOOD_TIDE_MAX_FT} ft, daylight = first light to last light per date)")
 
     with open(out_csv, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=OUT_HEADER)

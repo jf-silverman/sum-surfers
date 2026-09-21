@@ -81,7 +81,7 @@ CLIP_DURATION_SEC = 6       # one second of margin past the +1.5s side frame
 STREAM_URL_TTL_MIN = 60      # re-resolve the stream URL this often; CDN paths can rotate
 SLEEP_SLICE_SEC = 20         # wake this often while waiting, so Ctrl-C stays responsive
                              # and a laptop resuming from sleep is noticed promptly
-DARK_POLL_MIN = 5            # how often to re-check for dawn while it is dark
+DARK_POLL_MIN = 5            # how often to re-check for first light while it is dark
 FFMPEG_TIMEOUT_SEC = 90
 WARN_AFTER_CONSECUTIVE_FAILURES = 3
 
@@ -275,7 +275,7 @@ def main():
                 sleep_until(min(first_light, now + timedelta(minutes=DARK_POLL_MIN)), tz)
                 continue
             if now > last_light:
-                # Recompute tomorrow's window at dawn rather than now — the
+                # Recompute tomorrow's window at first light rather than now — the
                 # dates differ, and today's values would be stale by then.
                 tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=30, second=0, microsecond=0)
                 log(f"After last light ({last_light.strftime('%H:%M')}); sleeping until tomorrow.")

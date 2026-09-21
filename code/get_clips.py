@@ -187,11 +187,13 @@ def send_auth_failure_email(auth_failure_count):
 def get_light_window(date, local_tz):
     """Returns (first_light, last_light) datetimes for the clip-collection window.
 
-    Naming: Surfline's app labels these "first light" and "last light"; its API
-    calls the same values `dawn` and `dusk`. Verified identical on 2026-09-21
-    (app first light 6:30 / last light 7:34pm = API dawn 06:30 / dusk 19:34).
-    Both are civil twilight. Prose in this repo says "first light (dawn)" and
-    "last light (dusk)" so either name is recognisable.
+    Naming: these are FIRST LIGHT and LAST LIGHT — about 30 minutes before
+    sunrise and after sunset. Surfline's API happens to name the fields `dawn`
+    and `dusk`, and the variables below mirror the API, but in this repo's prose
+    first light is never called dawn or sunrise, and last light is never called
+    dusk or sunset. Verified against the Surfline app on 2026-09-21: first light
+    6:30, sunrise 6:56, sunset 7:08pm, last light 7:34pm — the API's `dawn` and
+    `dusk` fields match first light and last light exactly.
 
     Prefers Surfline's own `sunlight` forecast endpoint (dawn/dusk = civil twilight,
     the standard "usable light" boundary) for TODAY specifically — it's free/no-token
@@ -199,7 +201,7 @@ def get_light_window(date, local_tz):
     itself uses, so it can't drift from the real spot the way an independently
     computed astronomical estimate could. Falls back to astral (using this file's
     LOCATION, now corrected to Pleasure Point's real coordinates — confirmed via web
-    search 2026-08-28 to match Surfline's own dawn/dusk within 1-2 minutes) for any
+    search 2026-08-28 to match Surfline's own first/last light within 1-2 minutes) for any
     date astral can't reach live (i.e. everything in DAY_LOOKBACK_DAYS's backfill
     window, which is in the past and would otherwise need a premium session token —
     see backfill_historical_predictors.py) or if the live fetch fails for any reason
@@ -207,9 +209,9 @@ def get_light_window(date, local_tz):
 
     Previously this used sunrise-30min/sunset+30min as a stand-in for first/last
     light — a flawed heuristic on two counts: it assumed a fixed 30-minute margin
-    is always right (real dusk is ~25 min later than that at summer solstice for
+    is always right (real last light is ~25 min later than that at summer solstice for
     this location), and it inherited whatever error was in the hardcoded
-    coordinates. dawn/dusk (civil twilight) is the actual concept wanted here.
+    coordinates. First light / last light is the actual concept wanted here.
     """
     loc = LocationInfo(**LOCATION)
     astral_result = sun(loc.observer, date=date, tzinfo=local_tz)

@@ -28,10 +28,10 @@ detail and a link to the in-depth write-up.
 
 1. **Gather video clips.**
    ***Every hour of daylight, the project downloads a short video clip from a camera pointed at the surf spot.***
-   Clip collection runs from first light (dawn) to last light (dusk) for that
-   date — civil twilight, the same first/last light times the surf forecast
-   provider shows — rather than fixed clock times, so it follows the seasons
-   instead of wasting requests on darkness. Clips land in a dated folder and are deleted once
+   Clip collection runs from first light to last light for that date — the
+   same first/last light times the surf forecast provider shows, about 30
+   minutes before sunrise and after sunset — rather than fixed clock times, so
+   it follows the seasons instead of wasting requests on darkness. Clips land in a dated folder and are deleted once
    frames have been pulled from them.
    → [The pipeline, end to end](docs/HOW_IT_WORKS.md#the-pipeline-end-to-end)
 
@@ -48,8 +48,8 @@ detail and a link to the in-depth write-up.
    ***Frames too dark or too blurry to count are thrown away rather than guessed at.***
    Each primary frame is checked for brightness and for
    [Laplacian variance](docs/HOW_IT_WORKS.md#term-laplacian-variance), a
-   standard measure of how much fine detail an image holds. Fog, dusk and a
-   wet lens all fail it. Rejected frames are still logged with their scores,
+   standard measure of how much fine detail an image holds. Fog, fading evening light and
+   a wet lens all fail it. Rejected frames are still logged with their scores,
    just never counted — a wrong number is worse than a missing one.
    → [Image-quality gate](docs/HOW_IT_WORKS.md#image-quality-gate)
 
@@ -97,7 +97,7 @@ detail and a link to the in-depth write-up.
 
 9. **Publish it automatically.**
    ***Every night the animation and chart above are rebuilt and posted here on their own.***
-   A scheduled job runs the whole pipeline after last light (dusk), rebuilds both images
+   A scheduled job runs the whole pipeline after last light, rebuilds both images
    from the day's fresh data, and commits them to this repository. Nobody runs
    anything by hand, which is why the two images above are never more than a
    day old.

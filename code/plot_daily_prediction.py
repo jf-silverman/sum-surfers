@@ -77,8 +77,8 @@ DETECTOR_RECALL = 0.82047  # = sensitivity
 # extrapolated hours below) — NOT the same thing as "is it light on this specific day",
 # which varies by ~1hr+ across seasons and is computed per-day via get_light_window()
 # instead (a fixed 5-20 filter here previously showed a confident-looking prediction
-# for 5am on a day whose real dawn was 6:10am — the model doesn't know today's specific
-# dawn time, only the coarse is_night flag, so it happily extrapolated).
+# for 5am on a day whose real first light was 6:10am — the model doesn't know today's specific
+# first-light time, only the coarse is_night flag, so it happily extrapolated).
 TRAINED_HOUR_MIN, TRAINED_HOUR_MAX = 5, 20
 
 # Prediction-interval quantile levels the fan chart is built from -- 9 real
@@ -205,7 +205,7 @@ def main():
         return predict_for_hour(nearest)
 
     dawn, dusk = gc.get_light_window(target_date, local_tz)
-    print(f"First light (dawn) / last light (dusk) for {target_date}: "
+    print(f"First light / last light for {target_date}: "
           f"{dawn.strftime('%-I:%M %p')} - {dusk.strftime('%-I:%M %p')}")
     day_hours = sorted(hk for hk in by_hour if hk.date() == target_date and dawn.hour <= hk.hour <= dusk.hour)
     if not day_hours:
@@ -520,7 +520,7 @@ def generate_detection_gif(detection_date):
 
     Replaces the single ~8am still (2026-09-16): one frame showed one hour's
     crowd, while a day of them shows the shape the forecast model is actually
-    trying to predict — empty at dawn, building through the morning, thinning
+    trying to predict — empty at first light, building through the morning, thinning
     out again. Returns (date, n_frames) or None.
     """
     day, rows = find_day_crops(detection_date)
