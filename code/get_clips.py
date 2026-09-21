@@ -187,6 +187,12 @@ def send_auth_failure_email(auth_failure_count):
 def get_light_window(date, local_tz):
     """Returns (first_light, last_light) datetimes for the clip-collection window.
 
+    Naming: Surfline's app labels these "first light" and "last light"; its API
+    calls the same values `dawn` and `dusk`. Verified identical on 2026-09-21
+    (app first light 6:30 / last light 7:34pm = API dawn 06:30 / dusk 19:34).
+    Both are civil twilight. Prose in this repo says "first light (dawn)" and
+    "last light (dusk)" so either name is recognisable.
+
     Prefers Surfline's own `sunlight` forecast endpoint (dawn/dusk = civil twilight,
     the standard "usable light" boundary) for TODAY specifically — it's free/no-token
     for the live forward-looking window, and it's literally the same source Surfline

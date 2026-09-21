@@ -205,7 +205,8 @@ def main():
         return predict_for_hour(nearest)
 
     dawn, dusk = gc.get_light_window(target_date, local_tz)
-    print(f"Real dawn/dusk for {target_date}: {dawn.strftime('%-I:%M %p')} - {dusk.strftime('%-I:%M %p')}")
+    print(f"First light (dawn) / last light (dusk) for {target_date}: "
+          f"{dawn.strftime('%-I:%M %p')} - {dusk.strftime('%-I:%M %p')}")
     day_hours = sorted(hk for hk in by_hour if hk.date() == target_date and dawn.hour <= hk.hour <= dusk.hour)
     if not day_hours:
         print(f"No forecast data available for {target_date} (outside the live today+tomorrow window).")
