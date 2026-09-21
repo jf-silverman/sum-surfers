@@ -65,7 +65,8 @@ DEFAULT_INPUT = [_PROJECT_ROOT / "data" / "cvat_out_coco" / "posture_57",
                  _PROJECT_ROOT / "data" / "cvat_out_coco" / "batch01_73",
                  _PROJECT_ROOT / "data" / "cvat_out_coco" / "winter_7",
                  _PROJECT_ROOT / "data" / "cvat_out_coco" / "glare_12",
-                 _PROJECT_ROOT / "data" / "cvat_out_coco" / "glare_more_5"]
+                 _PROJECT_ROOT / "data" / "cvat_out_coco" / "glare_more_5",
+                 _PROJECT_ROOT / "data" / "cvat_out_coco" / "fog_19"]
 DEFAULT_OUTPUT = _PROJECT_ROOT / "data" / "cvat_out_coco" / "splits_v2"
 
 SPLITS = ["train", "val", "test"]

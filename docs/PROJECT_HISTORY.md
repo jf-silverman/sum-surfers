@@ -3680,3 +3680,28 @@ detect at 0.30 of truth, and the fog batch is staged but unlabeled). The
 row-edge weakness is second and partly overlaps it — the top band's problem is
 partly haze. No action taken; ideas recorded in
 `model_and_feature_ideas.md`.
+
+### Fog batch labeled: 19 frames, every one undercounted (2026-09-21)
+
+The fog batch that motivated the whole retraining effort is labeled and merged
+(`data/cvat_out_coco/fog_19/`): **19 frames, 546 boxes**, no duplicates, all
+staged frames returned.
+
+**Every frame was undercounted — not one exception.** The production detector
+found **402 of 546** surfers, 74% of the real count, with per-frame errors from
+-1 to -22. The canonical frame `crop2026-08-29_07-29-00` — the one Joel counted
+49 on from the water on 2026-08-29 — labeled at 48 against 27 detected. The
+bird frame `crop2026-08-09_08-23-00` came in at 46 against 24. This is the
+opposite of glare (phantoms) and fully consistent with the earlier
+image-haziness result (lap_var < 50 frames detecting at 0.30 of truth).
+
+**Pool: 172 images, 3,426 boxes.** Splits 96 / 44 / 32. Hazy frames (lap_var <
+50) now sit **11 in train, 5 in val, 5 in test** — up from zero in train, which
+is what made the cancelled 2026-09-20 run unable to affect fog at all.
+
+**Sequencing on CLAHE**, revising an earlier note: the 2026-08-25 result
+(miss rate 74.9% → 43.4%) was CLAHE applied at *inference only* on a model
+never trained on enhanced images. So training on plain images first is a valid
+step. It measures what the fog labels alone buy; CLAHE at inference can then be
+tested on the 10 held-out hazy frames with no further training, and training
+*with* CLAHE is only worth doing if that test still shows a gain.
