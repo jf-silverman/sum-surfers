@@ -219,3 +219,6 @@ data/cvat_out_coco/fog_19/
 
 # Ablation split: original 57 boxes + new images (local only)
 data/cvat_out_coco/splits_ablation/
+
+# Prioritized bug register — private, like bugs.md
+docs/known_bugs.md
