@@ -159,6 +159,51 @@ def nms_across_tiles(all_boxes_global, iou_thresh=IOU_NMS):
     return [all_boxes_global[i] for i in keep.tolist()]
 
 
+# Nested-box suppression (added 2026-09-22). IoU-based NMS keeps a small box
+# sitting inside a larger one on the same surfer, because their IoU is small:
+# the intersection is the whole small box, but the union is the whole big one.
+# On clear days that made the retrained detector count one surfer twice.
+# Measuring overlap against the SMALLER box's area catches exactly that case.
+#
+# 0.7 chosen by sweep on 2026-09-22 (retrained model; off -> 0.7):
+#   60-second clear-day human counts  107.1% -> 102.0%, MAE 1.90 -> 1.17
+#   spot-check human counts           102.7% -> 100.0%, MAE 1.28 -> 1.06
+#   held-out labeled frames           100.5% ->  98.9%, MAE 0.99 -> 0.99
+# Lower thresholds help clear days slightly more but start undercounting the
+# other sets, i.e. begin merging genuinely adjacent surfers. The threshold was
+# picked on these same three sets, so it is mildly tuned to them; re-check on
+# fresh frames. None disables it.
+CONTAINMENT_THRESH = 0.7
+
+
+def suppress_contained(boxes, thresh=None):
+    """Drop the lower-confidence box of any pair where one mostly covers the other.
+
+    boxes: [x1, y1, x2, y2, conf]. Greedy by confidence: a box is dropped when
+    its overlap with an already-kept box, divided by the smaller of the two
+    areas, exceeds thresh.
+    """
+    thresh = CONTAINMENT_THRESH if thresh is None else thresh
+    if thresh is None or len(boxes) < 2:
+        return list(boxes)
+    kept = []
+    for b in sorted(boxes, key=lambda b: -b[4]):
+        area_b = max(b[2] - b[0], 0) * max(b[3] - b[1], 0)
+        dup = False
+        for k in kept:
+            iw = min(b[2], k[2]) - max(b[0], k[0]); ih = min(b[3], k[3]) - max(b[1], k[1])
+            if iw <= 0 or ih <= 0:
+                continue
+            area_k = (k[2] - k[0]) * (k[3] - k[1])
+            smaller = min(area_b, area_k)
+            if smaller > 0 and (iw * ih) / smaller > thresh:
+                dup = True
+                break
+        if not dup:
+            kept.append(b)
+    return kept
+
+
 def _in_zone(box, zone):
     x1, y1, x2, y2, _conf = box
     cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
@@ -202,7 +247,7 @@ def run_inference(model, img_path):
 
     shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    kept = nms_across_tiles(all_boxes)
+    kept = suppress_contained(nms_across_tiles(all_boxes))
     kept = filter_false_positive_zones(kept)
     count = len(kept)
     avg_conf = (sum(b[4] for b in kept) / count) if count > 0 else 0.0
@@ -233,7 +278,7 @@ def run_inference_with_boxes(model, img_path):
 
     shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    kept = nms_across_tiles(all_boxes)
+    kept = suppress_contained(nms_across_tiles(all_boxes))
     kept = filter_false_positive_zones(kept)
     return kept
 

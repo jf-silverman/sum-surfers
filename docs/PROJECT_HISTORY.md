@@ -3898,3 +3898,38 @@ anyone score it partly on its own training data. The run's training filenames
 skips those frames in whole-frame counts and says so; it warns that
 Ultralytics' per-box metrics cannot skip them. Verified on the public test
 split: 4 of 10 frames excluded, 6 scored.
+
+### Nested-box suppression added to the detector (2026-09-22)
+
+Fixes the clear-day overcount traced to duplicate boxes on one surfer.
+Cross-tile NMS suppresses by IoU (0.45), and a small box inside a larger one has
+low IoU because the union is the whole large box, so both survived.
+`suppress_contained()` in `detect_surfers.py` now runs after NMS and drops the
+lower-confidence box of any pair whose overlap exceeds `CONTAINMENT_THRESH` of
+the *smaller* box's area. Unit-checked: removes a nested pair, keeps separate
+and merely touching boxes.
+
+Threshold sweep, retrained model:
+
+| threshold | held-out labeled (76) | 60-sec clear day (70) | spot-check human (36) |
+|---|---|---|---|
+| off | 100.5%, MAE 0.99 | 107.1%, MAE 1.90 | 102.7%, MAE 1.28 |
+| 0.9 | 99.5%, 0.96 | 104.6%, 1.51 | 101.5%, 1.17 |
+| 0.8 | 99.2%, 0.97 | 103.2%, 1.30 | 100.8%, 1.17 |
+| **0.7** | **98.9%, 0.99** | **102.0%, 1.17** | **100.0%, 1.06** |
+| 0.6 | 98.2%, 1.03 | 101.1%, 1.11 | 98.9%, 1.06 |
+| 0.5 | 97.8%, 1.04 | 100.3%, 1.06 | 98.5%, 1.11 |
+
+**Adopted 0.7.** Clear-day error down 38% (1.90 → 1.17), spot-check bias to
+exactly 0.00, held-out labeled MAE unchanged. Below 0.7 the labeled and
+spot-check sets start undercounting, which looks like merging genuinely
+adjacent surfers.
+
+**Stated plainly:** on the 20-frame demo set it is slightly worse — 491 against
+498 labeled (was 499), MAE 0.75 → 0.85 — and the README's demo figures were
+corrected to match what the default pipeline now produces. It helps both
+independent human-count sets while costing a little on some labeled frames,
+possibly where closely overlapping surfers were boxed separately. The threshold
+was chosen on these same sets, so it is mildly tuned to them and should be
+re-checked on fresh frames. It changes production counts from the next run:
+about 1% lower on typical frames, about 5% lower on clear days.

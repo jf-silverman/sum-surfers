@@ -415,7 +415,7 @@ It runs the real production inference path — tiling, cross-tile
 [NMS](docs/HOW_IT_WORKS.md#term-nms), false-positive filtering — on each
 frame and compares the surfer count with the number of hand-drawn boxes,
 frame by frame and broken out by crowd size. On the demo set it finds
-**499 surfers against 498 labeled**, an average error of 0.75 surfers per
+**491 surfers against 498 labeled**, an average error of 0.85 surfers per
 frame. That count is the number the forecast actually uses; a detector can
 look fine box-by-box while still undercounting crowded frames.
 
