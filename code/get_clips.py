@@ -254,6 +254,35 @@ def resolve_clip_duration():
     return CLIP_DURATION_SEC
 
 
+def existing_first_clip(day_folder, date, local_tz):
+    """Earliest clip already downloaded for this day, or None.
+
+    A day's clip schedule is chained from its first clip, which snaps to the
+    Surfline window at or before first light. First light for TODAY comes from
+    Surfline's live forecast, but for backfill days it comes from astral, which
+    runs about 1.5 minutes earlier. When first light sits just past a 9-minute
+    window boundary, the two sources snap to different windows, and the backfill
+    downloads an entire second schedule offset by 9 minutes. That happened on
+    2026-09-16 and 09-17 (06:17 and 06:26 series side by side); first light drifts
+    across a boundary roughly every 9 days in spring and autumn, so it recurs.
+
+    Reusing the schedule a day already has makes the backfill fill gaps in that
+    schedule instead of starting a new one. Folders without a clip.mp4 (a failed
+    download) don't count, so a day with only failures is recomputed as before.
+    """
+    if not day_folder.exists():
+        return None
+    times = sorted(sub.name for sub in day_folder.iterdir()
+                   if sub.is_dir() and (sub / "clip.mp4").exists())
+    for name in times:
+        try:
+            hh, mm = map(int, name.split("_"))
+        except ValueError:
+            continue
+        return local_tz.localize(datetime(date.year, date.month, date.day, hh, mm))
+    return None
+
+
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     today = datetime.now().date()
@@ -269,7 +298,11 @@ def main():
         day_folder.mkdir(parents=True, exist_ok=True)
 
         first_light, last_light = get_light_window(date, local_tz)
-        clip_dt = find_nearest_clip_window(first_light, clip_times_pattern)
+        anchor = existing_first_clip(day_folder, date, local_tz)
+        if anchor is not None:
+            clip_dt = anchor  # keep the day's existing schedule; see existing_first_clip()
+        else:
+            clip_dt = find_nearest_clip_window(first_light, clip_times_pattern)
 
         while clip_dt <= last_light:
             time_str = clip_dt.strftime("%H_%M")

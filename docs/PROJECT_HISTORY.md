@@ -3836,3 +3836,36 @@ manual pipeline runs during the LaunchAgent fixes, and each run chose its own
 clip times; the extra frames have no predictor rows and drop out of training.
 Clip times depend on when a run starts rather than a fixed schedule. Not acted
 on.
+
+### Double clip schedules explained and fixed; labeled data untracked (2026-09-21)
+
+**The Sept 16-17 extra clips were not caused by manual runs**, as I said
+earlier — correction. A day's first clip snaps to the Surfline window at or
+before first light, and every later clip is chained from it. First light for
+*today* comes from Surfline's live forecast; for the 5-day backfill it comes
+from astral, which runs about 1.5 minutes earlier (06:28:53 vs Surfline's
+06:30:16 on 2026-09-21). On Sept 16 and 17, astral's first light (06:24:44,
+06:25:34) snapped to 06:17 while Surfline's snapped to 06:26, so each day was
+collected once as "today" on the 06:26 schedule and again during backfill on
+06:17. The same drift explains the permanent shift from a 06:17 schedule
+(through Sept 15) to 06:26 (from Sept 18): first light moves about a minute a
+day in September and crosses a 9-minute boundary roughly every 9 days.
+
+**Kept the 06:26 schedule** on both days — the one collected as "today", which
+the same rule also reproduces on every neighbouring day. It holds all 15
+predictor rows per day; the 06:17 set held none and was in no labeled or review
+set. Removed 30 rows from `predictions.csv` (1,822 → 1,792), with 90 crop files
+and 30 clip folders moved to a local backup rather than deleted.
+
+**Fixed so it cannot recur.** Without a fix, tonight's backfill would have
+re-downloaded Sept 17's 06:17 set, since that day is still inside the 5-day
+window. `get_clips.py` now continues a day's existing schedule when it already
+has clips (`existing_first_clip()`), and only computes from first light for a
+day with none, or with only failed downloads. Verified: Sept 16 and 17 now plan
+06:26 onward; an empty day and a failed-download-only day both fall back to
+first light.
+
+**Labeled data untracked** (`15d3df5`), per Joel choosing to keep the dataset
+local: `posture_57`, `batch01_73`, `winter_7`, `glare_12`, `glare_more_5` and
+`fog_19` are gitignored with local copies intact. They remain in history from
+their 2026-09-14 to 09-21 commits.
