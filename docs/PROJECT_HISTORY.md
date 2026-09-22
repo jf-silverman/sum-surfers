@@ -4045,3 +4045,40 @@ Caveats: 63 frames, of which 10 hazy and 10 glare; the middle model differs
 from production in two respects at once, so the 9% cannot be pinned on the box
 corrections alone; and each model is a single training run, so run-to-run
 variance is unmeasured.
+
+### 2026-09-22 — Human review of the 46 out-of-window frames (B02)
+
+46 frames recorded before first light or after last light had been passing the
+quality gate. Joel reviewed every one by eye: **28 unusable**, **18 countable**
+(a few grainy or blurry but still countable).
+
+What the bad 28 had been contributing to training: **18 false zeros** — "nobody
+out" from a frame nobody could see — plus **10 phantom counts totalling 17
+surfers**. On the 18 countable frames the detector was fine: 86 against a human
+96 (90%), MAE 1.22, bias −0.56, with one frame off by 6.
+
+All 46 verdicts are now in the data. The 28 carry `quality_ok=False` /
+`quality_reason=too_dark_human_review` with their counts cleared, and the 18
+human counts are recorded. Quality-passed frames: 1,623 → 1,595; the training
+table rebuilt to 1,594 rows.
+
+**No automatic gate was added, because neither candidate rule survives contact
+with the corpus.** A clock rule is wrong on its face — one frame 14 minutes
+*before* first light is countable, while frames 0–4 minutes out are unusable;
+usable light does not track the almanac. The image-based separator looked much
+better: among these dim frames a *high* Laplacian variance means sensor noise
+rather than detail, and `lap_var > 180` sorts 38 of the 46 correctly (22 of 28
+unusable caught, 2 of 18 countable wrongly flagged).
+
+Applied corpus-wide it collapses. `brightness < 90 and lap_var > 180` rejects
+**462 of 1,595 quality-passed frames (29.0%)**, and the rejections are not at
+night — they cluster in the **afternoon** (16:00 → 64, 17:00 → 52, 14:00 → 44)
+and include **272 frames currently counting 5 or more surfers**, among them
+2025-10-11 17:14 with 23. Overcast daylight is dim and real water texture is
+sharp, so both conditions fire together constantly on good frames. Tightening
+brightness only trades coverage for the same error: `< 85` still rejects 15.7%,
+`< 80` 6.0%.
+
+The separation is real but conditional on the population it was measured in.
+Any future rule has to be scoped to frames outside the first-light/last-light
+window, and that is the open part of B02.

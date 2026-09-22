@@ -222,3 +222,6 @@ data/cvat_out_coco/splits_ablation/
 
 # Prioritized bug register — private, like bugs.md
 docs/known_bugs.md
+
+# Night-window human review (crops + verdicts) — local only
+data/reviews/night_window_review/
