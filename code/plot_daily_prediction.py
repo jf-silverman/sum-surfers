@@ -411,10 +411,29 @@ def find_nearest_hour_crop(target_date, target_hour=8, lookback_days=7):
 # 40% is traded away to see the remaining 60% properly. GIF_UPSCALE then takes
 # the 768px crop past GitHub's ~880px content column so it renders full width
 # instead of being letterboxed at its natural size.
-SIDE_CROP_FRAC = 0.20
-GIF_UPSCALE = 2.0
+# Trimming each end trades coverage for apparent size, and the trade is steep.
+# Measured on 2026-09-21's 186 detections: 0.20 keeps 83% of them, 0.25 keeps
+# 73%, 0.30 only 56%. Since GitHub scales the image to its ~880px column
+# regardless, the crop is what actually makes a surfer bigger on screen (880
+# over the kept width): 0.20 renders at 1.15x native, 0.25 at 1.38x, 0.30 at
+# 1.72x. 0.25 is the balance struck — noticeably bigger without dropping a
+# quarter of the day's detections off the sides. GIF_UPSCALE does not change
+# on-screen size; it keeps the image sharp on high-DPI displays.
+SIDE_CROP_FRAC = 0.25
+GIF_UPSCALE = 3.0
 GIF_FRAME_MS = 1000
 GIF_MAX_COLORS = 128          # palette size — the strip is mostly water, so this is plenty
+# Box color, defined once in both spaces: cv2 draws in BGR, the GIF palette
+# reserves it in RGB. Keeping a single source for it is what guarantees the
+# drawn pixels and the reserved palette entry are the same color.
+BOX_COLOR_RGB = (157, 227, 90)        # lime green, matching LIME "#9de35a"
+BOX_COLOR_BGR = BOX_COLOR_RGB[::-1]
+# Colors that must survive quantization exactly, whatever the frame contains.
+GIF_RESERVED_COLORS = (BOX_COLOR_RGB, (255, 255, 255), (235, 235, 235), (0, 0, 0))
+# GitHub does not autoplay an animated GIF in a README — it shows the first
+# frame with a small play button in the top-right corner, which readers miss.
+# The first frame therefore carries a callout pointing at it.
+GIF_PLAY_CALLOUT = "Click Play Here"
 GIF_LOOKBACK_DAYS = 14
 # A day also has to be busy enough to be worth showing: more than
 # BUSY_COUNT_MIN surfers in at least MIN_BUSY_FRACTION of its frames. Added
@@ -484,8 +503,6 @@ def render_detection_frame(img_path, model):
     cropped = img[:, x0:x1]
     out = cv2.resize(cropped, None, fx=GIF_UPSCALE, fy=GIF_UPSCALE, interpolation=cv2.INTER_CUBIC)
 
-    BOX_COLOR = (90, 227, 157)  # BGR — lime green, matching LIME "#9de35a"
-    overlay = out.copy()
     visible = 0
     for bx1, by1, bx2, by2, conf in boxes:
         # Drop boxes the crop removed; clip ones it cuts through.
@@ -494,11 +511,73 @@ def render_detection_frame(img_path, model):
         visible += 1
         p1 = (int(max(bx1 - x0, 0) * GIF_UPSCALE), int(by1 * GIF_UPSCALE))
         p2 = (int(min(bx2 - x0, x1 - x0) * GIF_UPSCALE), int(by2 * GIF_UPSCALE))
-        cv2.rectangle(overlay, p1, p2, BOX_COLOR, 2)
-        cv2.putText(overlay, f"{conf:.2f}", (p1[0], max(p1[1] - 6, 14)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, BOX_COLOR, 1, cv2.LINE_AA)
-    out = cv2.addWeighted(overlay, 0.65, out, 0.35, 0)
+        # Drawn at full opacity, directly onto the frame. These used to be
+        # composited at 65% via addWeighted, which blended every box toward the
+        # gray water under it — and a blended, frame-dependent green is exactly
+        # the kind of rare color GIF palette quantization throws away, so boxes
+        # came out green on some frames and gray on others. One exact color,
+        # reserved in the shared palette below, renders identically everywhere.
+        cv2.rectangle(out, p1, p2, BOX_COLOR_BGR, 2)
+        cv2.putText(out, f"{conf:.2f}", (p1[0], max(p1[1] - 6, 14)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, BOX_COLOR_BGR, 2, cv2.LINE_AA)
     return out, visible
+
+
+def quantize_to_shared_palette(frames):
+    """One palette for every frame, with the box green reserved exactly.
+
+    GIF is palette-based, so each frame's colors get reduced to at most 256
+    entries. The previous code called `convert("P", palette=ADAPTIVE)` per
+    frame, which despite the comment on it built a *separate* palette for each
+    one: a thin green box line covers very few pixels, so on frames whose water
+    happened to be more varied the green was dropped as an unimportant color
+    and snapped to the nearest gray. That is why some frames showed green boxes
+    and others gray.
+
+    Here the palette is built once from every frame together, and the colors
+    that must be exact — the box green, the banner text, black — are appended
+    afterwards rather than being left to survive on merit. Dithering is off so
+    flat colors stay flat instead of being stippled from neighbouring entries.
+    """
+    reserved = list(GIF_RESERVED_COLORS)
+    montage = Image.new("RGB", (frames[0].width, sum(f.height for f in frames)))
+    y = 0
+    for f in frames:
+        montage.paste(f, (0, y))
+        y += f.height
+
+    base = montage.quantize(colors=max(GIF_MAX_COLORS - len(reserved), 2),
+                            method=Image.Quantize.MEDIANCUT)
+    palette = base.getpalette()[: 3 * (GIF_MAX_COLORS - len(reserved))]
+    for color in reserved:
+        palette.extend(color)
+    palette.extend([0, 0, 0] * (256 - len(palette) // 3))
+
+    palette_img = Image.new("P", (1, 1))
+    palette_img.putpalette(palette)
+    return [f.quantize(palette=palette_img, dither=Image.Dither.NONE) for f in frames]
+
+
+def add_play_callout(canvas):
+    """Draws "Click Play Here -->" at the top right of the first frame.
+
+    GitHub renders an animated GIF in a README as a still first frame with a
+    small play button in the top-right corner, and readers do not reliably
+    notice it. The arrow points at where that button sits.
+    """
+    h, w = canvas.shape[:2]
+    text = f"{GIF_PLAY_CALLOUT}  -->"
+    font, scale, thickness = cv2.FONT_HERSHEY_SIMPLEX, 0.95, 2
+    (tw, th), _ = cv2.getTextSize(text, font, scale, thickness)
+    pad = 12
+    x = max(w - tw - pad * 3, pad)
+    y = pad + th
+
+    # Dark plate behind the text so it reads over bright water or sky.
+    cv2.rectangle(canvas, (x - pad, y - th - pad), (min(x + tw + pad, w - 1), y + pad),
+                  (0, 0, 0), cv2.FILLED)
+    cv2.putText(canvas, text, (x, y), font, scale, BOX_COLOR_BGR, thickness, cv2.LINE_AA)
+    return canvas
 
 
 def keep_existing_gif():
@@ -560,16 +639,15 @@ def generate_detection_gif(detection_date):
         # silently render it as "???".
         cv2.putText(canvas, f"{stamp}   |   {count} surfers detected", (10, h + 33),
                     cv2.FONT_HERSHEY_SIMPLEX, 1.0, (235, 235, 235), 2, cv2.LINE_AA)
+        if not frames:
+            add_play_callout(canvas)
         frames.append(Image.fromarray(cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)))
 
     if not frames:
         print("No frames rendered — skipping detection animation.")
         return None
 
-    # Quantize to a shared adaptive palette: GIF is palette-based anyway, and
-    # letting each frame pick its own palette both bloats the file and makes
-    # the water shimmer between frames.
-    palette_frames = [f.convert("P", palette=Image.ADAPTIVE, colors=GIF_MAX_COLORS) for f in frames]
+    palette_frames = quantize_to_shared_palette(frames)
     CHARTS_DIR.mkdir(parents=True, exist_ok=True)
     latest_path = CHARTS_DIR / "latest_detection.gif"
     palette_frames[0].save(latest_path, save_all=True, append_images=palette_frames[1:],

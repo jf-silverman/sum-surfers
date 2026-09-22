@@ -4282,3 +4282,39 @@ Checked every doc against the code after the day's changes. What was stale:
 
 Also removed six uses of "honest"/"honestly" from this file, one of them
 written earlier today. The word asserts something the reader should judge.
+
+### 2026-09-22 — Detection animation: consistent boxes, bigger view, play callout
+
+Joel noticed the animation drew green boxes on some frames and gray ones on
+others. Two compounding causes, both fixed:
+
+1. **Boxes were composited at 65% opacity** (`cv2.addWeighted`), so every box
+   was really a blend of green and whatever water sat under it — a different
+   color on every frame.
+2. **Each frame built its own GIF palette.** The code called
+   `convert("P", palette=ADAPTIVE)` per frame, despite a comment claiming a
+   shared palette. A 2px box line covers a tiny share of a 1280px-wide strip,
+   so on frames with more varied water the blended green was dropped as an
+   unimportant color and snapped to the nearest gray.
+
+Boxes are now drawn at full opacity in one exact color, and the palette is
+built once from all frames together with that green, the banner white and black
+appended explicitly rather than left to survive quantization on merit.
+Dithering is off so flat colors stay flat. Verified: every one of the 14 frames
+contains pixels of the exact box color, where previously some contained none.
+The file also got *smaller*, 3.0 MB to 2.4 MB at the intermediate setting,
+because undithered flat color compresses better.
+
+**Sizing.** The crop, not the upscale, is what makes a surfer bigger on screen:
+GitHub scales the image to its ~880px column either way, so apparent size is
+880 over the kept width. The trade is steep — measured against 2026-09-21's 186
+detections, trimming 20% off each end keeps 83% of them, 25% keeps 73%, and 30%
+keeps only 56%. Settled on **0.25** (1.38x native against the old 1.15x) rather
+than 0.30, which looked better but pushed a quarter of the day's detections off
+the sides. `GIF_UPSCALE` went 2.0 to 3.0, which does not change on-screen size
+but keeps it sharp on high-DPI displays. Final image is 1920x586, 3.1 MB.
+
+**Play callout.** GitHub does not autoplay a README GIF — it shows the first
+frame with a small play button in the top-right corner that readers miss. The
+first frame now carries "Click Play Here -->" in the same green, on a dark
+plate, pointing at where that button appears.
