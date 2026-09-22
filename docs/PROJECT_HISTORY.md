@@ -4183,3 +4183,52 @@ at the 20% level and 56.4% against 51.7% at the 60% level.
 72.7% on one), so this is a sharper model rather than a strictly better one, and
 the 80% band is what the public chart shows. Swapping the model family also means
 re-exporting the public release. That trade is Joel's call, not a metric's.
+
+### 2026-09-22 — Forecast release re-exported; comparison scenes rebuilt; birds confirmed
+
+**Release re-exported** on the corrected data, now that the night-frame review has
+removed 28 unusable frames. The published bundle was fitted before that fix and
+still contained the false zeros. New figures: 1,275 training rows (unpublished),
+**319 held out**, MAE 5.58, RMSE 8.05, bias −1.03, 80% interval coverage 75.2%.
+MAE is nominally worse than the 5.39 it replaces, which is expected — removing
+false empty hours takes away easy rows, so the same model is now being scored on
+a harder and more truthful test set. README and `PROJECT_FILES.md` figures updated
+(the latter was still quoting 292 held-out and 1,165 training rows from an older
+export).
+
+**Clear-day comparison scenes rebuilt.** `data/compare_detector_20260921/clearday_scenes/`
+was produced inline at 08:49, half an hour before nested-box suppression was
+committed, so the new-model panels showed surfers boxed twice. There was no script
+to regenerate them, so `code/compare_detector_scenes.py` now exists and runs *both*
+models through the same current post-processing, isolating the weights. Set 5 went
+from 20/21 boxes to 18/19. The doubling still visible in that scene is side-by-side
+splits of one surfer, which containment suppression cannot catch (B06).
+
+**Birds confirmed on held-out data, and a reflection counted as a surfer.**
+Joel spotted two low-flying birds in the top of `set5_09_26/sec_21.jpg` — a frame
+from the 60-second review set that no model trained on — and noted the tell:
+their reflections are **completely detached**, sitting below them with water
+visible between, because they are flying over the water rather than floating in
+it. Measured:
+
+| model | boxes in the bird region | what they landed on |
+|---|---:|---|
+| old (Oct 2025) | 2 | one per bird, conf 0.223 and 0.313 |
+| new (Sept 2026) | 2 | both on the *first* bird — the bird at conf 0.719 and its reflection below at conf 0.316; the second bird is missed |
+
+This closes the open question under B10, which had been waiting for a bird in a
+frame outside the training set: birds are counted, on unseen data, by both models.
+The reflection detection is new and separate — the bird box (y 69–75) and the
+reflection box (y 77–83) are vertically adjacent rather than nested, so nested-box
+suppression leaves both, since it compares intersection against the smaller box's
+area and these barely touch. Human count for the frame is 16; the new model
+returns 19.
+
+The fix is training data, not a filter, and specifically **not** a box-size filter:
+`crop2026-08-09_08-23-00` holds a foreground-sized bird, so a size rule would miss
+it while deleting genuine distant surfers.
+
+All of this now lives in `docs/non_surfer_objects.md`, a catalog of everything in
+frame that isn't a surfer — birds and reflections, the tree bough and wind sock,
+shore walkers, sun glare — with the visual tells, current handling, and test
+frames for each. Kept private alongside the bug register.

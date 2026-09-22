@@ -16,7 +16,7 @@ Each green box below contains a surfer, according to the object detection model.
 
 #### The Surfer Crowd Forecast for: Wednesday, September 23, 2026
 
-Once enough hours and days were gathered along with weather and surf conditions, a surf count prediction model was built to forecast how many surfers would be present at each hour for the coming day.  This is useful for surfers to plan to avoid busy times or at least know what to expect.  Recently the predictions have been low compared to actual counts, so more images are being collected to improve the object detection model's ability to find surfers in a variety of light and water conditions, like fog or choppy water surfaces.
+Once enough hours and days were gathered along with weather and surf conditions, a surf count prediction model was built to forecast how many surfers would be present at each hour for the coming day.  This is useful for surfers to plan to avoid busy times or at least know what to expect.  The forecast still runs about one surfer low on average, and it misses by about five surfers in a typical hour - crowds depend on plenty of things the weather and surf data never see.  The detector underneath it used to undercount badly in fog and glare, which made the forecast worse; that was fixed in September 2026 by labeling those conditions and retraining, so what remains is the prediction model's own error.
 ![Latest daily prediction chart](data/charts/latest.png)
 
 <!-- DAILY_CHART_END -->
@@ -241,8 +241,12 @@ model trained on. On hazy frames the new model finds **98%** of the real
 surfers, against **59%** for the previous one; across all held-out frames
 the average error per frame fell from 5.16 surfers to 0.94. Against
 independent hand counts, its average error per frame halved (2.61 → 1.28).
-The one regression: on ordinary clear-day frames it now counts slightly
-high, about 3–7%.
+The one regression was on ordinary clear-day frames, where it counted about
+3–7% high. Most of that turned out to be one surfer drawn twice — a small box
+nested inside a larger one, which survives overlap-based de-duplication because
+the two boxes share little area relative to the larger one. Suppressing nested
+boxes brought clear-day counts to **102%** of the human count and cut the
+average error there by 38%, with hand-counted frames landing at exactly 100%.
 
 Note that mAP@0.5:0.95 (38.5%) is much lower than mAP@0.5 (86.8%): it's an
 average over much stricter box-overlap requirements (up to near-perfect box
@@ -440,7 +444,7 @@ optimistic. The demo set is the clean check.
 
 ### Check the forecast model against held-out data
 
-`data/model_release/` holds the fitted forecast model, the **325 rows it was
+`data/model_release/` holds the fitted forecast model, the **319 rows it was
 never trained on**, and the metadata to reproduce the split:
 
 ```bash
@@ -452,7 +456,7 @@ purpose. A predictions-versus-actuals file is self-reported — you can
 recompute the error from it, but not check that the model was not fit on
 those same rows. With the model included you can run it yourself on rows it
 never saw; the script re-predicts from the raw predictor values and verifies
-it reproduces the shipped numbers before reporting anything. The 1,297
+it reproduces the shipped numbers before reporting anything. The 1,275
 training rows stay unpublished.
 
 It reports MAE, RMSE and bias (broken out by how crowded the day actually

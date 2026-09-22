@@ -1,10 +1,10 @@
 {
-  "generated_utc": "2026-09-22T17:12:33Z",
+  "generated_utc": "2026-09-22T20:39:21Z",
   "split": {
     "test_size": 0.2,
     "random_state": 42,
-    "n_train": 1297,
-    "n_test": 325
+    "n_train": 1275,
+    "n_test": 319
   },
   "test_date_range": [
     "2025-10-12",
@@ -13,7 +13,7 @@
   "quantiles": {
     "lower": 0.1,
     "upper": 0.9,
-    "lower_min_samples_leaf": 50,
+    "lower_min_samples_leaf": 200,
     "upper_min_samples_leaf": 20
   },
   "point_model_kwargs": {
@@ -25,10 +25,10 @@
   },
   "n_features": 34,
   "holdout_metrics": {
-    "mae": 5.386828136626169,
-    "rmse": 7.579178948627809,
-    "mean_bias": -0.39947171591030384,
-    "interval_coverage_80pct": 0.8153846153846154
+    "mae": 5.578904530046327,
+    "rmse": 8.049738945751205,
+    "mean_bias": -1.0302385480382135,
+    "interval_coverage_80pct": 0.7523510971786834
   },
   "coverage_note": "Coverage here is computed from the shipped q0.10/q0.90 pair alone. The README's calibration chart fits a 9-level quantile ladder and enforces monotonicity across all levels, so its 80% figure can differ from this one by a row or two.",
   "versions": {

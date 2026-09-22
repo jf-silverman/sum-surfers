@@ -225,3 +225,6 @@ docs/known_bugs.md
 
 # Night-window human review (crops + verdicts) — local only
 data/reviews/night_window_review/
+
+# Non-surfer object catalog — defect-adjacent, kept alongside known_bugs.md
+docs/non_surfer_objects.md
