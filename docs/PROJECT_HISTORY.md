@@ -4094,3 +4094,43 @@ countable frames the rule mis-sorts on the review set (2026-09-07 06:17 and
 2026-09-09 06:17, counted 14 and 10 by hand). Their human counts stay as the
 review recorded them; a human count outranks the heuristic, so no history was
 re-marked. Everything else the rule would catch is already marked unusable.
+
+### 2026-09-22 — Confidence threshold re-swept for the fog model (B05)
+
+`CONF_THRESH = 0.195` was tuned on the October 2025 weights. `code/tune_confidence.py`
+re-measures it on **76 held-out frames (1,419 labeled surfers)** from `splits_v2`,
+with the fog model's 96 training frames excluded. Inference runs once per frame at a
+0.02 floor and each candidate threshold is applied to the cached boxes; that is
+equivalent to re-running detection, because NMS and containment suppression are both
+score-ordered and the zone filter is per-box, so low-scoring boxes can never displace
+high-scoring ones. The script asserts the equivalence against the production path.
+
+**0.195 stands.** Whole-frame count MAE bottoms out at 0.200 (MAE 0.99, bias −0.22),
+which is where production already is, and the F1 surface is nearly flat — 0.848 to
+0.855 across the whole 0.125–0.425 range:
+
+| conf | precision | recall | F1 | count MAE | count bias |
+|---:|---:|---:|---:|---:|---:|
+| 0.100 | 0.839 | 0.860 | 0.849 | 1.17 | +0.49 |
+| 0.150 | 0.850 | 0.851 | 0.851 | 1.08 | +0.03 |
+| **0.195** | **0.859** | **0.850** | **0.854** | **0.99** | **−0.20** |
+| 0.250 | 0.863 | 0.841 | 0.852 | 1.11 | −0.47 |
+| 0.350 | 0.878 | 0.832 | 0.855 | 1.32 | −0.97 |
+| 0.450 | 0.890 | 0.815 | 0.851 | 1.82 | −1.58 |
+
+F1 peaks at 0.350, but only by 0.001 over production while the count bias worsens from
+−0.20 to −0.97. Counting is the product, so the MAE optimum wins.
+
+**The row-gradient idea does not pay.** Recall by row band at production is bottom 78%,
+middle 86%, top 84% — the whitewater band is genuinely weakest (B03). But loosening it
+barely moves: a bottom-band threshold of 0.08 with 0.20 elsewhere gives MAE 0.96 against
+0.99, a difference of **−0.026 with a 95% bootstrap CI of [−0.145, +0.092]**, changing
+any prediction on only 19 of 76 frames. Linear gradients from a stricter top to a looser
+bottom were slightly *worse* (MAE 1.08). B03 needs labeled whitewater examples, not a
+threshold.
+
+**The dawn/dusk threshold idea could not be tested.** The hourly breakdown is too thin:
+25 of the 76 held-out frames are the original 2025 captures whose filenames carry no
+time at all, and the remaining 51 spread across 13 hours, with only 2 frames each at
+06:00 and 19:00. Testing it needs labeled frames sampled deliberately from the ends of
+the day.
