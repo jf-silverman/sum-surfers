@@ -4330,3 +4330,36 @@ while the image is scaled to fit the column, so the same pixel offset buys less
 clearance as the image gets wider, and at full width the arrow was partly covered
 again. `PLAY_BUTTON_CLEARANCE_FRAC` (0.13 of image width) replaces it — about 270
 pixels at 1920 wide, roughly 124 on screen, which holds at any zoom level.
+
+### 2026-09-22 — Evening forecast-vs-actual email
+
+Each evening the pipeline now emails the day's forecast with the day's actual
+hourly counts drawn over it (`code/email_daily_report.py`, step 10). The chart
+shows the forecast median and 80% band with the real counts on top, and the body
+carries an hour-by-hour table plus average miss, bias, and how many hours landed
+inside the band.
+
+**This required recording forecasts, which the project had never done.** A
+forecast existed only as pixels in a PNG, so there was no way to ask afterwards
+what had been predicted. `plot_daily_prediction.py` now writes
+`data/forecasts/forecast_<date>.csv` when it makes a forecast — one row per hour
+with the point estimate, both band edges, weather and tide. It never overwrites
+an existing file, because the value of the record is that it was written *before*
+the day happened; a later run on the same date would have more data and would
+quietly flatter history.
+
+Step 10 runs after step 9 for that reason: step 9 records tomorrow's forecast,
+and tomorrow's email scores it.
+
+For days predating the record, `--allow-reconstruct` refits on rows strictly
+before the target date and predicts it. The chart footer and the email body both
+state plainly when a forecast was reconstructed rather than recorded — it is a
+re-enactment, and a model fit today has seen months the original had not.
+
+The trial run (2026-09-21, reconstructed) reported an average miss of 3.8
+surfers, bias −1.9, and 14 of 14 hours inside the 80% range. The band being that
+reliable is partly its width: the afternoon range ran 7-35 surfers.
+
+`send_email.py` gained optional attachments. A missing attachment raises rather
+than sending the report without it, since a daily email whose chart silently
+failed to attach looks the same as one with nothing to say.

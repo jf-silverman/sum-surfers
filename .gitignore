@@ -226,3 +226,8 @@ docs/known_bugs.md
 # Night-window human review (crops + verdicts) — local only
 data/reviews/night_window_review/
 
+
+# Hero-image candidates (working set; the chosen one gets committed on its own)
+data/hero_candidates/
+# Per-day forecast-vs-actual report charts (emailed, not published)
+data/charts/forecast_vs_actual_*.png

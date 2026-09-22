@@ -216,6 +216,7 @@ def main():
 
     records = [r for r in (predict_for_hour(hk) for hk in day_hours) if r is not None]
     d = pd.DataFrame(records)
+    save_forecast_record(target_date, records)
 
     fig = plt.figure(figsize=(14, 6.5), facecolor=BG_COLOR)
     gs = fig.add_gridspec(1, 2, width_ratios=[3.2, 1], wspace=0.05)
@@ -532,6 +533,45 @@ def render_detection_frame(img_path, model):
         cv2.putText(out, f"{conf:.2f}", (p1[0], max(p1[1] - 6, 14)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, BOX_COLOR_BGR, 2, cv2.LINE_AA)
     return out, visible
+
+
+FORECASTS_DIR = _PROJECT_ROOT / "data" / "forecasts"
+
+
+def save_forecast_record(target_date, records):
+    """Writes the day's forecast to `data/forecasts/forecast_<date>.csv`.
+
+    Until 2026-09-22 a forecast existed only as pixels in a PNG, so there was no
+    way to ask later how well it did — the evening report would have had to refit
+    a model and call the result "what we predicted", which it would not be. One
+    row per hour, written when the forecast is made.
+
+    Never overwrites an existing file: the point of the record is what was
+    predicted *before* the day happened, and a later run on the same date would
+    have more data and quietly improve history.
+    """
+    FORECASTS_DIR.mkdir(parents=True, exist_ok=True)
+    out = FORECASTS_DIR / f"forecast_{target_date.isoformat()}.csv"
+    if out.exists():
+        return out
+
+    rows = []
+    for r in records:
+        q = r["quantiles"]
+        rows.append({
+            "date": target_date.isoformat(),
+            "hour_local": r["hour"].strftime("%H:%M"),
+            "predicted": round(r["point"], 2),
+            "lower_q10": round(q[FAN_LEVELS[0]], 2),
+            "upper_q90": round(q[FAN_LEVELS[-1]], 2),
+            "weather_simple": r["weather_simple"],
+            "tide_ft": round(r["tide_ft"], 2),
+            "in_training_range": r["in_training_range"],
+            "forecast_made_at": datetime.now().isoformat(timespec="seconds"),
+        })
+    pd.DataFrame(rows).to_csv(out, index=False)
+    print(f"Saved forecast record ({len(rows)} hours) to {out}")
+    return out
 
 
 def quantize_to_shared_palette(frames):

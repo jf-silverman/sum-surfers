@@ -87,28 +87,28 @@ log "=== Local pipeline starting ==="
 cd "$PROJECT_ROOT"
 
 # ── Step 1: Download clips ────────────────────────────────────────────────────
-log "Step 1/9 — Downloading Surfline clips..."
+log "Step 1/10 — Downloading Surfline clips..."
 run_step "Step 1 (download clips)" "$PYTHON" code/get_clips.py
 log "Step 1 done."
 
 # ── Step 2: Extract crop frames ───────────────────────────────────────────────
-log "Step 2/9 — Extracting crop frames..."
+log "Step 2/10 — Extracting crop frames..."
 run_step "Step 2 (extract crops)" "$PYTHON" code/get_cropped_frame.py
 log "Step 2 done."
 
 # ── Step 3: Check local clips storage ────────────────────────────────────────
 # Emails a warning if clips folder exceeds CLIPS_DIR_LIMIT_GB; never fails the pipeline.
-log "Step 3/9 — Checking clips storage..."
+log "Step 3/10 — Checking clips storage..."
 "$PYTHON" code/manage_clips.py --check || true
 log "Step 3 done."
 
 # ── Step 4: Run detection locally ────────────────────────────────────────────
-log "Step 4/9 — Running YOLOv8 detection locally..."
+log "Step 4/10 — Running YOLOv8 detection locally..."
 run_step "Step 4 (detection)" "$PYTHON" code/detect_surfers.py
 log "Step 4 done."
 
 # ── Step 5: Pull Surfline predictors (weather/rating/tide/swell) for Jack's ──
-log "Step 5/9 — Pulling Surfline predictors for Jack's..."
+log "Step 5/10 — Pulling Surfline predictors for Jack's..."
 run_step "Step 5 (surf predictors)" "$PYTHON" code/get_surf_predictors.py
 log "Step 5 done."
 
@@ -119,21 +119,21 @@ log "Step 5 done."
 # training_features.csv below, and so the daily chart's model) freeze at
 # 2026-08-28 while 161 new quality_ok rows piled up unused. Never fail the
 # pipeline over it — the detection data above is the irreplaceable part.
-log "Step 6/9 — Backfilling real observed weather (Open-Meteo)..."
+log "Step 6/10 — Backfilling real observed weather (Open-Meteo)..."
 run_step "Step 6 (Open-Meteo backfill)" "$PYTHON" code/backfill_openmeteo_weather.py
 log "Step 6 done."
 
 # ── Step 7: Rebuild the model's training table ───────────────────────────────
 # Joins predictions (target) with all predictor sources (features). Also
 # manual-only until 2026-09-09 — see Step 6. Rebuilt from scratch each run.
-log "Step 7/9 — Rebuilding training features table..."
+log "Step 7/10 — Rebuilding training features table..."
 run_step "Step 7 (training features)" "$PYTHON" code/build_training_features.py
 log "Step 7 done."
 
 # ── Step 8: Record success timestamp locally ─────────────────────────────────
 LAST_SUCCESS_FILE="$PROJECT_ROOT/data/.last_local_success"
 date -u +"%Y-%m-%dT%H:%M:%SZ" > "$LAST_SUCCESS_FILE"
-log "Step 8/9 — Local success timestamp recorded: $(cat "$LAST_SUCCESS_FILE")"
+log "Step 8/10 — Local success timestamp recorded: $(cat "$LAST_SUCCESS_FILE")"
 
 # ── Step 9: Build the daily prediction chart ─────────────────────────────────
 # Chained here rather than run from its own cron entry (moved 2026-09-15). As a
@@ -145,10 +145,19 @@ log "Step 8/9 — Local success timestamp recorded: $(cat "$LAST_SUCCESS_FILE")"
 # holding the machine awake for this job, and means the chart always trains on
 # detections that were written minutes earlier rather than last night's.
 # Non-fatal: the chart is regenerable, the clip/detection data above is not.
-log "Step 9/9 — Building daily prediction chart..."
+log "Step 9/10 — Building daily prediction chart..."
 run_step "Step 9 (daily chart)" bash "$PROJECT_ROOT/code/daily_chart.sh" \
     >> "$PROJECT_ROOT/data/daily_chart.log" 2>&1
 log "Step 9 done."
+
+# ── Step 10: Evening forecast-vs-actual email ────────────────────────────────
+# Runs last, and deliberately AFTER step 9: step 9 records tomorrow's forecast
+# to data/forecasts/, which is what tomorrow evening's email will score. Today's
+# email reads the record written on a previous run, so the report always
+# compares the day against what was predicted before it happened.
+log "Step 10/10 — Emailing the forecast-vs-actual report..."
+run_step "Step 10 (evening report)" "$PYTHON" code/email_daily_report.py
+log "Step 10 done."
 
 # ── Notify only on failure ───────────────────────────────────────────────────
 # The only two things worth an email are a failed pipeline and storage over the
