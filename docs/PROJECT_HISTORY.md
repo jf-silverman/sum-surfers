@@ -4134,3 +4134,52 @@ threshold.
 time at all, and the remaining 51 spread across 13 hours, with only 2 frames each at
 06:00 and 19:00. Testing it needs labeled frames sampled deliberately from the ends of
 the day.
+
+### 2026-09-22 — B19: the pinned lower bound un-pinned itself, and a hurdle model tested
+
+B19 recorded that the forecast's 10th-percentile model predicted under one
+surfer for 72% of hours, so the 80% band's apparent 82% coverage came partly
+from a floor at zero rather than from knowledge. Re-measuring after the
+night-frame review (B02) shows **the premise no longer holds**:
+
+| | before the night fix | after |
+|---|---:|---:|
+| lower bound under 1 surfer | 72% of hours | **22%** |
+| 80% band misses low (target 10%) | 4.6% | **11.9%** |
+| 80% band misses high (target 10%) | 13.5% | **12.5%** |
+| 80% band coverage (target 80%) | 82% | **75.5%** |
+
+The 28 unusable frames removed by the review had been entering the record as
+empty hours and phantom counts. Taking them out cut the excess zero-inflation
+that was holding the lower quantile on the floor. Coverage *fell* because the
+interval became informative — both edges can now actually be missed, and the
+band is honestly overconfident rather than flatteringly wide. This is the second
+time this number has moved for exactly this reason (the first was the 2026-09-08
+swell-data correction), so the README now states the rule outright: a coverage
+number near target is only good news once both edges can be missed.
+
+**The hurdle model was tested anyway**, since zero-inflation is real at 15% empty
+hours. `code/eval_hurdle_model.py` fits P(anyone out) as a classifier and the
+count quantiles on the positive rows only, then composes them back: for a target
+quantile q, predict 0 when P(empty) exceeds q, else the conditional quantile at
+(q − p_zero) / (1 − p_zero).
+
+It is consistently better on the proper scoring rule and consistently sharper:
+
+| seed | baseline pinball | hurdle | delta | baseline MAE | hurdle MAE |
+|---:|---:|---:|---:|---:|---:|
+| 42 | 2.4197 | 2.3481 | −0.0716 | 6.11 | 6.03 |
+| 7 | 2.4947 | 2.4238 | −0.0709 | 6.21 | 6.10 |
+| 13 | 2.4270 | 2.2901 | −0.1369 | 5.97 | 5.80 |
+| 2026 | 2.1657 | 2.1178 | −0.0479 | 5.50 | 5.34 |
+| 99 | 2.3834 | 2.3255 | −0.0579 | 6.05 | 5.96 |
+
+Better pinball on 5 of 5 seeds (mean −0.077, about 3%; on seed 42 the bootstrap
+CI is [−0.112, −0.032], excluding zero) and better median MAE on 5 of 5. The
+middle intervals also land closer to target — on seed 42, 23.2% against 17.9%
+at the 20% level and 56.4% against 51.7% at the 60% level.
+
+**Not adopted.** The 80% coverage moves the wrong way on 3 of 5 seeds (79.6% →
+72.7% on one), so this is a sharper model rather than a strictly better one, and
+the 80% band is what the public chart shows. Swapping the model family also means
+re-exporting the public release. That trade is Joel's call, not a metric's.

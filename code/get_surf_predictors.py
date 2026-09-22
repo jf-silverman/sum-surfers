@@ -84,7 +84,7 @@ DAYS = 2  # today + 1, covers utcOffset edge cases around midnight
 # two different things, so it takes two endpoints to replace it:
 #   - `surf`   -> surf_min_ft / surf_max_ft (row["surf"]["min"/"max"])
 #   - `swells` -> primary_swell_* (row["swells"], see merge_into_by_hour)
-# Both are hourly, same as the old `wave`. See docs/bugs.md.
+# Both are hourly, same as the old `wave`. See docs/known_bugs.md.
 ENDPOINT_PATHS = ["weather", "rating", "tides", "surf", "swells", "wind", "energy", "consistency"]
 
 # Same "recent" scope logic as detect_surfers.py, so a fresh machine doesn't
@@ -150,7 +150,7 @@ def primary_swell(swells):
     The `swells` endpoint returns 6 slots per hour, each a distinct swell
     *train* with its own height/period/direction plus `impact`, `power` and
     `spectralPower`. Unused slots are all-zero. Two traps, both measured
-    rather than assumed (2026-09-09, see docs/bugs.md):
+    rather than assumed (2026-09-09, see docs/known_bugs.md):
 
     1. NOT slot 0. The slots are not size- or importance-ordered. On the
        live endpoint slot 0 is frequently an empty all-zero partition

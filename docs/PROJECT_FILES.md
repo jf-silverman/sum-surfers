@@ -23,8 +23,8 @@ stays at root so GitHub still renders it on the repo homepage).
 |---|---|
 | `docs/HOW_IT_WORKS.md` | Plain-language walkthrough of the detection pipeline (capture → crop → quality gate → tile → detect → filter → count), plus a glossary of CV/ML terms used across this repo. |
 | `docs/PROJECT_HISTORY.md` | Chronological record of how the project was built and tuned. |
-| `docs/bugs.md` | Known defects/false-positive-prone behaviors and their open/resolved status (gitignored — split out of `PROJECT_HISTORY.md`'s old "Open engineering leads" section 2026-08-28; still recoverable from repo history). |
-| `docs/model_and_feature_ideas.md` | Enhancements/possible future work that aren't bugs, split into "Model Ideas" (prediction model/predictors) and "Feature Ideas" (detection pipeline) subsections (gitignored — same split as `bugs.md`; renamed from `feature_ideas.md` 2026-08-28). |
+| `docs/known_bugs.md` | The prioritized bug register: open defects ranked P1-P4, known limitations, and everything fixed to date (gitignored). Replaced `docs/bugs.md` on 2026-09-22 — that file was never committed, so its contents live on only here. |
+| `docs/model_and_feature_ideas.md` | Enhancements/possible future work that aren't bugs, split into "Model Ideas" (prediction model/predictors) and "Feature Ideas" (detection pipeline) subsections (gitignored — same 2026-08-28 split that produced the old `bugs.md`; renamed from `feature_ideas.md`). |
 | `docs/misc_notes.md` | Small operational notes (env/cron/GCP-history caveats), split out of `README.md`'s old "Notes" section (gitignored, 2026-08-28). |
 | `docs/PROJECT_FILES.md` | This file. |
 | `docs/requirements.txt` | Pinned Python dependencies (added 2026-08-28 after a security review flagged there was previously no way to reproduce/audit the environment). Install with `pip install -r docs/requirements.txt`. |

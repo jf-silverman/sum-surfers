@@ -304,27 +304,33 @@ rather than trusted from the nominal target:
 ![Prediction-interval calibration for the surf-count model](analysis/surf_count_model_calibration/calibration_plot.png)
 
 Measured 2026-09-22, after the whole history was recounted with the
-September 2026 detector: 17% vs 20%, 37% vs 40%, 52% vs 60%, and **82% vs
-80%**. The narrower bands are a little overconfident, which is the ordinary
-direction for this kind of model.
+September 2026 detector and the night frames were resolved by hand:
+18% vs 20%, 36% vs 40%, 52% vs 60%, and **75.5% vs 80%**. Every band is
+somewhat overconfident — real counts fall outside them more often than the
+nominal level says — which is the ordinary direction for this kind of model
+and the direction worth stating plainly.
 
-**The 80% band looks well calibrated, but read that with care.** The
-real count falls below it only 4.6% of the time (target 10%) and above it
-13.5% (target 10%) — two errors that happen to offset. The low side is low
-because the band's bottom edge sits under 1 surfer for 72% of hours, so
-there is almost nothing left to undershoot. That isn't a model failure:
-removing the old detector's glare phantoms raised the share of genuinely
-empty hours from 11% to 15%, and a 10th percentile near zero is the honest
-answer for a spot that is often empty. But it means the band's **upper
-edge is the informative one**, and it runs about 3.5 points short.
+The 80% band now misses **11.9% low and 12.5% high** against a 10% target on
+each side: roughly symmetric, so both edges carry information. That is a
+change from how this number read earlier the same day, and the reason is
+worth spelling out, because the earlier reading was flattering for the wrong
+cause.
 
-This number has moved before for the same reason, which is why it's worth
-spelling out. On 2026-09-08 the check read 82.8%, when the lower bound had
-fully collapsed to zero (92% of its predictions under 1 surfer). Corrected
-swell data then made it a real estimate — median 5.5 surfers, 20% under 1 —
-and coverage fell to 72%, precisely *because* the interval had become more
-informative. The recount pushed the lower bound most of the way back toward
-zero, this time because the data really is emptier. See
+Before the night-frame review, the check read 82% coverage, but it missed low
+only 4.6% of the time — the band's bottom edge sat under 1 surfer for 72% of
+hours, so there was almost nothing left to undershoot, and the apparent
+calibration came from a floor rather than from the model. The review resolved
+46 frames recorded outside the light window: 28 were genuinely unusable and
+had been entering the record as empty hours or phantom counts. Removing them
+cut the share of empty hours enough to un-pin the lower bound, which now sits
+under 1 surfer for 22% of hours instead of 72%. Coverage fell from 82% to
+75.5% *because* the interval became informative — the same thing that happened
+on 2026-09-08, when correcting the swell data moved the lower bound off zero
+and dropped coverage from 82.8% to 72%.
+
+The pattern is consistent enough to state as a rule for reading this chart: a
+coverage number near its target is only good news once you have checked that
+both edges can actually be missed. See
 [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md) for the full investigation.
 
 ### Exploratory Findings
