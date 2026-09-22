@@ -4308,13 +4308,23 @@ because undithered flat color compresses better.
 **Sizing.** The crop, not the upscale, is what makes a surfer bigger on screen:
 GitHub scales the image to its ~880px column either way, so apparent size is
 880 over the kept width. The trade is steep — measured against 2026-09-21's 186
-detections, trimming 20% off each end keeps 83% of them, 25% keeps 73%, and 30%
-keeps only 56%. Settled on **0.25** (1.38x native against the old 1.15x) rather
-than 0.30, which looked better but pushed a quarter of the day's detections off
-the sides. `GIF_UPSCALE` went 2.0 to 3.0, which does not change on-screen size
-but keeps it sharp on high-DPI displays. Final image is 1920x586, 3.1 MB.
+detections, trimming 20% off each end keeps 83% of them in view, 25% keeps 73%,
+and 30% keeps only 56%.
+
+Joel's call: **keep the middle 40%** (0.30 each side, 1.72x native against the
+old 1.15x) and say so in the caption. The animation is a demonstration of what
+detection looks like, not a record of the day's count — that lives in
+`predictions.csv` and the forecast chart, both computed on the full frame width.
+The banner on each frame already counts only the boxes visible in it, so the
+image never claims more than it shows, and the caption now states the crop
+outright. `GIF_UPSCALE` went 2.0 to 3.0, which does not change on-screen size
+but keeps it sharp on high-DPI displays. Final image is 1536x586, 2.4 MB.
 
 **Play callout.** GitHub does not autoplay a README GIF — it shows the first
 frame with a small play button in the top-right corner that readers miss. The
 first frame now carries "Click Play Here -->" in the same green, on a dark
-plate, pointing at where that button appears.
+plate, pointing at where that button appears. The first placement put the arrow
+directly under the button, which covered it; `PLAY_BUTTON_CLEARANCE_PX` now
+pulls the callout 90 image pixels left. That constant is in final-image pixels
+and GitHub scales the image by about 0.57, so it buys roughly the 50 on-screen
+pixels of clearance the arrow needed.
