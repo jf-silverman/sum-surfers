@@ -12,7 +12,9 @@ Tiling mirrors the training setup:
 
 import os
 import csv
+import sys
 import torch
+import pytz
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -88,6 +90,27 @@ QUALITY_LAPVAR_THRESH = 12.7       # Laplacian variance (blur/detail); below -> 
 # The real fix is training data, not a filter: 21 labeled empty glare frames now
 # exist, so a retrain can learn that sparkle is not a surfer. Until then the
 # column makes contaminated rows findable after the fact.
+# Out-of-window sensor noise (B02, added 2026-09-22). Frames recorded before
+# first light or after last light can pass the two thresholds above and still be
+# uncountable: the camera pushes gain in the dark, and the resulting chroma noise
+# reads as BOTH bright enough and sharp enough. Counter-intuitively the tell is
+# HIGH Laplacian variance — amplified noise is higher-frequency than real water.
+#
+# Fit on 46 out-of-window frames that Joel counted by hand (28 unusable, 18
+# countable — data/reviews/night_window_review/): lap_var > 180 sorts 38 of the
+# 46 correctly, catching 22 of the 28 unusable at the cost of 2 of the 18
+# countable. Those 28 frames had been contributing 18 false zeros and 10 phantom
+# counts (17 surfers) to the training table.
+#
+# SCOPE MATTERS: this rule is only valid outside the light window, which is why
+# outside_light_window() gates it. Corpus-wide it is useless — `brightness < 90
+# and lap_var > 180` rejects 29% of all quality-passed frames, mostly bright
+# afternoon ones, including 272 frames counting 5+ surfers. Overcast daylight is
+# dim and real water texture is sharp, so both conditions fire constantly on good
+# frames. A clock-only rule is no substitute either: one reviewed frame 14 minutes
+# BEFORE first light is countable while frames 0-4 minutes out are not.
+NIGHT_WINDOW_LAPVAR_THRESH = 180.0
+
 QUALITY_GLARE_LEVEL = 240          # pixel value counted as specular glare
 # No threshold constant on purpose — nothing acts on this value yet.
 # ----------------------------
@@ -335,11 +358,49 @@ def run_inference_multi(model, primary_img_path):
     }
 
 
+_light_window_cache = {}
+
+
+def light_window_for(date):
+    """(first_light, last_light) for a local date, computed offline via astral.
+
+    Deliberately astral and not get_clips.get_light_window(): that one prefers a
+    live Surfline fetch, which only covers today and would put a network call in
+    the middle of a detection run that may be backfilling months of crops. Astral
+    matches Surfline's own first/last light within 1-2 minutes at these
+    coordinates (verified 2026-08-28), which is far finer than this gate needs.
+    """
+    if date not in _light_window_cache:
+        from astral import LocationInfo  # noqa: PLC0415
+        from astral.sun import sun  # noqa: PLC0415
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import get_clips  # noqa: PLC0415  (imported for LOCATION only)
+
+        tz = pytz.timezone(get_clips.LOCATION["timezone"])
+        result = sun(LocationInfo(**get_clips.LOCATION).observer, date=date, tzinfo=tz)
+        # The API's `dawn`/`dusk` fields ARE first light and last light.
+        _light_window_cache[date] = (result["dawn"], result["dusk"])
+    return _light_window_cache[date]
+
+
+def outside_light_window(img_path):
+    """True if this crop was taken before first light or after last light."""
+    dt = parse_crop_datetime(img_path)
+    if dt is None:
+        return False
+    first_light, last_light = light_window_for(dt.date())
+    local = first_light.tzinfo.localize(dt) if hasattr(first_light.tzinfo, "localize") \
+        else dt.replace(tzinfo=first_light.tzinfo)
+    return local < first_light or local > last_light
+
+
 def compute_image_quality(img_path):
     """
     Returns (quality_ok, reason, brightness, lap_var). Cheap (no model
     load), so it's meant to run before detection and skip inference on
-    frames that fail — see QUALITY_BRIGHTNESS_THRESH / QUALITY_LAPVAR_THRESH.
+    frames that fail — see QUALITY_BRIGHTNESS_THRESH / QUALITY_LAPVAR_THRESH
+    and NIGHT_WINDOW_LAPVAR_THRESH.
     """
     import cv2
 
@@ -353,6 +414,8 @@ def compute_image_quality(img_path):
         return False, "dark_or_night", brightness, lap_var
     if lap_var < QUALITY_LAPVAR_THRESH:
         return False, "foggy_or_blurred", brightness, lap_var
+    if lap_var > NIGHT_WINDOW_LAPVAR_THRESH and outside_light_window(img_path):
+        return False, "night_sensor_noise", brightness, lap_var
     return True, "ok", brightness, lap_var
 
 

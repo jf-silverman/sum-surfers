@@ -4082,3 +4082,15 @@ brightness only trades coverage for the same error: `< 85` still rejects 15.7%,
 The separation is real but conditional on the population it was measured in.
 Any future rule has to be scoped to frames outside the first-light/last-light
 window, and that is the open part of B02.
+
+**Gate shipped, scoped (same day).** `detect_surfers.py` now applies the rule
+where it was measured and nowhere else: a frame recorded before first light or
+after last light and carrying `lap_var > 180` is rejected as
+`night_sensor_noise`. The light window is computed offline with astral rather
+than the live Surfline fetch, so a backfill run makes no network call per frame.
+
+Measured cost on the existing corpus: **2 frames** of 1,595 — the same two
+countable frames the rule mis-sorts on the review set (2026-09-07 06:17 and
+2026-09-09 06:17, counted 14 and 10 by hand). Their human counts stay as the
+review recorded them; a human count outranks the heuristic, so no history was
+re-marked. Everything else the rule would catch is already marked unusable.
