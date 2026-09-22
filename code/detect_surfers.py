@@ -25,8 +25,10 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MODEL_PATH = Path(
     os.environ.get(
         "MODEL_PATH",
-        str(_PROJECT_ROOT / "data" / "model_out" / "20251013" / "train"
-            / "runs" / "detect" / "train13" / "weights" / "best.pt"),
+        # 2026-09-21 fog retrain, adopted into production that day (the October
+        # 2025 model it replaced is data/model_out/20251013/.../train13/weights/best.pt).
+        str(_PROJECT_ROOT / "data" / "model_out" / "20260921_fog" / "train"
+            / "weights" / "best.pt"),
     )
 )
 

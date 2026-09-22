@@ -376,7 +376,7 @@ While it is running, it records a few seconds off the camera's public live
 stream once every few minutes during daylight, cuts three frames from that
 clip the same way the scheduled pipeline does, crops each to the region the
 detector was trained on, counts surfers with the [trained model weights
-committed to this repo](data/model_out/20251013/train/runs/detect/train13/weights),
+committed to this repo](data/model_out/20260921_fog/train/weights),
 and appends the averaged count to its own file — `data/live_watch/live_predictions.csv`,
 with the same columns as the main predictions file, kept separate so a demo
 run can never mix into the real dataset.
@@ -399,42 +399,34 @@ running. It cannot fill in the past. Outside the daylight window it waits
 rather than collecting frames the [image quality gate](docs/HOW_IT_WORKS.md#term-image-quality-gate)
 would reject anyway.
 
-### Check the detector against labeled images
+### Try the detector on a demo set
 
-The labeled test split is in this repo — **10 whole frames carrying 148
-hand-drawn boxes**, plus the 40 tiles cut from them — and so are the trained
-weights. Nothing about the detector's reported accuracy has to be taken on
-faith:
+`data/demo/` holds **20 labeled frames chosen to cover the conditions that
+matter here**: fog, sun glare with and without surfers in it, winter,
+empty water, crowds from 0 to 56 surfers, and light from early morning to
+evening, across May to December. None of them was used to train the
+detector, so this is a fair test rather than a replay of its training data.
 
 ```bash
-python code/eval_detector.py                 # held-out test split
-python code/eval_detector.py --split val     # reproduces the numbers quoted above
+python code/eval_detector.py --coco-dir data/demo --split test --skip-tile-metrics
 ```
 
-It reports two different things. First, per-box precision, recall and
-[mAP](docs/HOW_IT_WORKS.md#term-map) on the tiles — the same measurement the
-training log made, which is why `--split val` reconciles against the
-previous model's published 85.6%/82.0% — the weights committed to this repo
-are still the October 2025 model; the retrained production weights have not
-been published yet. Second, and more to the point, **count accuracy on
-whole frames**: it runs the real production inference path (tiling,
-cross-tile [NMS](docs/HOW_IT_WORKS.md#term-nms), false-positive filtering) on
-each test image and compares the surfer count to the number of labeled boxes.
-That second number is the one the forecast actually consumes, and a detector
-can look fine per-box while undercounting crowded frames.
+It runs the real production inference path — tiling, cross-tile
+[NMS](docs/HOW_IT_WORKS.md#term-nms), false-positive filtering — on each
+frame and compares the surfer count with the number of hand-drawn boxes,
+frame by frame and broken out by crowd size. On the demo set it finds
+**499 surfers against 498 labeled**, an average error of 0.75 surfers per
+frame. That count is the number the forecast actually uses; a detector can
+look fine box-by-box while still undercounting crowded frames.
 
-On the 10 held-out frames it comes to **MAE 1.30 surfers, mean bias −0.90**
-(139 predicted against 148 labeled, −6.1%) — a consistent, mild undercount.
-
-Read that with its limit in mind, which the script now prints: **those 10
-frames span 7 to 24 surfers**, so they say nothing about crowded scenes.
-That matters, because crowded frames fail differently. On real frames with
-human counts, the detector is accurate up to 29 surfers (bias −0.6) and
-stays accurate on most crowded frames too — but on 2 of 9 frames above 30 it
-missed almost everything (30 counted as 3; 46 counted as 19). The other
-seven average +0.7. The failure there is rare and total rather than a
-gradual drift, which is exactly the kind a 10-frame test split capped at 24
-surfers cannot see.
+The weights in this repo are the production detector, retrained in September
+2026 on labeled fog, glare and pose data. The evaluator will also run on the
+older labeled splits in `data/cvat_out_coco/splits/`, but those predate the
+retrain and the new model trained on some of their frames, so it skips those
+frames automatically (they are listed in
+`data/model_out/20260921_fog/train_filenames.txt`). Per-box precision and
+recall from Ultralytics' own validator can't skip them, so treat those as
+optimistic. The demo set is the clean check.
 
 ### Check the forecast model against held-out data
 
@@ -506,8 +498,9 @@ Optional:
   for Jack's, plus observed Open-Meteo weather): `data/predictor_vars/`
 - Human-review datasets (image batches + a `review_counts.csv` to fill
   in), one subfolder per dataset: `data/reviews/`
-- Model weights default:
-  `data/model_out/20251013/train/runs/detect/train13/weights/best.pt`
+- Model weights default (the September 2026 retrain):
+  `data/model_out/20260921_fog/train/weights/best.pt`. The October 2025
+  model it replaced is at `data/model_out/20251013/train/runs/detect/train13/weights/best.pt`.
 
 ## Analysis
 

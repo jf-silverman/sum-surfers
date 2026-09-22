@@ -216,3 +216,6 @@ data/cvat_out_coco/winter_7/
 data/cvat_out_coco/glare_12/
 data/cvat_out_coco/glare_more_5/
 data/cvat_out_coco/fog_19/
+
+# Ablation split: original 57 boxes + new images (local only)
+data/cvat_out_coco/splits_ablation/

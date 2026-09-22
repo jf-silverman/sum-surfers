@@ -112,11 +112,34 @@ def ground_truth_counts(split):
     return {img["file_name"]: per_image[img["id"]] for img in coco["images"]}
 
 
+def training_filenames():
+    """Frames the model under evaluation was trained on, if its run published a list.
+
+    Looked for next to the weights' run folder (`train_filenames.txt`). The
+    public `splits/` predate the September 2026 retrain, which reshuffled them:
+    that model trained on 9 of the 15 public val images and 4 of the 10 public
+    test images. Without this exclusion it would be scored partly on its own
+    training data, which inflates every number below.
+    """
+    for parent in ds.MODEL_PATH.parents:
+        f = parent / "train_filenames.txt"
+        if f.exists():
+            return {ln.strip() for ln in f.read_text().splitlines()
+                    if ln.strip() and not ln.startswith("#")}
+    return set()
+
+
 def count_level_metrics(model, split):
     """Production inference path vs. ground-truth box counts, per whole frame."""
     truth = ground_truth_counts(split)
+    seen_in_training = training_filenames() & set(truth)
+    if seen_in_training:
+        print(f"  Excluding {len(seen_in_training)} of {len(truth)} frames this model "
+              f"was trained on (listed in train_filenames.txt).")
     rows = []
     for file_name, actual in sorted(truth.items()):
+        if file_name in seen_in_training:
+            continue
         img_path = COCO_SPLITS_DIR / split / file_name
         if not img_path.exists():
             print(f"  WARNING: {img_path} missing, skipping")
@@ -229,8 +252,12 @@ def main():
             print(f"  recall      : {m['recall']:.5f}")
             print(f"  mAP@0.5     : {m['map50']:.5f}")
             print(f"  mAP@0.5:0.95: {m['map50_95']:.5f}")
+            if training_filenames():
+                print("  NOTE: tile metrics come from Ultralytics' validator and cannot skip\n"
+                      "  training frames — treat them as optimistic. The whole-frame counts\n"
+                      "  below do exclude them.")
             if split == "val":
-                print(f"\n  Published in README/plot_daily_prediction.py: "
+                print(f"\n  October 2025 model's published numbers (comparable only for that model): "
                       f"precision {PUBLISHED_VAL_PRECISION:.5f}, recall {PUBLISHED_VAL_RECALL:.5f}")
                 print(f"  Difference: precision {m['precision'] - PUBLISHED_VAL_PRECISION:+.5f}, "
                       f"recall {m['recall'] - PUBLISHED_VAL_RECALL:+.5f}")

@@ -3869,3 +3869,32 @@ first light.
 local: `posture_57`, `batch01_73`, `winter_7`, `glare_12`, `glare_more_5` and
 `fog_19` are gitignored with local copies intact. They remain in history from
 their 2026-09-14 to 09-21 commits.
+
+### Demo set and retrained weights published (2026-09-22)
+
+Joel approved publishing a demo set and the retrained detector.
+
+**`data/demo/`: 20 labeled frames, 498 boxes**, chosen from every labeled set to
+cover the conditions that matter — 4 fog frames, 3 glare (1 with surfers, 2
+empty), 5 from December, 3 of empty water, crowds of 0 to 56, light from 06:00
+to 19:00, May to December. All 20 are frames the new detector never trained on
+(11 from its test split, 9 from validation, which was used to pick the
+checkpoint and so is slightly optimistic). Boxes are Joel's tightened
+annotations, with poses. On the demo, the published detector finds **499
+against 498 labeled**, average error 0.75 per frame. Runs with
+`eval_detector.py --coco-dir data/demo --split test --skip-tile-metrics`.
+
+**Retrained weights published** at
+`data/model_out/20260921_fog/train/weights/best.pt`, with its `results.csv`,
+and made the code default in `detect_surfers.py`. The October 2025 model stays
+in the repo for comparison.
+
+**A trap avoided while doing it:** the public `data/cvat_out_coco/splits/`
+predate the retrain, and the new model trained on **9 of the 15 public val
+images and 4 of the 10 public test images** (the re-split reshuffled the
+original 57). Switching the default model without handling that would have let
+anyone score it partly on its own training data. The run's training filenames
+(names only) are now published as `train_filenames.txt`, and `eval_detector.py`
+skips those frames in whole-frame counts and says so; it warns that
+Ultralytics' per-box metrics cannot skip them. Verified on the public test
+split: 4 of 10 frames excluded, 6 scored.
