@@ -4012,3 +4012,36 @@ predictions to 5e-05. The export script had hardcoded a README coverage figure
 (71.6%) into the release's `coverage_note`; it went stale the moment the counts
 changed, so the note now explains the ladder-versus-pair difference without
 quoting a number.
+
+### Three-way comparison: how much of the gain came from the new images (2026-09-22)
+
+Joel asked whether the detector's improvement can be attributed to the added
+labels. Trained a third model to find out: **original 57 boxes in their
+original split, plus the new images in their production split positions**
+(`splits_ablation`, local only). It differs from production in two ways — the
+57's looser boxes, and the stratified re-split — and from the October model in
+one: the new images.
+
+Scored on the **63 frames none of the three models trained on** (1,028 labeled
+surfers), same post-processing for all three:
+
+| condition | n | real | old (Oct 2025) | + new images | + new images & tighter boxes |
+|---|---:|---:|---|---|---|
+| hazy (lap_var<50) | 10 | 260 | 152 (58%), MAE 10.80 | 248 (95%), MAE 1.80 | 251 (97%), MAE 1.70 |
+| glare | 10 | 45 | 149 (331%), MAE 10.80 | 30 (67%), MAE 1.70 | 37 (82%), MAE 0.80 |
+| everything else | 43 | 723 | 647 (89%), MAE 2.47 | 731 (101%), MAE 1.16 | 721 (100%), MAE 0.88 |
+| **all** | 63 | 1,028 | 948 (92%), **MAE 5.11** | 1,009 (98%), **MAE 1.35** | 1,009 (98%), **MAE 1.00** |
+
+**The new images carry about 91% of the improvement** (MAE 5.11 → 1.35 of the
+5.11 → 1.00 total); the tighter boxes plus the re-split carry the remaining 9%
+(1.35 → 1.00). Fog and glare are fixed almost entirely by the added frames.
+
+The box corrections earn their place on glare specifically: the middle model
+**over-corrects**, finding only 67% of real surfers on glare frames against
+production's 82%. Tightening the boxes appears to keep the glare correction
+from overshooting into suppression.
+
+Caveats: 63 frames, of which 10 hazy and 10 glare; the middle model differs
+from production in two respects at once, so the 9% cannot be pinned on the box
+corrections alone; and each model is a single training run, so run-to-run
+variance is unmeasured.
