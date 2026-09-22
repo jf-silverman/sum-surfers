@@ -3933,3 +3933,46 @@ possibly where closely overlapping surfers were boxed separately. The threshold
 was chosen on these same sets, so it is mildly tuned to them and should be
 re-checked on fresh frames. It changes production counts from the next run:
 about 1% lower on typical frames, about 5% lower on clear days.
+
+### History recounted with the production detector (2026-09-22)
+
+Joel approved rewriting historical counts. Every quality-passed row of
+`predictions.csv` (1,623) was recounted with the production pipeline exactly as
+it now runs — the September 2026 detector plus nested-box suppression at 0.7.
+The comparison recount from 2026-09-21 was not reused, since it predated the
+suppression step; reusing it would have left history and new rows counted two
+different ways.
+
+Only the count fields changed. Quality fields, `glare_frac` and the one
+`human_count` (the 2026-08-29 frame, 49) were kept, rows stayed in order, and
+the file was written through a temp file with a re-read of the live file first
+so an overlapping pipeline append could not be lost (none occurred). Backup of
+the previous file kept locally.
+
+**1,128 of 1,623 counts changed; the total barely moved (-0.3%)**, because two
+corrections offset each other:
+
+| month | old | new | change |
+|---|---:|---:|---:|
+| 2025-10 | 12.7 | 12.0 | -0.7 |
+| 2025-11 | 12.3 | 9.3 | **-3.0** |
+| 2025-12 | 13.4 | 9.1 | **-4.3** |
+| 2026-03 | 21.4 | 22.2 | +0.8 |
+| 2026-05 | 16.8 | 16.7 | -0.1 |
+| 2026-07 | 17.4 | 18.2 | +0.8 |
+| 2026-08 | 16.4 | 17.7 | +1.3 |
+| 2026-09 | 13.4 | 14.2 | +0.8 |
+
+Winter falls by a quarter to a third — the glare phantoms coming out — and
+summer rises as fog and crowd undercounts are fixed. Empty hours go from 10.9% to
+15.3%. That confirms the 2026-09-19 suspicion that glare had been inflating the
+winter rows and that the true winter drop is steeper than the tables showed.
+
+Rebuilt from the recount: `training_features.csv` (1,622 rows), the monthly
+averages table (November weekdays 8.3 → 6.1, December 11.8 → 7.7; September's
+change also reflects six days added since the table was first built), and
+today's chart, whose forecast retrains on this history each run.
+
+Still describing the old counts, and recorded in `known_bugs.md` rather than
+changed here: the README's calibration section and charts (B17), and the
+published forecast release in `data/model_release/` (B18).

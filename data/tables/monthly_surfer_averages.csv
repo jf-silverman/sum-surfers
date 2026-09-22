@@ -1,13 +1,13 @@
 month,weekday_avg,weekday_hours,weekend_avg,weekend_hours,source,basis
-January,15.9,0,20.6,0,interpolated,mean of December and March
-February,15.9,0,20.6,0,interpolated,mean of December and March
-March,20.0,41,23.5,28,measured,
-April,18.1,0,20.8,0,interpolated,mean of March and May
-May,16.2,40,18.0,20,measured,
-June,16.8,0,19.2,0,interpolated,mean of May and July
-July,17.3,186,20.4,85,measured,
-August,14.5,240,21.7,135,measured,
-September,12.9,164,21.0,60,measured,
-October,11.1,150,16.4,63,measured,
-November,8.3,127,17.9,92,measured,
-December,11.8,53,17.7,19,measured,
+January,14.5,0,18.2,0,interpolated,mean of December and March
+February,14.5,0,18.2,0,interpolated,mean of December and March
+March,21.4,41,23.5,28,measured,
+April,18.8,0,20.5,0,interpolated,mean of March and May
+May,16.3,40,17.6,20,measured,
+June,17.2,0,19.5,0,interpolated,mean of May and July
+July,18.1,186,21.5,85,measured,
+August,15.1,240,24.3,135,measured,
+September,12.3,220,18.8,90,measured,
+October,10.3,150,15.9,63,measured,
+November,6.1,127,13.9,92,measured,
+December,7.7,53,12.9,19,measured,
