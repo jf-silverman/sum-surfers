@@ -573,13 +573,13 @@ predictor backfill, is now done — see above).
   prompted the investigation. Fix: `l2_regularization=0.0` and
   shallower trees (`max_depth=3`) for the quantile models specifically
   (point/median/upper models weren't affected). After the fix, true
-  empirical coverage is honestly lower — 66.8% for a nominal 80%
+  empirical coverage is genuinely lower — 66.8% for a nominal 80%
   interval (both tails individually miss more than their 10% target) —
   and pushing to a wider 90% interval (5th/95th) doesn't help: the
   5th-percentile model collapses to constant 0 again regardless of
   tuning, meaning there just isn't enough learnable signal below the
   10th percentile given how zero-inflated this ~1145-row dataset is.
-  **`[0.1, 0.9]` with the corrected hyperparameters is the honest
+  **`[0.1, 0.9]` with the corrected hyperparameters is the accurate
   ceiling for this dataset's size**, not the originally-reported 80%.
 - New `code/demo_predictions.py`: shows N random held-out predictions
   (point + 80% range) alongside the actual count and main predictor
@@ -617,7 +617,7 @@ predictor backfill, is now done — see above).
   finding that multi-frame averaging gives a real but not dramatic
   accuracy gain. The GLMs barely moved (Poisson/NegBin MAE ~9 either
   way). Quantile-interval coverage similarly unchanged (~65-67%,
-  consistent with the honest-ceiling finding above). Remaining 313 rows
+  consistent with the real-ceiling finding above). Remaining 313 rows
   (27%) genuinely have no clip left on disk (or hit the rare unreadable-
   frame decoder issue) and still use the single-frame count.
 
@@ -706,7 +706,7 @@ its entire history, not failing loudly.
   exactly; confirmed zero non-`frame_count_*` columns changed via
   before/after diff.
 - **Rebuilt `training_features.csv` and refit all models on the
-  genuinely-correct data.** The honestly surprising result: barely
+  genuinely-correct data.** The genuinely surprising result: barely
   moved. GBT MAE 6.21→6.15, RMSE 8.85→8.79; GLM MAE ~9 either way;
   quantile coverage 65.5%→65.1%. A systematically-wrong third frame
   value gets diluted by averaging into `frame_count_mean` (1 of 3
@@ -1858,7 +1858,7 @@ either number without checking:
   to compare against.
 
 **Conclusion**: trusted the current, twice-independently-verified 82.8%
-number as the honest current state, over the stale 65-67% figure, and
+number as the real current state, over the stale 65-67% figure, and
 updated README's Caveat and "How to Read the Daily Chart" text plus
 added a new "Model Calibration" section with the plot and this
 explanation — rather than either silently keeping the old (now
@@ -4153,7 +4153,7 @@ The 28 unusable frames removed by the review had been entering the record as
 empty hours and phantom counts. Taking them out cut the excess zero-inflation
 that was holding the lower quantile on the floor. Coverage *fell* because the
 interval became informative — both edges can now actually be missed, and the
-band is honestly overconfident rather than flatteringly wide. This is the second
+band is plainly overconfident rather than flatteringly wide. This is the second
 time this number has moved for exactly this reason (the first was the 2026-09-08
 swell-data correction), so the README now states the rule outright: a coverage
 number near target is only good news once both edges can be missed.
@@ -4246,3 +4246,39 @@ script, so the corrected forecast blurb and the new link would both have been
 silently reverted that night. The captions in the script are the actual source
 of truth for that section; they now carry the corrected text, verified by
 re-running the job and diffing the README to confirm it comes back byte-identical.
+
+### 2026-09-22 — Documentation sweep
+
+Checked every doc against the code after the day's changes. What was stale:
+
+- **`HOW_IT_WORKS.md`** described a de-duplication step that stopped at NMS,
+  never mentioning nested-box suppression; a quality gate with two rules rather
+  than three; and a confidence threshold whose guidance predated the retrain.
+  All three sections rewritten, including *why* the out-of-window night rule is
+  scoped the way it is, since that is the part someone would otherwise
+  "generalize" into the version that rejects 29% of the corpus. Added a
+  limitations note pointing at the new object catalog, and corrected the
+  glossary's epoch entry — the deployed weights are the best checkpoint
+  (epoch 46), not the last of the 60 trained.
+- **`CLAUDE.md`** pointed at `data/predictions.csv` and
+  `data/surfline_predictors.csv`; the real paths are
+  `data/predictions/predictions.csv` and
+  `data/predictor_vars/surfline_predictors.csv`. This cost real time earlier in
+  the day — a script failed with `FileNotFoundError` on the documented path. It
+  also described a six-step pipeline that has nine steps, and a cron schedule
+  that no longer exists: `crontab -l` has no entry for this job, and
+  `launchctl list` shows `com.jfs.sumsurfers` running it daily at 20:30.
+- **`misc_notes.md`** still described the frame-variability study as in
+  progress. It concluded: three frames per clip, averaged. Sampling several
+  times *within* the hour remains genuinely open and is now recorded as such,
+  with the tradeoff named (clip storage and detection time against hourly
+  resolution).
+- **`model_and_feature_ideas.md`** had three sections overtaken by the day's
+  work — conditional confidence thresholds, night detection, and the clear-day
+  overcount. Each now carries its outcome, including the two ideas that were
+  *refuted* rather than shipped, since the reasoning is the reusable part.
+- **`PROJECT_FILES.md`** was still quoting 292 held-out and 1,165 training rows
+  from an old export. Every script in `code/` is otherwise accounted for.
+
+Also removed six uses of "honest"/"honestly" from this file, one of them
+written earlier today. The word asserts something the reader should judge.
