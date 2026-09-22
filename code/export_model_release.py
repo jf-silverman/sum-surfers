@@ -149,10 +149,12 @@ def main():
         # all of it, which nudges the q0.90 bound up and catches two more rows.
         # This release ships only the q0.10/q0.90 pair, so it enforces
         # monotonicity between those two alone. The gap is 2 rows out of 292.
+        # No specific README figure is quoted here: an earlier version hardcoded
+        # one (71.6%), and it went stale the moment the underlying counts changed.
         "coverage_note": (
-            "Coverage here is computed from the shipped q0.10/q0.90 pair. The README's "
-            "calibration chart reports 71.6% because it fits a 9-level quantile ladder and "
-            "enforces monotonicity across all levels, which differs by 2 rows out of 292."
+            "Coverage here is computed from the shipped q0.10/q0.90 pair alone. The README's "
+            "calibration chart fits a 9-level quantile ladder and enforces monotonicity "
+            "across all levels, so its 80% figure can differ from this one by a row or two."
         ),
         # Version-sensitive: a joblib pickle is not guaranteed to load under a
         # different scikit-learn. Recorded so a load failure is diagnosable

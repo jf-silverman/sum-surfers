@@ -3976,3 +3976,39 @@ today's chart, whose forecast retrains on this history each run.
 Still describing the old counts, and recorded in `known_bugs.md` rather than
 changed here: the README's calibration section and charts (B17), and the
 published forecast release in `data/model_release/` (B18).
+
+### Forecast write-ups and public release refreshed on the recounted history (2026-09-22)
+
+Closes B17 and B18 in `known_bugs.md`.
+
+**Calibration** (`plot_calibration.py`, same held-out split as before): 17%
+vs 20%, 37% vs 40%, 52% vs 60%, **82% vs 80%** — up from 72%. But the 80%
+figure is two offsetting tail errors: the real count falls below the band 4.6%
+of the time (target 10%) and above it 13.5% (target 10%).
+
+Checked with the same diagnostic that exposed the 2026-09-08 artifact rather
+than taking the improvement at face value. The 10th-percentile model now
+predicts **under 1 surfer for 72% of hours, median 0** — back most of the way
+toward the floor (92.3% on 2026-09-08, 19.9% on 2026-09-10, both on the old
+counts). It is not fully collapsed (prediction std 4.18, so the robust fitter's
+check passes), but 68.6% of hours that do have surfers still get a lower bound
+under 1. The cause is that the recount raised genuinely empty hours from 10.9%
+to 15.3%, which pulls the 10th percentile toward zero. So the band's upper edge
+is the informative one. The README section now says this directly, and it is
+logged as B19 with a suggestion to model zeros separately (hurdle model).
+
+**Fit** (`plot_fit_scatter.py`): held-out MAE **6.33 → 5.39**, bias -0.40, and
+less regression to the mean — quiet hours +4.0 → +2.8, the ~46-surfer bucket
+-14.8 → -11.3. Held-out sets differ in size (292 then, 325 now, with more data),
+so these are directional. This corrects the 2026-09-12 claim that the
+forecast's error floor was not label noise: frame-to-frame noise is small, but
+systematic detector error — glare phantoms, fog misses — was part of the floor.
+L01 amended.
+
+**Public release** (`data/model_release/`) re-exported: 1,297 training rows
+(unpublished), 325 held out, MAE 5.39, RMSE 7.58, 80% coverage 81.5%; verified
+by `eval_surf_count_model.py` from the released files alone, reproducing its own
+predictions to 5e-05. The export script had hardcoded a README coverage figure
+(71.6%) into the release's `coverage_note`; it went stale the moment the counts
+changed, so the note now explains the ladder-versus-pair difference without
+quoting a number.

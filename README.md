@@ -303,25 +303,29 @@ rather than trusted from the nominal target:
 
 ![Prediction-interval calibration for the surf-count model](analysis/surf_count_model_calibration/calibration_plot.png)
 
-Every interval runs under its nominal target — 21% vs 20%, 35% vs 40%,
-52% vs 60%, and **72% vs 80%** — so the model is consistently a little
-overconfident: the real count falls outside the shaded band somewhat
-more often than the band claims. That's the ordinary direction for this
-kind of model, and the gap widens for the wider bands.
+Measured 2026-09-22, after the whole history was recounted with the
+September 2026 detector: 17% vs 20%, 37% vs 40%, 52% vs 60%, and **82% vs
+80%**. The narrower bands are a little overconfident, which is the ordinary
+direction for this kind of model.
 
-Worth knowing how that number moved, because it's a case of a metric
-looking *better* while the model was actually worse. On 2026-09-08 this
-same check reported 82.8% — above nominal, seemingly well calibrated.
-It wasn't: the 10th-percentile model had collapsed toward zero (92% of
-its predictions were below 1 surfer), and a lower bound pinned at 0
-can't be undershot, so almost nothing fell below it and coverage looked
-inflated. After the swell-data corrections of 2026-09-09/10 gave the
-model real signal to work with, that same lower bound became a genuine
-estimate (median 5.5 surfers, only 20% below 1) — it can now be missed
-low, and is, on 17% of rows. Coverage dropped to 72% precisely *because*
-the interval got more informative. See
-[`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md) for the full
-investigation.
+**The 80% band looks well calibrated, but read that with care.** The
+real count falls below it only 4.6% of the time (target 10%) and above it
+13.5% (target 10%) — two errors that happen to offset. The low side is low
+because the band's bottom edge sits under 1 surfer for 72% of hours, so
+there is almost nothing left to undershoot. That isn't a model failure:
+removing the old detector's glare phantoms raised the share of genuinely
+empty hours from 11% to 15%, and a 10th percentile near zero is the honest
+answer for a spot that is often empty. But it means the band's **upper
+edge is the informative one**, and it runs about 3.5 points short.
+
+This number has moved before for the same reason, which is why it's worth
+spelling out. On 2026-09-08 the check read 82.8%, when the lower bound had
+fully collapsed to zero (92% of its predictions under 1 surfer). Corrected
+swell data then made it a real estimate — median 5.5 surfers, 20% under 1 —
+and coverage fell to 72%, precisely *because* the interval had become more
+informative. The recount pushed the lower bound most of the way back toward
+zero, this time because the data really is emptier. See
+[`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md) for the full investigation.
 
 ### Exploratory Findings
 
@@ -430,7 +434,7 @@ optimistic. The demo set is the clean check.
 
 ### Check the forecast model against held-out data
 
-`data/model_release/` holds the fitted forecast model, the **292 rows it was
+`data/model_release/` holds the fitted forecast model, the **325 rows it was
 never trained on**, and the metadata to reproduce the split:
 
 ```bash
@@ -442,7 +446,7 @@ purpose. A predictions-versus-actuals file is self-reported — you can
 recompute the error from it, but not check that the model was not fit on
 those same rows. With the model included you can run it yourself on rows it
 never saw; the script re-predicts from the raw predictor values and verifies
-it reproduces the shipped numbers before reporting anything. The 1,165
+it reproduces the shipped numbers before reporting anything. The 1,297
 training rows stay unpublished.
 
 It reports MAE, RMSE and bias (broken out by how crowded the day actually
