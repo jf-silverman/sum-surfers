@@ -4305,26 +4305,28 @@ contains pixels of the exact box color, where previously some contained none.
 The file also got *smaller*, 3.0 MB to 2.4 MB at the intermediate setting,
 because undithered flat color compresses better.
 
-**Sizing.** The crop, not the upscale, is what makes a surfer bigger on screen:
-GitHub scales the image to its ~880px column either way, so apparent size is
-880 over the kept width. The trade is steep — measured against 2026-09-21's 186
-detections, trimming 20% off each end keeps 83% of them in view, 25% keeps 73%,
-and 30% keeps only 56%.
+**Sizing — tried cropping, reverted to full width.** The crop, not the upscale,
+is what makes a surfer bigger on screen: GitHub scales the image to its ~880px
+column either way, so apparent size is 880 over the kept width. Trimming 20% off
+each end renders at 1.15x native, 25% at 1.38x, 30% at 1.72x.
 
-Joel's call: **keep the middle 40%** (0.30 each side, 1.72x native against the
-old 1.15x) and say so in the caption. The animation is a demonstration of what
-detection looks like, not a record of the day's count — that lives in
-`predictions.csv` and the forecast chart, both computed on the full frame width.
-The banner on each frame already counts only the boxes visible in it, so the
-image never claims more than it shows, and the caption now states the crop
-outright. `GIF_UPSCALE` went 2.0 to 3.0, which does not change on-screen size
-but keeps it sharp on high-DPI displays. Final image is 1536x586, 2.4 MB.
+The cost is real detections leaving the frame. Measured against 2026-09-21's 186
+detections: 0.20 keeps 83% of them in view, 0.25 keeps 73%, 0.30 keeps 56%. At
+0.30 the animation's last frame read "0 surfers detected" for an hour that
+actually had one, because that surfer sat outside the crop. A demonstration image
+whose printed count contradicts the data it is demonstrating is worse than small
+surfers, so **`SIDE_CROP_FRAC` is back to 0.0** and every frame's count now
+matches `predictions.csv` exactly. `GIF_UPSCALE` is 1.5, putting the full 1280px
+strip at 1920px — above 2x GitHub's column, so it stays sharp on high-DPI
+displays without bloating the file. Final image 1920x316, 2.4 MB.
 
 **Play callout.** GitHub does not autoplay a README GIF — it shows the first
 frame with a small play button in the top-right corner that readers miss. The
 first frame now carries "Click Play Here -->" in the same green, on a dark
 plate, pointing at where that button appears. The first placement put the arrow
-directly under the button, which covered it; `PLAY_BUTTON_CLEARANCE_PX` now
-pulls the callout 90 image pixels left. That constant is in final-image pixels
-and GitHub scales the image by about 0.57, so it buys roughly the 50 on-screen
-pixels of clearance the arrow needed.
+directly under the button, which covered it. A fixed 90px offset fixed it at one
+width and broke again at another: GitHub's button is a fixed size in CSS pixels
+while the image is scaled to fit the column, so the same pixel offset buys less
+clearance as the image gets wider, and at full width the arrow was partly covered
+again. `PLAY_BUTTON_CLEARANCE_FRAC` (0.13 of image width) replaces it — about 270
+pixels at 1920 wide, roughly 124 on screen, which holds at any zoom level.

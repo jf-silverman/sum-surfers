@@ -411,21 +411,20 @@ def find_nearest_hour_crop(target_date, target_hour=8, lookback_days=7):
 # 40% is traded away to see the remaining 60% properly. GIF_UPSCALE then takes
 # the 768px crop past GitHub's ~880px content column so it renders full width
 # instead of being letterboxed at its natural size.
-# Trimming each end trades coverage for apparent size. Since GitHub scales the
-# image to its ~880px column regardless, the crop is what actually makes a
-# surfer bigger on screen (880 over the kept width): 0.20 renders at 1.15x
-# native, 0.25 at 1.38x, 0.30 at 1.72x. Coverage cost, measured against
-# 2026-09-21's 186 detections: 0.20 keeps 83% of them in view, 0.25 keeps 73%,
-# 0.30 keeps 56%.
+# Full width, no side crop (Joel's call, 2026-09-22, after trying 0.20-0.30).
+# Cropping does make surfers bigger — GitHub scales the image to its ~880px
+# column regardless, so apparent size is 880 over the kept width — but it drops
+# real detections off the sides: measured against 2026-09-21's 186 detections,
+# trimming 30% off each end left only 56% of them in view. That produced frames
+# whose printed count disagreed with what the pipeline actually counted, and in
+# one case a frame reading "0 surfers detected" for an hour that had one. Small
+# surfers are the better trade than a picture that contradicts the data.
 #
-# Joel's call (2026-09-22): this animation is a demonstration of what detection
-# looks like, not a record of the day's count — that lives in predictions.csv
-# and the forecast chart. Seeing the surfers clearly beats showing all of them,
-# so keep the middle 40% and say so in the caption. The banner on each frame
-# counts only the boxes actually visible, so the image never claims more than
-# it shows.
-SIDE_CROP_FRAC = 0.30
-GIF_UPSCALE = 3.0
+# GIF_UPSCALE does not change on-screen size, since GitHub scales to its column
+# either way; it only keeps the image sharp on high-DPI displays. 1.5x puts the
+# full 1280px strip at 1920px, comfortably above 2x that column.
+SIDE_CROP_FRAC = 0.0
+GIF_UPSCALE = 1.5
 GIF_FRAME_MS = 1000
 GIF_MAX_COLORS = 128          # palette size — the strip is mostly water, so this is plenty
 # Box color, defined once in both spaces: cv2 draws in BGR, the GIF palette
@@ -439,10 +438,13 @@ GIF_RESERVED_COLORS = (BOX_COLOR_RGB, (255, 255, 255), (235, 235, 235), (0, 0, 0
 # frame with a small play button in the top-right corner, which readers miss.
 # The first frame therefore carries a callout pointing at it.
 GIF_PLAY_CALLOUT = "Click Play Here"
-# Clearance in FINAL IMAGE pixels. GitHub scales the ~1536px-wide image down to
-# its ~880px column (about 0.57x), so 90 image pixels is roughly the 50 on-screen
-# pixels the arrow needed to clear the play button.
-PLAY_BUTTON_CLEARANCE_PX = 90
+# Clearance from the right edge, as a FRACTION of image width rather than a
+# pixel count. GitHub's play button is a fixed size in CSS pixels while the
+# image is scaled to fit its column, so a fixed pixel offset buys less and less
+# clearance the wider the image gets — a 90px offset that worked at 1536px wide
+# still left the arrow partly under the button at full width. A fraction scales
+# with the image and holds at any zoom level.
+PLAY_BUTTON_CLEARANCE_FRAC = 0.13
 GIF_LOOKBACK_DAYS = 14
 # A day also has to be busy enough to be worth showing: more than
 # BUSY_COUNT_MIN surfers in at least MIN_BUSY_FRACTION of its frames. Added
@@ -580,10 +582,9 @@ def add_play_callout(canvas):
     (tw, th), _ = cv2.getTextSize(text, font, scale, thickness)
     pad = 12
     # GitHub overlays its own play button in the top-right corner, which sat on
-    # top of the arrow. PLAY_BUTTON_CLEARANCE_PX pulls the whole callout left so
-    # the arrow points AT that button instead of being covered by it. It is in
-    # final-image pixels, so it scales with GIF_UPSCALE the same way the text does.
-    x = max(w - tw - pad * 3 - PLAY_BUTTON_CLEARANCE_PX, pad)
+    # top of the arrow. Pull the whole callout left so the arrow points AT that
+    # button instead of being covered by it.
+    x = max(w - tw - pad * 3 - int(w * PLAY_BUTTON_CLEARANCE_FRAC), pad)
     y = pad + th
 
     # Dark plate behind the text so it reads over bright water or sky.
@@ -701,14 +702,11 @@ def update_readme(target_date, detection_capture=None):
         "of the photo.  Birds, reflections, people on the beach and sun glare "
         "fool it too: [what isn't a surfer](docs/non_surfer_objects.md) "
         "catalogs each one, how to tell it apart, and what the pipeline does "
-        "about it.  Each frame is one hour of that day, one second apart.  "
-        "**This animation is a demonstration, not the day's official count:** "
-        "to make the surfers big enough to actually see, it shows only the "
-        "middle 40% of the camera's view, so surfers off to either side are "
-        "not in frame.  The count printed on each frame is only what is "
-        "visible in it.  The full width of every frame is what the pipeline "
-        "actually counts, and those counts are what the forecast below is "
-        "built from.\n"
+        "about it.  Each frame is one hour of that day, one second apart, and "
+        "shows the camera's full width - the same strip the pipeline counts, "
+        "so the number printed on each frame is the whole count for that hour.  "
+        "The surfers are small at this width; open the image on its own to see "
+        "them properly.\n"
     )
     FORECAST_CAPTION = (
         "Once enough hours and days were gathered along with weather and surf "
