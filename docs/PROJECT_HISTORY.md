@@ -4232,3 +4232,17 @@ All of this now lives in `docs/non_surfer_objects.md`, a catalog of everything i
 frame that isn't a surfer — birds and reflections, the tree bough and wind sock,
 shore walkers, sun glare — with the visual tells, current handling, and test
 frames for each. Kept private alongside the bug register.
+
+**Published the object catalog (same day).** `docs/non_surfer_objects.md` is
+tracked rather than gitignored, linked from the README's detection caption next
+to the wind sock it already pointed out. Register IDs were stripped from it,
+since the register itself stays private, and a note explains that the frame
+names refer to working data that is not committed, with `data/demo/` offered as
+the runnable alternative.
+
+Publishing it surfaced a live bug: `plot_daily_prediction.py` rewrites the
+README's chart section on every nightly run from captions hardcoded in the
+script, so the corrected forecast blurb and the new link would both have been
+silently reverted that night. The captions in the script are the actual source
+of truth for that section; they now carry the corrected text, verified by
+re-running the job and diffing the README to confirm it comes back byte-identical.
