@@ -205,3 +205,14 @@ data/charts/latest_detection.json
 
 # Old-vs-new detector comparisons (recounted history, local only — not for publication)
 data/compare_detector_*/
+
+# Labeled training data, kept local only (2026-09-21, Joel's decision). These
+# were committed between 2026-09-14 and 09-21 and remain in git history; they
+# are untracked from here on. Anything to be shared publicly goes out as a
+# deliberately chosen subset, not by default.
+data/cvat_out_coco/posture_57/
+data/cvat_out_coco/batch01_73/
+data/cvat_out_coco/winter_7/
+data/cvat_out_coco/glare_12/
+data/cvat_out_coco/glare_more_5/
+data/cvat_out_coco/fog_19/
