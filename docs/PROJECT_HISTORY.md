@@ -4400,3 +4400,24 @@ marked block containing both images; now there are two marker pairs
 (`DETECTION_GIF_*` and `DAILY_CHART_*`), rewritten independently, so either can
 move on the page without the nightly run dragging the other back. Checked for
 idempotency by running twice and diffing: the second run changes nothing.
+
+**README header image (2026-09-22).** The top of the README now opens with a
+still: two surfers riding a wave, cropped 3:2 from `crop2025-10-15_11-50-00` —
+the labeled pair at x=524 and x=556 — with open water to their left. Chosen from
+ten candidates Joel reviewed. `make_hero_crop.py` gained `subject_x`/`subject_y`
+for that framing: 0.5 centers the subject, and higher values push it right,
+leaving room on the other side. 0.62 keeps both riders clear of the right edge
+while still giving the open water Joel wanted.
+
+The image is soft, and that is inherent: the pair occupies 61x30 pixels in the
+source, because the camera is far offshore. Joel accepted that explicitly.
+
+The animation went back above the forecast chart, so the two-marker split made
+for the brief period it sat at the top was reverted to the single rewritten
+block. The hero image sits deliberately *outside* those markers, which is what
+keeps the nightly rewrite from touching it — verified by running the job twice
+and diffing.
+
+Also fixed a rendering bug in the summary: the line about why crowd size matters
+ended `expect. _**`, and the space before the closing underscore broke the
+emphasis, so the literal underscores were showing on the page.

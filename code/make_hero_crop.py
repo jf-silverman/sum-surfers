@@ -26,8 +26,14 @@ OUT_WIDTH = 1200
 
 
 def hero_crop(img, box, context_mult=CONTEXT_MULT, out_width=OUT_WIDTH,
-              aspect=(ASPECT_W, ASPECT_H)):
-    """3:2 crop centered on `box` (x, y, w, h), enlarged to `out_width`."""
+              aspect=(ASPECT_W, ASPECT_H), subject_x=0.5, subject_y=0.5):
+    """3:2 crop around `box` (x, y, w, h), enlarged to `out_width`.
+
+    `subject_x` / `subject_y` place the subject within the frame: 0.5 centers it,
+    and a larger value pushes it right or down, which leaves more open water on
+    the other side. Useful when the subject is moving across the frame and
+    should have room in front of, or behind, it.
+    """
     ih, iw = img.shape[:2]
     bx, by, bw, bh = box
     cx, cy = bx + bw / 2, by + bh / 2
@@ -42,8 +48,8 @@ def hero_crop(img, box, context_mult=CONTEXT_MULT, out_width=OUT_WIDTH,
     crop_h = min(crop_h, crop_w * aspect[1] / aspect[0])
     crop_w = crop_h * aspect[0] / aspect[1]
 
-    x0 = int(round(min(max(cx - crop_w / 2, 0), iw - crop_w)))
-    y0 = int(round(min(max(cy - crop_h / 2, 0), ih - crop_h)))
+    x0 = int(round(min(max(cx - crop_w * subject_x, 0), iw - crop_w)))
+    y0 = int(round(min(max(cy - crop_h * subject_y, 0), ih - crop_h)))
     patch = img[y0:y0 + int(round(crop_h)), x0:x0 + int(round(crop_w))]
 
     out_h = int(round(out_width * aspect[1] / aspect[0]))
@@ -58,12 +64,16 @@ def main():
     p.add_argument("--out", required=True, type=Path)
     p.add_argument("--context", type=float, default=CONTEXT_MULT)
     p.add_argument("--width", type=int, default=OUT_WIDTH)
+    p.add_argument("--subject-x", type=float, default=0.5,
+                   help="subject's horizontal place in frame; >0.5 leaves room on the left")
+    p.add_argument("--subject-y", type=float, default=0.5)
     args = p.parse_args()
 
     img = cv2.imread(str(args.image))
     if img is None:
         raise SystemExit(f"Cannot read {args.image}")
-    out = hero_crop(img, args.box, args.context, args.width)
+    out = hero_crop(img, args.box, args.context, args.width,
+                    subject_x=args.subject_x, subject_y=args.subject_y)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(args.out), out)
     print(f"Wrote {args.out}  ({out.shape[1]}x{out.shape[0]})")

@@ -725,12 +725,9 @@ def generate_detection_gif(detection_date):
 
 README_START_MARKER = "<!-- DAILY_CHART_START -->"
 README_END_MARKER = "<!-- DAILY_CHART_END -->"
-# The animation sits high on the page, directly under the Project Summary
-# heading, while the forecast chart stays further down with the rest of the
-# summary. Two marker pairs rather than one block, so each can move
-# independently without the nightly rewrite dragging the other along.
-DETECTION_START_MARKER = "<!-- DETECTION_GIF_START -->"
-DETECTION_END_MARKER = "<!-- DETECTION_GIF_END -->"
+# One rewritten block holding the animation above the forecast chart. The static
+# hero image at the top of the README is deliberately OUTSIDE these markers, so
+# the nightly rewrite never touches it.
 
 
 def update_readme(target_date, detection_capture=None):
@@ -739,10 +736,9 @@ def update_readme(target_date, detection_capture=None):
     daily; only the content between the markers changes."""
     readme_path = _PROJECT_ROOT / "README.md"
     readme = readme_path.read_text()
-    if README_START_MARKER not in readme and DETECTION_START_MARKER not in readme:
-        print("WARNING: no README markers found — skipping README update. Add "
-              f"{DETECTION_START_MARKER}/{DETECTION_END_MARKER} and "
-              f"{README_START_MARKER}/{README_END_MARKER} to enable this.")
+    if README_START_MARKER not in readme or README_END_MARKER not in readme:
+        print(f"WARNING: README.md markers not found — skipping README update. "
+              f"Add {README_START_MARKER} / {README_END_MARKER} to enable this.")
         return
 
     # Static caption text, rewritten into the README on every run. Kept
@@ -776,14 +772,7 @@ def update_readme(target_date, detection_capture=None):
         "the prediction model's own error.\n"
     )
 
-    def replace_between(text, start, end, body):
-        if start not in text or end not in text:
-            print(f"WARNING: {start} / {end} not found in README.md — section skipped.")
-            return text
-        before, _, rest = text.partition(start)
-        _, _, after = rest.partition(end)
-        return before + start + "\n" + body + end + after
-
+    detection_block = ""
     if (CHARTS_DIR / "latest_detection.gif").exists() and detection_capture is not None:
         capture_day, _n_frames = detection_capture
         capture_str = capture_day.strftime("%A, %B %d, %Y")
@@ -792,19 +781,21 @@ def update_readme(target_date, detection_capture=None):
             f"{DETECTION_CAPTION}"
             f"![Detections through {capture_str}](data/charts/latest_detection.gif)\n\n"
         )
-        readme = replace_between(readme, DETECTION_START_MARKER, DETECTION_END_MARKER,
-                                 detection_block)
 
     target_date_str = target_date.strftime("%A, %B %d, %Y")
-    forecast_block = (
+    section = (
+        f"{README_START_MARKER}\n"
+        f"{detection_block}"
         f"#### The Surfer Crowd Forecast for: {target_date_str}\n\n"
         f"{FORECAST_CAPTION}"
         f"![Latest daily prediction chart](data/charts/latest.png)\n\n"
+        f"{README_END_MARKER}"
     )
-    readme = replace_between(readme, README_START_MARKER, README_END_MARKER, forecast_block)
 
-    readme_path.write_text(readme)
-    print("Updated README.md detection and forecast sections.")
+    before, _, rest = readme.partition(README_START_MARKER)
+    _, _, after = rest.partition(README_END_MARKER)
+    readme_path.write_text(before + section + after)
+    print("Updated README.md daily chart section.")
 
 
 if __name__ == "__main__":

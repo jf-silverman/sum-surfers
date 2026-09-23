@@ -25,6 +25,7 @@ stays at root so GitHub still renders it on the repo homepage).
 | `docs/PROJECT_HISTORY.md` | Chronological record of how the project was built and tuned. |
 | `docs/known_bugs.md` | The prioritized bug register: open defects ranked P1-P4, known limitations, and everything fixed to date (gitignored). Replaced `docs/bugs.md` on 2026-09-22 — that file was never committed, so its contents live on only here. |
 | `docs/non_surfer_objects.md` | Catalog of everything in frame that isn't a surfer — birds and their reflections, the tree bough and wind sock, shore walkers, sun glare — with the visual tells, how each is handled, and which frames to test against. |
+| `docs/images/hero_two_surfers.png` | The README's header image: two surfers riding a wave, cropped 3:2 from a labeled frame (`crop2025-10-15_11-50-00`, the pair at x=524 and x=556) with open water to their left. Cut with `code/make_hero_crop.py`. Deliberately outside the README's rewritten markers so the nightly job never touches it. |
 | `docs/model_and_feature_ideas.md` | Enhancements/possible future work that aren't bugs, split into "Model Ideas" (prediction model/predictors) and "Feature Ideas" (detection pipeline) subsections (gitignored — same 2026-08-28 split that produced the old `bugs.md`; renamed from `feature_ideas.md`). |
 | `docs/misc_notes.md` | Small operational notes (env/cron/GCP-history caveats), split out of `README.md`'s old "Notes" section (gitignored, 2026-08-28). |
 | `docs/PROJECT_FILES.md` | This file. |
