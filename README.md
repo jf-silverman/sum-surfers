@@ -5,7 +5,7 @@
 ![Two surfers riding a wave at Jack's, Pleasure Point — a frame from the camera this project counts](docs/images/hero_two_surfers.png)
 
 This project collects images from a shoreline video camera and tries to answer two questions:
-- **_How many surfers were out are out there each hour of each day in the past?_**
+- **_How many surfers were out there each hour of each day in the past?_**
 - **_How many will there be at each hour of the day in the upcoming days?_**
 
 **_This matters to me as a surfer because the competition for each wave becomes more intense as the crowd size increases.  It helps me choose when to go and know what to expect._**
