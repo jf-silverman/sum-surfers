@@ -234,3 +234,7 @@ data/hero_candidates/
 data/charts/forecast_vs_actual_*.png
 # Per-day extreme detector frames (emailed, not published)
 data/charts/frame_*.png
+
+# Cached forecast models (refit weekly; rebuildable) and the forecast response cache
+data/model_cache/
+data/predictor_vars/.forecast_response_cache.json

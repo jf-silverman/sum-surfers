@@ -4765,3 +4765,46 @@ measure it does not exist yet, and starts accumulating with the first
 `week_*.csv`. Day 7 is currently presented with the same interval as day 1,
 which is almost certainly too narrow; the chart says so in words but the
 bands do not yet widen with lead time.
+
+### 2026-09-23 — Three fixes: the split, the refit schedule, the request rate
+
+**The split (B21 → F39).** `split_by_day()` now holds out whole days, forward in
+time, and every path that reports a number uses it: `fit_surfer_count_model.py`,
+`export_model_release.py`, the calibration analysis, and the chart's own
+permutation-importance step. Restated on the corrected split:
+
+| | before (random hours) | after (recent days held out) |
+|---|---:|---:|
+| MAE | 5.58 | **7.60** |
+| bias | −1.03 | −1.84 |
+| 80% interval coverage | 75.5% | **71.9%** |
+| calibration, 20/40/60% bands | 18/36/52% | 15/26/36% |
+
+The model is unchanged; only the measurement is. The release was re-exported
+(1,242 train / 352 held out, the most recent days as a block) and verifies
+against its own shipped predictions. Its metadata now *describes* the scheme
+instead of naming a random seed, so a reader can see what was held out and why.
+The README says plainly that the number went up without the model getting worse.
+
+**The refit schedule.** The chart cached its fitted models: refit weekly, or
+sooner if 100 new rows have arrived, and reused in between. A cache whose feature
+columns no longer match is refused rather than silently used, since mismatched
+columns would produce plausible nonsense rather than an error. `--refit` forces a
+fit; `--no-cache` skips the cache entirely. The footer no longer claims "refit
+this run" — it states when the model was fitted and that it is reused.
+
+Measured effect: a full run went from **34.9s to 8.3s**, and — the point of the
+change — a forecast now moves only when conditions move or the model is
+deliberately refreshed, instead of drifting 0.78 surfers a day on refit noise.
+
+**The request rate.** The eight forecast endpoints were fetched back to back,
+twice a run. Now they are paced 2s apart with jitter (8 requests over ~17s
+instead of ~1s), and the responses are cached for 90 minutes, which removes the
+second burst entirely: the second call in a run makes **zero** requests. Verified
+with a stubbed fetch — cache hit, correct refetch when a wider horizon is asked
+for, and `use_cache=False` honoured. A cache holding nothing but failed fetches
+is refused, so one bad run cannot pin its own emptiness in place for 90 minutes.
+
+Combined with the light-window caching earlier in the day, a nightly run's
+requests to `services.surfline.com` fall from about 34 to about 17, and the
+bursts are gone.

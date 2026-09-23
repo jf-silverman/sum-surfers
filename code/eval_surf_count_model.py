@@ -94,8 +94,11 @@ def main():
     print(f"Held-out rows : {len(df)}")
     if meta:
         s = meta["split"]
-        print(f"Split         : test_size={s['test_size']}, random_state={s['random_state']} "
+        scheme = s.get("scheme", f"random, random_state={s.get('random_state')}")
+        print(f"Split         : {scheme}, test_size={s['test_size']} "
               f"({s['n_train']} train rows, not published)")
+        if s.get("description"):
+            print(f"                {s['description']}")
         print(f"Date range    : {meta['test_date_range'][0]} -> {meta['test_date_range'][1]}")
         print(f"Built with    : scikit-learn {meta['versions']['scikit_learn']}, "
               f"Python {meta['versions']['python']}")

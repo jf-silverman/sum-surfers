@@ -8,7 +8,7 @@ closer to a 65% interval"): nominal vs. actual empirical coverage on a
 real held-out test split, not simulated or eyeballed.
 
 Reuses the exact same setup fit_surfer_count_model.py's fit_quantile_intervals()
-already uses (load_and_prepare(), the same train_test_split(test_size=0.2,
+already uses (load_and_prepare(), the same day-grouped forward split (test_size=0.2,
 random_state=42), standardize(), fit_quantile_model_robust()) so the numbers
 here are directly consistent with -- not a separately-computed, possibly
 different -- the coverage figures already documented elsewhere.
@@ -31,12 +31,11 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.model_selection import train_test_split
 
 HERE = Path(__file__).resolve().parent
 PROJECT_ROOT = HERE.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "code"))
-from fit_surfer_count_model import load_and_prepare, standardize, fit_quantile_model_robust  # noqa: E402
+from fit_surfer_count_model import split_by_day, load_and_prepare, standardize, fit_quantile_model_robust  # noqa: E402
 
 AQUA = "#3ab4c9"
 LIME = "#9de35a"
@@ -55,7 +54,12 @@ INTERVALS = [(0.40, 0.60), (0.30, 0.70), (0.20, 0.80), (0.10, 0.90)]
 
 def main():
     X, y, df, numeric_cols = load_and_prepare()
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Day-grouped and forward in time, matching fit_surfer_count_model (B21).
+    # A random split of hours leaked whole-day information and made coverage
+    # look better than it is.
+    train_idx, test_idx = split_by_day(df, test_size=0.2, scheme="forward")
+    X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+    y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
     X_train, X_test = standardize(X_train, X_test, numeric_cols)
     print(f"Train rows: {len(X_train)}  Test rows: {len(X_test)}")
 

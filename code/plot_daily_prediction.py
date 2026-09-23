@@ -44,6 +44,7 @@ matplotlib.use("Agg")
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
+import joblib
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -55,7 +56,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import get_clips as gc  # noqa: E402 — needed for get_light_window() (real dawn/dusk)
 import get_surf_predictors as sp  # noqa: E402
 import detect_surfers as ds  # noqa: E402
-from fit_surfer_count_model import load_and_prepare, fit_quantile_model_robust  # noqa: E402
+from fit_surfer_count_model import (  # noqa: E402
+    load_and_prepare, fit_quantile_model_robust, split_by_day,
+)
 from predict_surf_count import build_feature_row, add_tide_daylight_features, MEAN_KWARGS  # noqa: E402
 from build_training_features import simplify_weather_condition  # noqa: E402
 from crowd_rating import (  # noqa: E402
@@ -143,10 +146,63 @@ READABLE_NAMES = {
 }
 
 
+# Refitting every night was churn, not learning. Measured 2026-09-23: adding one
+# day of data (14 rows, 0.9% of the table) moved predictions by 0.78 surfers on
+# average and up to 3.35, with 33 of 101 hours moving by more than a surfer —
+# about 15% of the model's own error, for reasons unrelated to conditions. The
+# models are now fitted on a schedule and reused in between, so a forecast only
+# changes when the weather does or when the model is deliberately refreshed.
+MODEL_CACHE_PATH = _PROJECT_ROOT / "data" / "model_cache" / "chart_models.joblib"
+REFIT_AFTER_DAYS = 7          # refresh weekly...
+REFIT_AFTER_NEW_ROWS = 100    # ...or sooner if this much new data has arrived
+
+
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--date", help="Target date YYYY-MM-DD (default: today, local)")
+    p.add_argument("--refit", action="store_true",
+                   help="Refit the forecast models now, ignoring the cache")
+    p.add_argument("--no-cache", action="store_true",
+                   help="Fit fresh without reading or writing the cache")
     return p.parse_args()
+
+
+def cached_models_are_usable(cache, n_rows, feature_names):
+    """Whether a cached fit can still be used for today's chart.
+
+    Refuses a cache whose feature columns differ from the current ones: a
+    silently mismatched feature order would produce plausible-looking nonsense
+    rather than an error.
+    """
+    if cache is None:
+        return False, "no cache yet"
+    if list(cache.get("feature_names", [])) != list(feature_names):
+        return False, "feature columns changed"
+    age_days = (datetime.now() - datetime.fromisoformat(cache["fitted_at"])).days
+    if age_days >= REFIT_AFTER_DAYS:
+        return False, f"cache is {age_days} days old"
+    new_rows = n_rows - cache.get("n_rows", 0)
+    if new_rows >= REFIT_AFTER_NEW_ROWS:
+        return False, f"{new_rows} new rows since the fit"
+    return True, f"fitted {age_days}d ago on {cache['n_rows']} rows, {new_rows} new since"
+
+
+def load_model_cache():
+    if not MODEL_CACHE_PATH.exists():
+        return None
+    try:
+        return joblib.load(MODEL_CACHE_PATH)
+    except Exception as e:
+        print(f"  WARNING: could not read the model cache ({type(e).__name__}: {e}); refitting.")
+        return None
+
+
+def save_model_cache(payload):
+    try:
+        MODEL_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(payload, MODEL_CACHE_PATH)
+    except Exception as e:
+        print(f"  WARNING: could not write the model cache ({type(e).__name__}: {e})")
 
 
 def main():
@@ -167,11 +223,25 @@ def main():
     X_std = X.copy()
     X_std[numeric_cols] = (X_std[numeric_cols] - train_mean) / train_std
 
-    Xi_train, Xi_test, yi_train, yi_test = train_test_split(X_std, y, test_size=0.2, random_state=42)
-    importance_model = HistGradientBoostingRegressor(loss="poisson", **MEAN_KWARGS).fit(Xi_train, yi_train)
-    perm = permutation_importance(importance_model, Xi_test, yi_test, n_repeats=15,
-                                    random_state=42, scoring="neg_mean_absolute_error")
-    top_predictors = pd.Series(perm.importances_mean, index=Xi_test.columns).sort_values(ascending=False).head(5)
+    cache = None if (args.no_cache or args.refit) else load_model_cache()
+    usable, why = cached_models_are_usable(cache, len(X_std), X_std.columns)
+    if usable:
+        print(f"  Reusing the cached forecast models ({why}). "
+              f"Pass --refit to force a new fit.")
+        quantile_models = cache["quantile_models"]
+        top_predictors = cache["top_predictors"]
+        fitted_at = datetime.fromisoformat(cache["fitted_at"])
+        trained_rows = cache["n_rows"]
+    else:
+        print(f"  Fitting forecast models ({why}).")
+        # Day-grouped forward split, not a random one — see split_by_day (B21).
+        train_idx, test_idx = split_by_day(df, test_size=0.2, scheme="forward")
+        Xi_train, Xi_test = X_std.iloc[train_idx], X_std.iloc[test_idx]
+        yi_train, yi_test = y.iloc[train_idx], y.iloc[test_idx]
+        importance_model = HistGradientBoostingRegressor(loss="poisson", **MEAN_KWARGS).fit(Xi_train, yi_train)
+        perm = permutation_importance(importance_model, Xi_test, yi_test, n_repeats=15,
+                                        random_state=42, scoring="neg_mean_absolute_error")
+        top_predictors = pd.Series(perm.importances_mean, index=Xi_test.columns).sort_values(ascending=False).head(5)
 
     # Fan-chart quantiles: 9 real fitted models at 10%-90% (step 10), rendered
     # as a continuous-looking gradient by interpolating between them at plot
@@ -183,8 +253,17 @@ def main():
     # 2026-09-16 that raised and killed the whole chart — the 09-15 run produced
     # nothing at all. A display chart can draw a flat band honestly; calibration
     # code still uses the default and still raises.
-    quantile_models = {level: fit_quantile_model_robust(X_std, y, level, allow_degenerate=True)[0]
-                       for level in FAN_LEVELS}
+        quantile_models = {level: fit_quantile_model_robust(X_std, y, level, allow_degenerate=True)[0]
+                           for level in FAN_LEVELS}
+        fitted_at = datetime.now()
+        trained_rows = len(X_std)
+        if not args.no_cache:
+            save_model_cache({"quantile_models": quantile_models,
+                              "top_predictors": top_predictors,
+                              "feature_names": list(X_std.columns),
+                              "n_rows": trained_rows,
+                              "fitted_at": fitted_at.isoformat(timespec="seconds")})
+
     degenerate_levels = [lv for lv, m in quantile_models.items() if getattr(m, "degenerate", False)]
     if degenerate_levels:
         print(f"  Degenerate quantile level(s): {degenerate_levels} — drawn as flat bands.")
@@ -330,8 +409,9 @@ def main():
     # after the fact.
     info_text = (
         f"Model: gradient-boosted trees (quantile regression), point estimate = median model  "
-        f"|  Top predictors (live fit): {predictors_str}\n"
-        f"Refit this run on {len(df):,} detection-hours, {df['date'].min()} to {df['date'].max()}  "
+        f"|  Top predictors: {predictors_str}\n"
+        f"Model fitted {fitted_at:%Y-%m-%d} on {trained_rows:,} detection-hours "
+        f"({df['date'].min()} to {df['date'].max()}); reused since, refit weekly  "
         f"|  Surfer detector (YOLOv8s, Sept 2026 fog retrain — actual training log): "
         f"precision {DETECTOR_PRECISION:.1%}, recall {DETECTOR_RECALL:.1%}"
     )

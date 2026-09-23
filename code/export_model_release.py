@@ -22,9 +22,15 @@ fitted model with a held-out set lets a reader run it themselves on rows it
 never saw. It also means the training rows stay unpublished: the release
 contains the 20% test split only.
 
-The split is the same train_test_split(test_size=0.2, random_state=42) used
-everywhere else in this project, so these are literally the rows the reported
-metrics were computed on, not a fresh resample.
+The split is the same one used everywhere else in this project, so these are
+literally the rows the reported metrics were computed on, not a fresh resample.
+Since 2026-09-23 that means a FORWARD-IN-TIME split on whole days: the model is
+fitted on the earliest days and held out on the most recent. It used to be a
+random 80/20, which leaked — with ~13 rows per day, random assignment put hours
+from the same day on both sides, so the model learned a day's crowd level from
+its own hours and was scored on the rest of that day. That flattered the
+published MAE by about 2 surfers (B21). The number here is now the one a
+day-ahead forecast actually faces.
 
 Usage:
     python code/export_model_release.py
@@ -45,7 +51,7 @@ from sklearn.model_selection import train_test_split
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fit_surfer_count_model import (  # noqa: E402
-    load_and_prepare, standardize, fit_quantile_model_robust,
+    load_and_prepare, standardize, fit_quantile_model_robust, split_by_day,
 )
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -72,9 +78,10 @@ def main():
     RELEASE_DIR.mkdir(parents=True, exist_ok=True)
 
     X, y, df, numeric_cols = load_and_prepare()
-    X_train_raw, X_test_raw, y_train, y_test, df_train, df_test = train_test_split(
-        X, y, df, test_size=TEST_SIZE, random_state=RANDOM_STATE
-    )
+    train_idx, test_idx = split_by_day(df, test_size=TEST_SIZE, scheme="forward")
+    X_train_raw, X_test_raw = X.iloc[train_idx], X.iloc[test_idx]
+    y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+    df_train, df_test = df.iloc[train_idx], df.iloc[test_idx]
     X_train, X_test = standardize(X_train_raw, X_test_raw, numeric_cols)
 
     print(f"\nTrain rows: {len(y_train)} (not published)  |  held-out test rows: {len(y_test)}")
@@ -130,7 +137,13 @@ def main():
     covered = ((y_test.to_numpy() >= lower) & (y_test.to_numpy() <= upper)).mean()
     meta = {
         "generated_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "split": {"test_size": TEST_SIZE, "random_state": RANDOM_STATE,
+        "split": {"scheme": "forward_by_day",
+                  "description": ("The most recent 20% of DAYS are held out and the model is "
+                                  "fitted on the earlier ones. No day appears on both sides. "
+                                  "This replaced a random 80/20 split on 2026-09-23, which "
+                                  "leaked: at ~13 rows per day it put hours from the same day "
+                                  "in train and test, flattering MAE by about 2 surfers."),
+                  "test_size": TEST_SIZE,
                   "n_train": int(len(y_train)), "n_test": int(len(y_test))},
         "test_date_range": [str(df_test["date"].min()), str(df_test["date"].max())],
         "quantiles": {"lower": LOWER_Q, "upper": UPPER_Q,

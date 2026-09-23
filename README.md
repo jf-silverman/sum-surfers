@@ -277,9 +277,10 @@ live in `code/`:
 - `fit_surfer_count_model.py` — fits and compares a Poisson
   [GLM](docs/HOW_IT_WORKS.md#term-glm), a negative-binomial GLM, and
   [gradient-boosted trees (GBT)](docs/HOW_IT_WORKS.md#term-gbt) — GBT is
-  the best performer, off by ~6 surfers on average
-  ([MAE](docs/HOW_IT_WORKS.md#term-mae)) — plus GBT-based prediction
-  intervals (see [Model Calibration](#model-calibration) below).
+  the best performer, off by about 7.6 surfers on average
+  ([MAE](docs/HOW_IT_WORKS.md#term-mae)) when asked to predict days it has
+  never seen — plus GBT-based prediction intervals (see
+  [Model Calibration](#model-calibration) below).
 - `predict_surf_count.py` — pulls live tomorrow's forecast and outputs
   a prediction with an 80% range:
     ```bash
@@ -297,8 +298,19 @@ live in `code/`:
   twice-weekly clip pipeline. See "How to Read the Daily Chart" below for
   what everything on it means.
 
-Caveat: held-out MAE is ~6 surfers on a typical count of ~15 — treat
+Caveat: held-out MAE is about 7.6 surfers on a typical count of ~16 — treat
 outputs as directional estimates, not precise counts.
+
+**That number went up on 2026-09-23, and the model did not get worse.** Until
+then accuracy was measured with a random 80/20 split of *hours*. At roughly 13
+hours per day, that puts hours from the same day on both sides of the split: the
+model got to learn a particular day's crowd level from that day's own hours, and
+was then scored on the rest of it — which is not a forecast, it is a fill-in.
+Splitting by whole day costs about 1.2 MAE, and holding out the most recent days
+rather than random ones costs about another 0.8, because the model then also has
+to cope with a genuine seasonal level shift. The published figure is now the
+forward-in-time one: fit on the past, scored on days that had not happened yet,
+which is the only version that matches how the forecast is used.
 
 See [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for how the real-world
 condition data above (weather, tide, swell, wind, wave energy) is
@@ -314,18 +326,19 @@ rather than trusted from the nominal target:
 
 ![Prediction-interval calibration for the surf-count model](analysis/surf_count_model_calibration/calibration_plot.png)
 
-Measured 2026-09-22, after the whole history was recounted with the
-September 2026 detector and the night frames were resolved by hand:
-18% vs 20%, 36% vs 40%, 52% vs 60%, and **75.5% vs 80%**. Every band is
-somewhat overconfident — real counts fall outside them more often than the
-nominal level says — which is the ordinary direction for this kind of model
-and the direction worth stating plainly.
+Measured 2026-09-23, holding out the most recent days as a block rather than
+random hours: 15% vs 20%, 26% vs 40%, 36% vs 60%, and **71.9% vs 80%**. Every
+band is overconfident — real counts fall outside them more often than the
+nominal level says — and the narrow bands badly so.
 
-The 80% band now misses **11.9% low and 12.5% high** against a 10% target on
-each side: roughly symmetric, so both edges carry information. That is a
-change from how this number read earlier the same day, and the reason is
-worth spelling out, because the earlier reading was flattering for the wrong
-cause.
+The 80% band misses **9.4% low and 18.8% high** against a 10% target on each
+side. The low edge is about right; the high edge is where the model loses, which
+is the same mean-reversion that makes it under-call crowded hours.
+
+These numbers are worse than the ones published here the day before (18/36/52/75.5%),
+and the model did not change. The split did: measuring on randomly chosen hours
+let the model see part of every test day during training. See the accuracy caveat
+above for what that was worth.
 
 Before the night-frame review, the check read 82% coverage, but it missed low
 only 4.6% of the time — the band's bottom edge sat under 1 surfer for 72% of
@@ -457,8 +470,8 @@ optimistic. The demo set is the clean check.
 
 ### Check the forecast model against held-out data
 
-`data/model_release/` holds the fitted forecast model, the **319 rows it was
-never trained on**, and the metadata to reproduce the split:
+`data/model_release/` holds the fitted forecast model, the **352 rows it was
+never trained on** (the most recent days, held out as a block), and the metadata to reproduce the split:
 
 ```bash
 python code/eval_surf_count_model.py
@@ -469,7 +482,7 @@ purpose. A predictions-versus-actuals file is self-reported — you can
 recompute the error from it, but not check that the model was not fit on
 those same rows. With the model included you can run it yourself on rows it
 never saw; the script re-predicts from the raw predictor values and verifies
-it reproduces the shipped numbers before reporting anything. The 1,275
+it reproduces the shipped numbers before reporting anything. The 1,242
 training rows stay unpublished.
 
 It reports MAE, RMSE and bias (broken out by how crowded the day actually

@@ -44,6 +44,7 @@ Usage:
 import csv
 import os
 import sys
+import json
 import random
 import time
 from datetime import datetime, timedelta, timezone
@@ -136,6 +137,23 @@ CSV_HEADER = [
 # seconds, so 403 gets its own far longer, jittered schedule. Jitter matters:
 # identical retry timing across runs is itself a bot signal.
 FORBIDDEN_BACKOFF_SEC = (20, 60, 150)
+
+# Spacing between the eight endpoint calls. They used to go out back to back,
+# which is a burst of eight requests in a couple of seconds, twice a night —
+# a retry schedule measured in minutes does not excuse a request pattern
+# measured in milliseconds. Jittered so runs are not identically timed.
+ENDPOINT_SPACING_SEC = 2.0
+ENDPOINT_SPACING_JITTER_SEC = 1.0
+
+# The same eight responses were fetched twice per pipeline run about a minute
+# apart: once to match predictors to existing crops (step 5), once for the
+# chart's forward-looking hours (step 9). The second fetch is not redundant in
+# content — the CSV holds only hours that already have a crop, so the chart
+# genuinely needs live forecast values — but it is redundant in *requests*.
+# A short-lived response cache removes it. The TTL is well under the rate at
+# which these forecasts change.
+FORECAST_CACHE_PATH = PROJECT_ROOT / "data" / "predictor_vars" / ".forecast_response_cache.json"
+FORECAST_CACHE_TTL_MIN = 90
 
 
 def fetch(path, params, headers=None, retries=3):
@@ -352,22 +370,56 @@ def merge_openmeteo_forecast(by_hour, hourly):
     return by_hour
 
 
-def build_predictor_map(days=DAYS):
-    """Live (forward-looking) fetch of `days` days starting today — no auth
-    token needed/used.
+def cached_age_min():
+    """Age of the forecast response cache in minutes, or None if there is none."""
+    if not FORECAST_CACHE_PATH.exists():
+        return None
+    age = time.time() - FORECAST_CACHE_PATH.stat().st_mtime
+    return age / 60.0
 
-    `days` is capped at FORECAST_MAX_DAYS: past that the endpoints return
-    HTTP 400 "Parameters out of bounds" and the run would come back with
-    nothing at all rather than a shorter forecast. Clamping turns an
-    unsupported horizon into a shorter one, which the caller can see (the
-    hours simply aren't in the returned map) instead of an empty chart.
+
+def load_cached_responses(days):
+    """Cached Surfline responses if they are fresh enough and cover `days`.
+
+    Returns None when there is no usable cache, so the caller fetches. A cache
+    for MORE days than asked for is still usable — the extra days are simply
+    ignored downstream — but one for fewer is not.
     """
-    if days > FORECAST_MAX_DAYS:
-        print(f"  NOTE: days={days} exceeds the verified anonymous horizon "
-              f"({FORECAST_MAX_DAYS}); requesting {FORECAST_MAX_DAYS} instead.")
-        days = FORECAST_MAX_DAYS
+    age = cached_age_min()
+    if age is None or age > FORECAST_CACHE_TTL_MIN:
+        return None
+    try:
+        blob = json.loads(FORECAST_CACHE_PATH.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+    if blob.get("days", 0) < days or blob.get("spot_id") != SPOT_ID:
+        return None
+    responses = blob.get("responses")
+    if not isinstance(responses, dict) or not responses:
+        return None
+    # A cache of nothing but failures is worse than refetching: it would pin a
+    # bad run's emptiness in place for the whole TTL.
+    if not any(responses.get(path) for path in ENDPOINT_PATHS):
+        return None
+    return responses
+
+
+def save_cached_responses(responses, days):
+    try:
+        FORECAST_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        FORECAST_CACHE_PATH.write_text(json.dumps(
+            {"fetched_at": datetime.now().isoformat(timespec="seconds"),
+             "days": days, "spot_id": SPOT_ID, "responses": responses}))
+    except OSError as e:
+        print(f"  WARNING: could not write the forecast cache ({e})")
+
+
+def fetch_endpoint_responses(days):
+    """The eight Surfline forecast endpoints, paced rather than in a burst."""
     responses = {}
-    for path in ENDPOINT_PATHS:
+    for i, path in enumerate(ENDPOINT_PATHS):
+        if i:
+            time.sleep(ENDPOINT_SPACING_SEC + random.uniform(0, ENDPOINT_SPACING_JITTER_SEC))
         params = {"spotId": SPOT_ID, "days": str(days), "intervalHours": "1"}
         try:
             responses[path] = fetch(path, params)
@@ -377,10 +429,41 @@ def build_predictor_map(days=DAYS):
             # A narrower except HTTPError here let a real DNS-resolution failure
             # (machine offline at cron time) propagate uncaught through main() and
             # crash the whole daily_chart.sh run before it ever reached its git
-            # commit/push step -- no chart, no README update, no error surfaced
-            # anywhere. See docs/PROJECT_HISTORY.md's 2026-09-03 entry.
+            # commit/push step. See docs/PROJECT_HISTORY.md's 2026-09-03 entry.
             print(f"  WARNING: {path} fetch failed ({e}), continuing without it")
             responses[path] = []
+    return responses
+
+
+def build_predictor_map(days=DAYS, use_cache=True):
+    """Live (forward-looking) fetch of `days` days starting today — no auth
+    token needed/used.
+
+    `days` is capped at FORECAST_MAX_DAYS: past that the endpoints return
+    HTTP 400 "Parameters out of bounds" and the run would come back with
+    nothing at all rather than a shorter forecast. Clamping turns an
+    unsupported horizon into a shorter one, which the caller can see (the
+    hours simply aren't in the returned map) instead of an empty chart.
+
+    Responses are cached for FORECAST_CACHE_TTL_MIN minutes. One pipeline run
+    calls this twice, about a minute apart — once to match predictors to
+    existing crops, once for the chart's forward hours — and those were eight
+    identical requests each time.
+    """
+    if days > FORECAST_MAX_DAYS:
+        print(f"  NOTE: days={days} exceeds the verified anonymous horizon "
+              f"({FORECAST_MAX_DAYS}); requesting {FORECAST_MAX_DAYS} instead.")
+        days = FORECAST_MAX_DAYS
+
+    responses = load_cached_responses(days) if use_cache else None
+    if responses is not None:
+        print(f"  Reusing forecast responses fetched {cached_age_min():.0f} min ago "
+              f"(0 requests).")
+    else:
+        responses = fetch_endpoint_responses(days)
+        if any(responses.get(path) for path in ENDPOINT_PATHS):
+            save_cached_responses(responses, days)
+
     by_hour = merge_into_by_hour({}, **responses)
 
     try:
@@ -394,7 +477,6 @@ def build_predictor_map(days=DAYS):
         print(f"  WARNING: Open-Meteo forecast fetch failed ({e}), continuing without real_* fields")
 
     return by_hour
-
 
 def load_rows(csv_path):
     if not csv_path.exists():

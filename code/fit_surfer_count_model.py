@@ -361,12 +361,60 @@ def fit_quantile_intervals(X_train, y_train, X_test, y_test, lower_q=0.1, upper_
         print(f"  actual={y_test.values[i]:.0f}  ->  [{pred_lower[i]:.1f}, {pred_median[i]:.1f}, {pred_upper[i]:.1f}]")
 
 
+def split_by_day(df, test_size=0.2, scheme="forward", random_state=42):
+    """Train/test indices that never split a day across both sides.
+
+    Replaces `train_test_split(..., random_state=42)`, which leaked badly here
+    (B21). At roughly 13 rows per day, a random 20% split puts hours from the
+    same day on BOTH sides: the model learns that specific day's crowd level
+    from its own hours and is then scored on the rest of that same day.
+    Measured cost of that leak on this data, same model and features:
+
+        random 80/20            MAE 5.53   <- what was reported
+        whole days held out     MAE 6.75
+        train past / test future MAE 7.57  <- what a day-ahead forecast faces
+
+    `scheme`:
+      "forward" — train on the earliest days, test on the most recent. This is
+        the number to quote, because it is the only one that matches how the
+        model is actually used: fit on the past, predict a day that has not
+        happened. It also has to survive real level shifts (Oct-Nov day-means
+        of 12.1 and 9.4 against Jul-Aug at 18.9 and 18.1).
+      "grouped" — random days held out. Removes the same-day leak but still
+        lets the model see the future. Useful to separate the two effects.
+
+    Returns (train_idx, test_idx) as positional integer arrays.
+    """
+    import numpy as np  # noqa: PLC0415
+
+    days = pd.to_datetime(df["date"]).dt.date.values
+    unique_days = np.array(sorted(set(days)))
+    n_test = max(int(round(len(unique_days) * test_size)), 1)
+
+    if scheme == "forward":
+        test_days = set(unique_days[-n_test:])
+    elif scheme == "grouped":
+        rng = np.random.default_rng(random_state)
+        test_days = set(rng.choice(unique_days, size=n_test, replace=False))
+    else:
+        raise ValueError(f"unknown scheme {scheme!r} (use 'forward' or 'grouped')")
+
+    mask = np.array([d in test_days for d in days])
+    return np.where(~mask)[0], np.where(mask)[0]
+
+
 def main():
     X, y, df, numeric_cols = load_and_prepare()
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    train_idx, test_idx = split_by_day(df, test_size=0.2, scheme="forward")
+    X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+    y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
     X_train, X_test = standardize(X_train, X_test, numeric_cols)
-    print(f"\nTrain rows: {len(X_train)}  Test rows: {len(X_test)}")
+    train_days = pd.to_datetime(df["date"]).dt.date.iloc[train_idx]
+    test_days = pd.to_datetime(df["date"]).dt.date.iloc[test_idx]
+    print(f"\nSplit: forward in time, whole days (see split_by_day / B21) — "
+          f"train through {train_days.max()}, test from {test_days.min()}")
+    print(f"Train rows: {len(X_train)}  Test rows: {len(X_test)}")
     print(f"Target (surfer_count) — train mean: {y_train.mean():.2f}, var: {y_train.var():.2f} "
           f"(var >> mean is the classic sign of overdispersion favoring negative binomial)")
     print(f"Note: {numeric_cols} are z-score standardized (train-set mean/std) for optimizer "

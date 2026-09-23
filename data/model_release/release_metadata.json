@@ -1,19 +1,20 @@
 {
-  "generated_utc": "2026-09-22T20:39:21Z",
+  "generated_utc": "2026-09-23T15:53:34Z",
   "split": {
+    "scheme": "forward_by_day",
+    "description": "The most recent 20% of DAYS are held out and the model is fitted on the earlier ones. No day appears on both sides. This replaced a random 80/20 split on 2026-09-23, which leaked: at ~13 rows per day it put hours from the same day in train and test, flattering MAE by about 2 surfers.",
     "test_size": 0.2,
-    "random_state": 42,
-    "n_train": 1275,
-    "n_test": 319
+    "n_train": 1242,
+    "n_test": 352
   },
   "test_date_range": [
-    "2025-10-12",
+    "2026-08-29",
     "2026-09-21"
   ],
   "quantiles": {
     "lower": 0.1,
     "upper": 0.9,
-    "lower_min_samples_leaf": 200,
+    "lower_min_samples_leaf": 20,
     "upper_min_samples_leaf": 20
   },
   "point_model_kwargs": {
@@ -25,10 +26,10 @@
   },
   "n_features": 34,
   "holdout_metrics": {
-    "mae": 5.578904530046327,
-    "rmse": 8.049738945751205,
-    "mean_bias": -1.0302385480382135,
-    "interval_coverage_80pct": 0.7523510971786834
+    "mae": 7.598251961647094,
+    "rmse": 10.43269945267001,
+    "mean_bias": -1.8381950142668217,
+    "interval_coverage_80pct": 0.7159090909090909
   },
   "coverage_note": "Coverage here is computed from the shipped q0.10/q0.90 pair alone. The README's calibration chart fits a 9-level quantile ladder and enforces monotonicity across all levels, so its 80% figure can differ from this one by a row or two.",
   "versions": {
