@@ -426,7 +426,11 @@ def find_nearest_hour_crop(target_date, target_hour=8, lookback_days=7):
 # full 1280px strip at 1920px, comfortably above 2x that column.
 SIDE_CROP_FRAC = 0.0
 GIF_UPSCALE = 1.5
-GIF_FRAME_MS = 2000
+# Each hour appears twice: bare frame, then the same frame with boxes. The bare
+# one holds longer because that is the half asking the viewer to do something —
+# find the specks — while the reveal only has to be read.
+GIF_LOOK_MS = 2500
+GIF_REVEAL_MS = 2000
 GIF_MAX_COLORS = 256          # full palette: box pixels are alpha-blended (see BOX_ALPHA),
                               # so their exact color varies with the water beneath and a
                               # smaller palette starts discarding them
@@ -503,8 +507,13 @@ def find_day_crops(detection_date, lookback_days=GIF_LOOKBACK_DAYS):
     return None, []
 
 
-def render_detection_frame(img_path, model):
-    """One annotated frame: real detection boxes, cropped, upscaled, labelled.
+def render_detection_frame(img_path, model, draw_boxes=True, boxes=None):
+    """One frame: cropped, upscaled, and optionally annotated with real boxes.
+
+    `draw_boxes=False` returns the identical pixels with nothing drawn, which is
+    what the animation's "look first" half needs — the two halves of a pair must
+    differ only by the boxes, or the eye tracks the change in the image instead
+    of the change in the annotation.
 
     Boxes come from the production path (tiling, cross-tile NMS,
     false-positive filtering) via run_inference_with_boxes, not a
@@ -512,7 +521,11 @@ def render_detection_frame(img_path, model):
     outlines and text are drawn at final resolution rather than being
     upscaled into blurry lines.
     """
-    boxes = ds.run_inference_with_boxes(model, img_path)
+    # `boxes` lets a caller run inference once and render the frame twice — the
+    # paired animation needs the same detections drawn and not drawn, and
+    # inference is by far the expensive part of this function.
+    if boxes is None:
+        boxes = ds.run_inference_with_boxes(model, img_path)
     img = cv2.imread(str(img_path))
     if img is None:
         return None, 0
@@ -537,8 +550,9 @@ def render_detection_frame(img_path, model):
         # some frames and the boxes rendered gray. 0.90 stays close enough to
         # the reserved palette entry to survive, which the regeneration check
         # verifies frame by frame.
-        cv2.rectangle(overlay, p1, p2, BOX_COLOR_BGR, 2)
-    if visible:
+        if draw_boxes:
+            cv2.rectangle(overlay, p1, p2, BOX_COLOR_BGR, 2)
+    if visible and draw_boxes:
         out = cv2.addWeighted(overlay, BOX_ALPHA, out, 1.0 - BOX_ALPHA, 0)
     return out, visible
 
@@ -683,27 +697,41 @@ def generate_detection_gif(detection_date):
         return existing
 
     model = ds.load_model()
-    frames = []
+    frames, durations = [], []
     for row in rows:
-        frame, count = render_detection_frame(ds.CROPS_DIR / row["filename"], model)
-        if frame is None:
+        img_path = ds.CROPS_DIR / row["filename"]
+        detections = ds.run_inference_with_boxes(model, img_path)
+        boxed, count = render_detection_frame(img_path, model, boxes=detections)
+        if boxed is None:
             continue
+        clean, _ = render_detection_frame(img_path, model, draw_boxes=False,
+                                          boxes=detections)
 
-        # Banner below the image, so the labels never cover water that might
-        # contain a surfer the reader is trying to spot.
-        banner_h = 46
-        h, w = frame.shape[:2]
-        canvas = np.zeros((h + banner_h, w, 3), dtype=np.uint8)
-        canvas[:h] = frame
         hh, mm = map(int, row["time_local"].split(":")[:2])
         stamp = datetime(day.year, day.month, day.day, hh, mm).strftime("%-I:%M %p")
-        # ASCII only: cv2's Hershey fonts have no glyph for an em dash and
-        # silently render it as "???".
-        cv2.putText(canvas, f"{stamp}   |   {count} surfers detected", (10, h + 33),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (235, 235, 235), 2, cv2.LINE_AA)
-        if not frames:
-            add_play_callout(canvas)
-        frames.append(Image.fromarray(cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)))
+
+        # Each hour shows twice: the bare frame first, so the reader can hunt
+        # for the dark specks themselves, then the same frame with the boxes
+        # drawn. Joel's idea (2026-09-22) — it turns the animation from
+        # something to watch into something to play along with, and it shows
+        # honestly how hard these are to see before the model marks them.
+        for is_boxed, image in ((False, clean), (True, boxed)):
+            # Banner below the image, so the labels never cover water that might
+            # contain a surfer the reader is trying to spot.
+            banner_h = 46
+            h, w = image.shape[:2]
+            canvas = np.zeros((h + banner_h, w, 3), dtype=np.uint8)
+            canvas[:h] = image
+            # ASCII only: cv2's Hershey fonts have no glyph for an em dash and
+            # silently render it as "???".
+            label = (f"{stamp}   |   {count} surfers detected" if is_boxed
+                     else f"{stamp}   |   how many surfers can you spot?")
+            cv2.putText(canvas, label, (10, h + 33),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (235, 235, 235), 2, cv2.LINE_AA)
+            if not frames:
+                add_play_callout(canvas)
+            frames.append(Image.fromarray(cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)))
+            durations.append(GIF_LOOK_MS if not is_boxed else GIF_REVEAL_MS)
 
     if not frames:
         print("No frames rendered — skipping detection animation.")
@@ -713,14 +741,16 @@ def generate_detection_gif(detection_date):
     CHARTS_DIR.mkdir(parents=True, exist_ok=True)
     latest_path = CHARTS_DIR / "latest_detection.gif"
     palette_frames[0].save(latest_path, save_all=True, append_images=palette_frames[1:],
-                           duration=GIF_FRAME_MS, loop=0, optimize=True, disposal=2)
+                           duration=durations, loop=0, optimize=True, disposal=2)
+    n_hours = len(frames) // 2
     (CHARTS_DIR / "latest_detection.json").write_text(
-        json.dumps({"date": day.isoformat(), "n_frames": len(frames)}) + "\n")
+        json.dumps({"date": day.isoformat(), "n_frames": n_hours}) + "\n")
     dated_path = CHARTS_DIR / f"detection_{day.isoformat()}.gif"
     dated_path.write_bytes(latest_path.read_bytes())
     size_mb = latest_path.stat().st_size / 1e6
-    print(f"Saved detection animation ({len(frames)} frames, {size_mb:.1f} MB) to {dated_path}")
-    return day, len(frames)
+    print(f"Saved detection animation ({n_hours} hours, {len(frames)} frames, "
+          f"{size_mb:.1f} MB) to {dated_path}")
+    return day, n_hours
 
 
 README_START_MARKER = "<!-- DAILY_CHART_START -->"
@@ -752,11 +782,13 @@ def update_readme(target_date, detection_capture=None):
         "of the photo.  Birds, reflections, people on the beach and sun glare "
         "fool it too: [what isn't a surfer](docs/non_surfer_objects.md) "
         "catalogs each one, how to tell it apart, and what the pipeline does "
-        "about it.  Each frame is one hour of that day, two seconds apart, and "
-        "shows the camera's full width - the same strip the pipeline counts, "
-        "so the number printed on each frame is the whole count for that hour.  "
-        "The surfers are small at this width; open the image on its own to see "
-        "them properly.\n"
+        "about it.  **Each hour is shown twice: first the bare frame, so you "
+        "can hunt for the surfers yourself as small dark specks, then the same "
+        "frame with the model's boxes drawn.**  Try it before the boxes appear - "
+        "it shows how hard these are to see, which is the whole problem the "
+        "model is solving.  Each frame shows the camera's full width, the same "
+        "strip the pipeline counts, so the number printed is the whole count "
+        "for that hour.\n"
     )
     FORECAST_CAPTION = (
         "Once enough hours and days were gathered along with weather and surf "

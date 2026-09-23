@@ -4451,3 +4451,22 @@ Also corrected a wording trap in the frames: the banner said "28 detected" for
 an hour whose recorded count is 29. Both numbers are right — the frame shows one
 frame's boxes, while the hour's count is the mean of three — so the banner now
 reads "28 in this frame (hour counted 29)".
+
+**Animation becomes look-then-reveal (2026-09-22, Joel's idea).** Each hour now
+appears twice: the bare frame for 2.5 seconds, captioned "how many surfers can
+you spot?", then the identical frame with the boxes drawn for 2 seconds,
+captioned with the count. It turns the animation from something to watch into
+something to play along with, and it shows rather than asserts how hard these
+detections are — the surfers really are just dark specks until they are marked.
+
+Implementation notes. `render_detection_frame()` gained `draw_boxes` and an
+optional precomputed `boxes` argument, so both halves of a pair come from one
+inference pass and differ *only* by the annotation. The first version called the
+renderer twice and ran the model twice per hour, roughly doubling an already
+CPU-bound step. Per-frame durations replace the single `GIF_FRAME_MS`: the bare
+frame holds longer because it is the half asking the viewer to do something.
+
+The sidecar and the return value now report *hours*, not frames, since frames
+are twice the hours and the caption is written in hours.
+
+Cost: the file roughly doubled, 2.6 MB to 5.9 MB, for 14 hours at 1920x316.
