@@ -76,6 +76,29 @@ REQUEST_HEADERS = {
 
 DAYS = 2  # today + 1, covers utcOffset edge cases around midnight
 
+# How far ahead these endpoints will actually serve an anonymous request.
+# Measured 2026-09-23, one request per endpoint per value (no token, the same
+# REQUEST_HEADERS below):
+#
+#   days=17  weather/rating/tides/surf/swells/wind/energy -> HTTP 400
+#            {"message":"Parameters out of bounds"}; `consistency` alone
+#            returned 200 with a full 408 hourly rows (17 x 24).
+#   days=8   all eight endpoints -> HTTP 200, 192 hourly rows each
+#            (224 tide samples, ~28 per day at finer-than-hourly spacing),
+#            every model feature populated for all 8 days — no thinning, no
+#            nulls, tide included.
+#
+# So the horizon is a per-endpoint cap on `days`, not a per-field one: within
+# the cap, day 8 is as complete as day 1. Tide is astronomically predictable
+# and does run further (it is on the 17-day-capable side in spirit), but
+# `tides` refuses days=17 like the rest, so the cap is the API's, not
+# physics'. The exact ceiling is somewhere in 9..16 and was not bisected —
+# each probe is a request against endpoints that have been returning
+# intermittent Cloudflare 403s, and 8 is all the forecast needs.
+#
+# FORECAST_MAX_DAYS is therefore "verified to work", not "the maximum".
+FORECAST_MAX_DAYS = 8
+
 # Endpoints fetched, and the key each response's payload is nested under
 # (data[<path>]) — same for every endpoint observed so far.
 #
@@ -329,11 +352,23 @@ def merge_openmeteo_forecast(by_hour, hourly):
     return by_hour
 
 
-def build_predictor_map():
-    """Live (forward-looking, today+DAYS) fetch — no auth token needed/used."""
+def build_predictor_map(days=DAYS):
+    """Live (forward-looking) fetch of `days` days starting today — no auth
+    token needed/used.
+
+    `days` is capped at FORECAST_MAX_DAYS: past that the endpoints return
+    HTTP 400 "Parameters out of bounds" and the run would come back with
+    nothing at all rather than a shorter forecast. Clamping turns an
+    unsupported horizon into a shorter one, which the caller can see (the
+    hours simply aren't in the returned map) instead of an empty chart.
+    """
+    if days > FORECAST_MAX_DAYS:
+        print(f"  NOTE: days={days} exceeds the verified anonymous horizon "
+              f"({FORECAST_MAX_DAYS}); requesting {FORECAST_MAX_DAYS} instead.")
+        days = FORECAST_MAX_DAYS
     responses = {}
     for path in ENDPOINT_PATHS:
-        params = {"spotId": SPOT_ID, "days": str(DAYS), "intervalHours": "1"}
+        params = {"spotId": SPOT_ID, "days": str(days), "intervalHours": "1"}
         try:
             responses[path] = fetch(path, params)
         except requests.exceptions.RequestException as e:
@@ -349,7 +384,11 @@ def build_predictor_map():
     by_hour = merge_into_by_hour({}, **responses)
 
     try:
-        openmeteo_hourly = fetch_openmeteo_forecast()
+        # Open-Meteo serves the same 8-day window happily (verified
+        # 2026-09-23: forecast_days=8 -> 192 hourly rows, no nulls in any of
+        # the five real_* fields), so it is asked for the same horizon
+        # rather than being left at 2 and silently NaN-ing days 3-8.
+        openmeteo_hourly = fetch_openmeteo_forecast(days=days)
         by_hour = merge_openmeteo_forecast(by_hour, openmeteo_hourly)
     except requests.exceptions.RequestException as e:
         print(f"  WARNING: Open-Meteo forecast fetch failed ({e}), continuing without real_* fields")

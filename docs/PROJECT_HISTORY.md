@@ -4507,3 +4507,124 @@ while the pipeline only ran on 21 of them — **221 of 527 recent counted hours,
 42%, exist only because a later run backfilled days the laptop slept through.**
 A live-only pipeline would trade that for a machine that must be awake every
 daylight hour, forever.
+
+### 2026-09-23 — Forecast extended to seven days, and a 1-5 crowd level
+
+Two changes to the forecast, plus the measurement each one rests on.
+
+**How far Surfline will actually forecast for an anonymous request.** The
+project deliberately calls `services.surfline.com/kbyg/spots/forecasts/*`
+with no access token (passing one 403s `rating`), and had been asking for
+`days=2`. Probed one request per endpoint per value, spaced ~20s apart
+because these endpoints have been intermittently refusing with Cloudflare
+403s:
+
+- `days=17`: `weather`, `rating`, `tides`, `surf`, `swells`, `wind` and
+  `energy` all return **HTTP 400 `{"message":"Parameters out of bounds"}`**.
+  `consistency` alone returns 200, with a full 408 rows (17 x 24 hours),
+  every one populated.
+- `days=8`: **all eight return 200** — 192 hourly rows each, 224 tide
+  samples (~28/day, finer than hourly). Merging them through the existing
+  `merge_into_by_hour()` gives all 17 Surfline predictor fields populated
+  for all 24 hours of all 8 days. No thinning with lead time, no nulls.
+- Open-Meteo's forecast API (the `real_*` features) serves
+  `forecast_days=8` with 192 rows and no nulls in any of the five fields.
+
+So the horizon is a cap on the `days` parameter, not a per-field or
+per-lead-time thinning: within the cap, day 8 is as complete as day 1.
+Tide included — worth stating explicitly, since tide is the top predictor
+by permutation importance and is astronomically predictable, but `tides`
+refuses `days=17` exactly like the rest, so what bounds it is the API and
+not the physics. The exact ceiling is somewhere in 9..16 and was not
+bisected: each probe is another request against endpoints that have been
+refusing, and 8 is all a 7-day forecast needs.
+`get_surf_predictors.FORECAST_MAX_DAYS = 8` records "verified to work",
+not "the maximum", and `build_predictor_map(days=...)` clamps to it rather
+than letting a larger ask return nothing at all.
+
+**A seven-day chart, not a wider daily one.** `data/charts/latest_week.png`
+is a day x hour grid — one row per day, one column per hour from first
+light to last light, each cell coloured by crowd level with the predicted
+count printed in it — plus a "busiest hour each day" side table. The daily
+chart already carries a median line, a shaded 80% band, a tide curve on a
+second axis, per-hour weather markers and labels, night shading and its own
+table, at a width the README embeds fixed; seven days of that is ~100
+hourly points and seven tide curves in the same space. The two also answer
+different questions — "what does tomorrow look like hour by hour" wants the
+interval and the tide, "which day should I go" wants one comparable number
+per day-hour — so the week got the form its question needs and the daily
+chart was left alone. Both charts come out of the same run and the same
+already-fitted models: no second refit, and no extra API requests, since
+one `build_predictor_map()` call covers the whole horizon.
+
+**Predictors that run out are marked, not absorbed.** A gradient-boosted
+tree returns a number whatever is missing — it just takes the "missing"
+branch at every split using that feature — so an hour scored on fewer
+inputs than the model was trained on looks exactly like a good one.
+`predict_for_hour()` now counts, per hour, how many of the model's numeric
+features are actually present. Hours missing any get the same coral
+cross-hatch the charts already use for "no training data this hour",
+a count in the point label, a line in the footer, and
+`n_missing_predictors`/`missing_predictors` columns in the forecast CSV.
+Exercised deliberately by dropping three predictor fields from day 4
+onward: 56 hours hatched, footer line printed. On live data today it reads
+zero, which is the measured normal case, not an untested path.
+
+**Crowd level 1-5.** `code/crowd_rating.py` defines the bands as the
+quintiles of the 1,594 hourly counts the model is fit on: **1 Empty 0-2,
+2 Quiet 3-8, 3 Steady 9-16, 4 Busy 17-27, 5 Packed 28+** (24.2% / 17.1% /
+19.3% / 19.6% / 19.9% of recorded hours — level 1 is oversized because
+14.4% of hours are exactly zero and a quintile edge cannot split a tie).
+
+The rating is **not** read off the median point estimate, and
+`code/eval_crowd_rating.py` is why. On 319 held-out hours, of which 21.3%
+are genuinely level 5:
+
+| read off | exact | within 1 | mean level error | level-5 recall | share rated 5 |
+|---|---|---|---|---|---|
+| q0.50 (median) | 50.5% | 92.2% | +0.09 | 25.0% | 7.8% |
+| q0.55 | 52.0% | 92.2% | +0.25 | 47.1% | 13.5% |
+| **q0.60 (adopted)** | **50.8%** | **91.5%** | **+0.32** | **54.4%** | **16.9%** |
+| q0.70 | 42.3% | 86.2% | +0.60 | 76.5% | 29.5% |
+| q0.90 | 31.7% | 75.5% | +0.97 | 91.2% | 47.3% |
+
+L02's regression to the mean shows up here as a *frequency* error rather
+than a bias in the level number: the median's mean level error is a
+near-perfect +0.09, yet it calls only 7.8% of hours level 5 where reality
+has 19.9%, and catches 25% of the genuinely packed ones — **it misses three
+out of four crowds.** Reading the rating at the 60th percentile instead
+costs nothing measurable in agreement (50.8% exact vs 50.5%, within-1 91.5%
+vs 92.2%) and more than doubles level-5 recall to 54.4%, with the share of
+hours rated 5 landing at 16.9% against reality's 19.9%. Past 0.65 the
+agreement falls away fast for recall bought by calling half the week
+packed. The 60th percentile is interpolated between the 0.50 and 0.90
+models the chart already fits — no fourth model, since the chart refits
+every run.
+
+The level appears in the daily chart's side table (new `Crowd` column), in
+every cell of the week grid, in the week chart's side table, and in both
+forecast CSVs.
+
+**Forecast records.** `forecast_row()` is now shared, so
+`data/forecasts/forecast_<date>.csv` and the new
+`data/forecasts/week_<made-date>.csv` have identical column meanings; the
+week file adds `lead_days` so forecast skill by lead time can be measured
+later. The new columns (`crowd_level`, `crowd_label`, `crowd_band`,
+`crowd_level_quantile`, `crowd_level_value`, `crowd_level_low`,
+`crowd_level_high`, `n_missing_predictors`, `missing_predictors`) are
+appended after the originals, and `code/email_daily_report.py` reads that
+file by column name, so it is unaffected.
+
+The week outlook deliberately does **not** write seven
+`forecast_<date>.csv` files. Those are write-once by design — "what was
+predicted before the day happened" — so a run that wrote one for six days
+out would make the run on the eve of that day skip it, quietly replacing
+the freshest forecast (the one the evening report scores) with a week-old
+one. One week file per run, named for the day it was made, keeps both
+records meaning what they say.
+
+**Not done:** forecast *skill* by lead time is unmeasured — the data to
+measure it does not exist yet, and starts accumulating with the first
+`week_*.csv`. Day 7 is currently presented with the same interval as day 1,
+which is almost certainly too narrow; the chart says so in words but the
+bands do not yet widen with lead time.
