@@ -44,6 +44,7 @@ Usage:
 import csv
 import os
 import sys
+import random
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -104,6 +105,16 @@ CSV_HEADER = [
 ]
 
 
+# Backoff for a Cloudflare 403, which is a different animal from a network
+# blip: the existing 2/4/6-second schedule below retried three times inside six
+# seconds on 2026-09-22 and was refused every time, costing that day's weather
+# and energy columns permanently (these endpoints are forward-looking only, so
+# no later run can refill them — see B20). A bot check does not clear in
+# seconds, so 403 gets its own far longer, jittered schedule. Jitter matters:
+# identical retry timing across runs is itself a bot signal.
+FORBIDDEN_BACKOFF_SEC = (20, 60, 150)
+
+
 def fetch(path, params, headers=None, retries=3):
     """
     GET one forecast endpoint. `params` should already include spotId and
@@ -113,7 +124,9 @@ def fetch(path, params, headers=None, retries=3):
     """
     headers = headers or REQUEST_HEADERS
     last_exc = None
-    for attempt in range(retries):
+    forbidden_attempt = 0
+    attempt = 0
+    while attempt < retries:
         try:
             r = requests.get(
                 f"https://services.surfline.com/kbyg/spots/forecasts/{path}",
@@ -134,7 +147,20 @@ def fetch(path, params, headers=None, retries=3):
             # 2026-09-03 entry (same root-cause bug as build_predictor_map()'s
             # except clause, found the same day).
             last_exc = e
-            time.sleep(2 * (attempt + 1))
+            status = getattr(getattr(e, "response", None), "status_code", None)
+            if status == 403 and forbidden_attempt < len(FORBIDDEN_BACKOFF_SEC):
+                # Does not consume a regular retry: a refused bot check and a
+                # flaky connection are different failures and should not share
+                # a budget.
+                delay = FORBIDDEN_BACKOFF_SEC[forbidden_attempt] * random.uniform(0.75, 1.25)
+                forbidden_attempt += 1
+                print(f"  {path}: 403 (bot check). Waiting {delay:.0f}s before retry "
+                      f"{forbidden_attempt} of {len(FORBIDDEN_BACKOFF_SEC)}...")
+                time.sleep(delay)
+                continue
+            attempt += 1
+            if attempt < retries:
+                time.sleep(2 * attempt)
     raise last_exc
 
 
