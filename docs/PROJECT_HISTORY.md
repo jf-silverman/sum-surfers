@@ -4507,3 +4507,41 @@ while the pipeline only ran on 21 of them — **221 of 527 recent counted hours,
 42%, exist only because a later run backfilled days the laptop slept through.**
 A live-only pipeline would trade that for a machine that must be awake every
 daylight hour, forever.
+
+### 2026-09-23 — Forecast log, and two audits
+
+**One file for forecasts and actuals.** The two halves lived apart: per-day
+forecast records in `data/forecasts/forecast_<date>.csv` and counts in
+`predictions.csv`. `code/build_forecast_log.py` now writes
+`data/forecasts/forecast_log.csv` — one row per forecast hour with the
+prediction, the band, the actual, the error, whether the actual landed inside
+the band, and the lead time in days. It is **rebuilt from the sources rather
+than appended to**, so it can never drift from them, and hours with no actual
+yet are kept with empty columns so the file also shows what is outstanding. It
+runs nightly from the evening report. Right now it holds 14 outstanding hours
+and nothing scored, because forecast recording only started on 2026-09-22.
+
+**Audit: are we retraining every day?** Yes — `plot_daily_prediction.py` refits
+from scratch on every run: three quantile models, a point model, and a
+15-repeat permutation importance whose only job is to print the footer's top
+predictors.
+
+Measured cost of that choice, which is not the CPU time. Fitting the median
+model on data through 2026-09-21 and again through 2026-09-22 — **14 new rows,
+0.9% of 1,594** — and comparing predictions on the same 101 recent hours:
+
+| | |
+|---|---:|
+| mean absolute change from one extra day | **0.78 surfers** |
+| largest single change | 3.35 |
+| hours changing by more than 1 surfer | 33 of 101 |
+| hours changing at all | 101 of 101 |
+
+So a published forecast moves by about 0.8 surfers a day for reasons that have
+nothing to do with changing conditions — roughly 15% of the model's own 5.4 MAE,
+pure refit churn on a small dataset. The recommendation is to fit on a schedule
+(weekly, or on N new rows), persist the model, and load it daily: the chart
+already stamps a training snapshot in its footer, so the provenance slot exists.
+Not implemented yet — it touches a file another task is editing.
+
+**Audit: request volume against the 403s.** See the entry below.

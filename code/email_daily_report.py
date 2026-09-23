@@ -435,6 +435,15 @@ def main():
             f"detector, not a human, so they carry its own error (about 1 surfer per\n"
             f"frame on held-out images).\n")
 
+    # Rebuild the combined forecast-vs-actual log while today's counts are fresh.
+    # Kept non-fatal: the log is a derived view, and losing it must never cost
+    # the report itself.
+    try:
+        import build_forecast_log  # noqa: PLC0415
+        build_forecast_log.build()
+    except Exception as e:
+        print(f"  WARNING: could not rebuild the forecast log ({type(e).__name__}: {e})")
+
     if args.no_send:
         print("\n--no-send, so here is the email that would go out:\n")
         print(body)
