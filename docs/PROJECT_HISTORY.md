@@ -1523,7 +1523,7 @@ confirm it completes normally and catches GitHub up immediately rather
 than waiting for tonight's cron — pushed successfully
 (`e83fd5a`, forecast for 2026-09-04). Detection image still shows
 2026-09-01 (last local_pipeline.sh success) — expected, not a bug; the
-twice-weekly clip cron was due to run later that same evening.
+scheduled clip run was due later that same evening.
 
 ### Added retry-with-backoff so a short home-internet outage recovers same-evening (2026-09-03)
 
@@ -2074,9 +2074,9 @@ days=2, +intervalHours, spotId alone). Surfline removed it.
 Joel asked to move clip collection to 9pm nightly, then audit what
 predictor data is missing and whether it can be backfilled.
 
-**Schedule.** Cron changed from `28 18 * * 2,4` (Tue/Thu 18:28) to
-`0 21 * * *` (nightly 21:00). Joel applies cron changes himself — the
-new crontab was staged to a file for him to install. The timing matters
+**Schedule.** Moved from twice a week to nightly, later in the evening.
+Joel applies schedule changes himself, so the change was staged rather than
+applied. The timing matters
 for a specific reason now documented at the top of `local_pipeline.sh`:
 Surfline's forecast endpoints are forward-looking only, serving today
 and tomorrow but never a past date without a premium token, so a clip
@@ -2948,29 +2948,25 @@ combined 130-frame pool tiles to at least 63 of 520 background tiles
 (12.1%) — slightly above the guideline, which `build_stratified_splits.py`
 can trim if it matters.
 
-### Daily chart chained onto the pipeline instead of its own cron entry (2026-09-15)
+### Daily chart chained onto the pipeline instead of a separate job (2026-09-15)
 
 The chart job silently produced nothing on the night of 2026-09-14: no chart
-file, no commit, and **no log lines at all** for its 21:15 slot, which means
-cron never started it rather than starting it and failing. The pipeline's own
-20:30 run that night completed normally at 20:31, and the power log shows the
-machine heading for sleep around 20:42 — Joel had packed the laptop up for a
-trip.
+file, no commit, and **no log lines at all** for its slot, which means it was
+never started rather than started and failed. The pipeline's own run that night
+completed normally, and the power log shows the machine heading for sleep a few
+minutes later — the laptop had been packed up for a trip.
 
-The structural problem, not the closed lid: the two jobs sat 45 minutes
-apart, the pipeline held the Mac awake with `caffeinate -i` only while it ran,
-and cron can neither wake a sleeping machine nor catch up a run it missed
-(launchd can; cron cannot). Any sleep inside that gap dropped a day's chart.
+The structural problem, not the closed lid: the two jobs sat 45 minutes apart,
+the pipeline held the machine awake only while it ran, and the scheduler in use
+then could neither wake a sleeping machine nor catch up a run it had missed. Any
+sleep inside that gap dropped a day's chart.
 
-`daily_chart.sh` is now Step 9 of `local_pipeline.sh` and its 21:15 crontab
-entry is removed. It runs inside the pipeline's existing `caffeinate` wrapper,
-so the gap no longer exists, and as a side benefit it now trains on detections
-written minutes earlier instead of the previous night's. It stays runnable by
-hand, and its failure is non-fatal to the pipeline — a chart is regenerable,
-the clip and detection data above it is not.
-
-Crontab is now a single line at 20:30. Staged for Joel to apply; this process
-is blocked from writing the crontab (macOS TCC).
+`daily_chart.sh` is now a step inside `local_pipeline.sh` rather than a separate
+scheduled job, so it runs within the pipeline's existing wake window and the gap
+no longer exists. As a side benefit it now trains on detections written minutes
+earlier instead of the previous night's. It stays runnable by hand, and its
+failure is non-fatal to the pipeline — a chart is regenerable, the clip and
+detection data above it is not.
 
 Worth noting for the trip: clip collection is the only step with a deadline.
 `get_clips.py` backfills `CLIP_LOOKBACK_DAYS` (default 5) days, so up to five
@@ -2978,37 +2974,30 @@ missed nights are recoverable by the next run; past that the footage is gone
 unless the camera still serves it at a larger lookback. Predictors backfill
 from history, detection rebuilds from clips, and charts are regenerable.
 
-### LaunchAgent written to replace the pipeline's cron entry (2026-09-15)
+### Scheduler swapped so missed runs catch up (2026-09-15)
 
-Checking whether to move the pipeline to launchd surfaced the more important
-fact: **nothing wakes this Mac for the 20:30 run.** The only repeating power
-event is `wakepoweron at 6:25PM weekdays only`, paired with another project's
-18:30 agent, and idle sleep is enabled. The pipeline has been running on the
-chance that the laptop happened to be awake — with no coverage at all at
-weekends.
+Reviewing the schedule surfaced the more important fact: **nothing was waking
+this machine for the nightly run.** The only repeating wake belonged to another
+project, on weekday evenings and hours earlier, and idle sleep was enabled. The
+pipeline had been running on the chance that the laptop happened to be awake,
+with no coverage at all at weekends.
 
-Retargeting the wake was rejected: `pmset repeat` holds a single repeating
-event, so moving it to 20:25 would remove the 18:25 wake the other project
-depends on.
+Retargeting that wake was rejected at the time: a machine has one repeating wake
+event, and taking it would have removed the one the other project depended on.
+(Resolved much later, on 2026-09-23, when that project moved to the same time.)
 
-`code/launchagents/com.jfs.sumsurfers.plist` instead relies on launchd's
-behaviour of running a missed `StartCalendarInterval` job at the next wake,
-which cron does not do — the exact failure mode that lost 2026-09-14's chart.
-The job still runs at 20:30 when the machine is awake; otherwise it runs when
-the lid next opens, and clip backfill (`CLIP_LOOKBACK_DAYS`, default 5) covers
-the delay.
+The pipeline moved to a scheduler that **runs a missed job at the next wake**,
+which the previous one did not do — the exact failure mode that lost
+2026-09-14's chart. The job still runs on time when the machine is awake;
+otherwise it runs when the lid next opens, and clip backfill
+(`CLIP_LOOKBACK_DAYS`, default 5) covers the delay. Setup specifics live in the
+private ops notes.
 
-Same `caffeinate -i` wrapper, same log file (launchd appends to
-`StandardOutPath`, matching the crontab `>>`), `RunAtLoad` false so installing
-it does not trigger a run. Install/verify/test/uninstall commands live in the
-plist's own comment. Not installed — Joel is loading it tonight after the
-existing cron run finishes, removing the crontab line in the same sitting so
-the job cannot fire twice.
-
-Open risk: Full Disk Access. The grants for `/usr/sbin/cron` and the real
-Python binary do not obviously cover a job launched by launchd through
-`/bin/bash`; a TCC denial would appear as `Operation not permitted` in
-`data/local_pipeline.log`. One manual `launchctl kickstart` answers it.
+Open risk at the time: the existing file-access grants covered the old
+scheduler and the Python binary, and it was not obvious they would cover a job
+launched a different way. A denial would surface as `Operation not permitted`
+in the pipeline log. One manual triggered run answers it — and, as the next two
+entries record, it did not go smoothly.
 
 ### The 10% band is genuinely zero; chart no longer dies on it (2026-09-16)
 
@@ -3054,72 +3043,57 @@ Changes, per Joel's call:
 Verified by generating the chart: the 0.1 level reports as degenerate, the
 band renders flat at zero, the footer note appears, and nothing overlaps.
 
-### LaunchAgent spawn failure: two separate TCC denials (2026-09-16)
+### A scheduled job that fails before it starts (2026-09-16)
 
-The first `launchctl kickstart` of `com.jfs.sumsurfers` returned silently and
-wrote nothing anywhere. `launchctl print` told the real story: **exit code 78
-(EX_CONFIG), "job state = spawn failed", runs = 1**. Nothing reached
-`data/local_pipeline.log` because the job never started.
+The first triggered run returned silently and wrote nothing anywhere. The
+scheduler's own status output told the real story: a configuration exit code and
+"spawn failed". Nothing reached the pipeline log because the job never started.
 
-Probed with a throwaway agent (`/bin/bash -c`, output to `/tmp`), which
-isolated two independent problems:
+A throwaway probe job, writing to an unprotected directory, isolated two
+independent problems:
 
-1. **launchd cannot open a `StandardOutPath` under `~/Documents`.** The test
-   agent with a `/tmp` log spawned cleanly (exit 0) while the real one failed
-   before running. The file open happens in launchd, not in the job, so
-   granting the *job* Full Disk Access does not help. Fixed in the plist: the
-   job is now `bash -c 'exec >> .../data/local_pipeline.log 2>&1; exec
-   local_pipeline.sh'`, so bash opens the log, and `StandardOutPath` points at
-   `/tmp/sumsurfers_launchd.log` purely to catch pre-redirect failures — the
-   exact case that was silent this time.
-2. **A launchd-spawned bash cannot read `~/Documents` either.** The probe
-   printed `CANNOT_READ_DOCS` (it could `touch` a new file but not `ls` the
-   directory). The pipeline globs those directories constantly, so it would
-   have failed immediately even once spawned. This needs a Full Disk Access
-   grant for `/bin/bash`, which is separate from the existing grants for
-   `/usr/sbin/cron` and the real Python binary — three distinct grants, none
-   implying the others.
+1. **The scheduler itself could not open a log file inside a protected folder.**
+   The probe with an unprotected log spawned cleanly while the real job failed
+   before running. That file is opened by the scheduler, not by the job, so
+   granting the *job* file access does not help. Fixed by having the shell open
+   the log itself after starting, and pointing the scheduler's own output at an
+   unprotected path purely to catch pre-redirect failures — the exact case that
+   was silent here.
+2. **The spawned shell could not read the project directory either.** The probe
+   could create a new file but not list the directory. The pipeline globs those
+   directories constantly, so it would have failed immediately even once
+   spawned.
 
-Worth keeping in mind generally: cron's grant does not carry to launchd, and a
-LaunchAgent whose log lives in a protected folder fails in the most unhelpful
-way available — no log line, no stderr, just an exit code visible only via
-`launchctl print`.
+Worth keeping in mind generally: a file-access grant to one scheduler does not
+carry to another, and a scheduled job whose log lives in a protected folder
+fails in the most unhelpful way available — no log line, no stderr, just an exit
+code visible only from the scheduler's status command.
 
-### TCC attributes a LaunchAgent's access to the lead process, not to bash (2026-09-16)
+### File-access grants attach to the process the scheduler starts (2026-09-16)
 
-After granting Full Disk Access to `/bin/bash`, the job still failed:
+After granting the shell file access, the job still failed — denied on both the
+log and the script itself — while the throwaway probe, re-run unchanged, now
+succeeded. So the grant had taken effect; something about the real job was
+different.
 
-    /bin/bash: .../data/local_pipeline.log: Operation not permitted
-    bash: .../code/local_pipeline.sh: Operation not permitted
+The difference was the **lead process**. The real job wrapped the shell in a
+sleep-suppression utility, so the scheduler started *that*, and macOS attributes
+a job's file access to the executable the scheduler starts — not to whatever
+runs later in the chain. The grant on the shell was irrelevant, because the
+wrapper had none. The probe worked precisely because it ran the shell directly.
 
-— denied on both the log and the script itself. Meanwhile the throwaway probe
-agent, re-run unchanged, now printed `CAN_READ_DOCS` / `CAN_WRITE_DOCS`. So the
-grant had taken effect; something about the real job was different.
+Fixed by making the shell the lead process and keeping the sleep assertion as a
+backgrounded child that waits on it. That holds off idle sleep for the whole run
+exactly as the old wrapper did, while leaving the shell as the process the
+system judges. Backgrounded rather than exec'd, since exec would put the wrapper
+back in front.
 
-The difference was the lead process. The real job was
-`/usr/bin/caffeinate -i /bin/bash -c ...`, so launchd started **caffeinate**,
-and TCC attributes a job's file access to the executable launchd starts — not
-to whatever runs later in the chain. The Full Disk Access on `/bin/bash` was
-irrelevant; `caffeinate` had none. The probe worked precisely because it ran
-bash directly.
+Verified end to end: a triggered run completed all nine steps, wrote 1,534
+training rows, generated the chart, committed and pushed it, and exited 0.
 
-Fixed by making bash the lead process and keeping the sleep assertion as a
-backgrounded child that waits on it:
-
-    /bin/bash -c 'exec >> <log> 2>&1; /usr/bin/caffeinate -i -w $$ & exec <pipeline>'
-
-`caffeinate -i -w $$` holds off idle sleep until the bash process exits,
-covering the whole run exactly as the old `caffeinate -i <script>` crontab
-wrapper did, while leaving bash as the process TCC judges. Backgrounded rather
-than exec'd, since exec would put caffeinate back in front.
-
-Verified end to end: `launchctl kickstart` ran all nine steps, wrote 1,534
-training rows, generated the chart, committed and pushed it, **exit code 0**,
-with `/tmp/sumsurfers_launchd.log` empty and `caffeinate -i -w <pid>` visible
-in `ps` for the duration.
-
-Three grants now exist and none implies the others: `/usr/sbin/cron` (legacy,
-no longer used), the real Python binary, and `/bin/bash`.
+The general lesson is the one worth carrying: these grants are per-executable
+and none implies another, so the question is always *which binary does the
+scheduler actually launch*.
 
 ### README restructured; detection animation, simpler chart, failure-only email (2026-09-16)
 
@@ -4265,9 +4239,9 @@ Checked every doc against the code after the day's changes. What was stale:
   `data/predictions/predictions.csv` and
   `data/predictor_vars/surfline_predictors.csv`. This cost real time earlier in
   the day — a script failed with `FileNotFoundError` on the documented path. It
-  also described a six-step pipeline that has nine steps, and a cron schedule
-  that no longer exists: `crontab -l` has no entry for this job, and
-  `launchctl list` shows `com.jfs.sumsurfers` running it daily at 20:30.
+  also described a six-step pipeline that has nine steps, and a scheduler that
+  is no longer the one in use — the job moved to launchd some time ago, and the
+  file still described the old arrangement.
 - **`misc_notes.md`** still described the frame-variability study as in
   progress. It concluded: three frames per clip, averaged. Sampling several
   times *within* the hour remains genuinely open and is now recorded as such,

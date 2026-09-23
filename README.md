@@ -294,9 +294,9 @@ live in `code/`:
   gradient with a side-by-side 80%-range table, tide, weather, night
   shading) and a detection-review image (real boxes/labels on the day's
   ~8am crop with the predicted range overlaid), auto-committed to the top
-  of this README. Run via its own daily cron entry, independent of the
-  twice-weekly clip pipeline. See "How to Read the Daily Chart" below for
-  what everything on it means.
+  of this README. Runs as the last step of the nightly pipeline, so it
+  trains on detections written minutes earlier. See "How to Read the Daily
+  Chart" below for what everything on it means.
 
 Caveat: held-out MAE is about 7.6 surfers on a typical count of ~16 — treat
 outputs as directional estimates, not precise counts.
