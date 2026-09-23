@@ -199,7 +199,8 @@ def extreme_frames(target_date, model=None):
         hh, mm = map(int, str(row["time_local"]).split(":")[:2])
         stamp = datetime(target_date.year, target_date.month, target_date.day,
                          hh, mm).strftime("%-I:%M %p")
-        cv2.putText(canvas, f"{label}  |  {stamp}  |  {visible} detected",
+        cv2.putText(canvas, f"{label}  |  {stamp}  |  {visible} in this frame "
+                    f"(hour counted {row['surfer_count']:.0f})",
                     (10, h + 31), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (235, 235, 235), 2,
                     cv2.LINE_AA)
         slug = label.lower().split()[0]
@@ -209,18 +210,40 @@ def extreme_frames(target_date, model=None):
     return out
 
 
+def missing_predictor_note(target_date):
+    """Names the predictor columns that are empty for a date, if any.
+
+    Turns "cannot reconstruct" into something actionable: the reason is almost
+    always that an upstream fetch failed for that day, and the columns say which.
+    """
+    if not FEATURES_CSV.exists():
+        return ""
+    df = pd.read_csv(FEATURES_CSV, float_precision="round_trip")
+    day = df[df["date"] == target_date.isoformat()]
+    if day.empty:
+        return f"There are no rows at all in the training table for {target_date}."
+    empty = [c for c in day.columns if day[c].isna().all()]
+    if not empty:
+        return ""
+    return (f"Every value is missing for these predictors on {target_date}: "
+            f"{', '.join(empty)}. Rows missing any predictor are dropped before "
+            f"fitting, so this day currently cannot be forecast or trained on. "
+            f"The usual cause is a failed forecast fetch during that day's run - "
+            f"check the pipeline log for 403s.")
+
+
 def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path, tide=None):
     fig, ax = plt.subplots(figsize=(13, 6.2), facecolor=pdp.BG_COLOR)
     ax.set_facecolor(pdp.AXES_BG)
 
-    fh = [r["hour"] for r in forecast_rows]
-    lower = [r["lower"] for r in forecast_rows]
-    upper = [r["upper"] for r in forecast_rows]
-    point = [r["point"] for r in forecast_rows]
-
-    ax.fill_between(fh, lower, upper, color=pdp.AQUA, alpha=0.22, linewidth=0,
-                    label="Forecast 80% range")
-    ax.plot(fh, point, color=pdp.AQUA, linewidth=2.5, label="Forecast")
+    if forecast_rows:
+        fh = [r["hour"] for r in forecast_rows]
+        ax.fill_between(fh, [r["lower"] for r in forecast_rows],
+                        [r["upper"] for r in forecast_rows],
+                        color=pdp.AQUA, alpha=0.22, linewidth=0,
+                        label="Forecast 80% range")
+        ax.plot(fh, [r["point"] for r in forecast_rows], color=pdp.AQUA,
+                linewidth=2.5, label="Forecast")
 
     if actuals:
         ah = [a[0] for a in actuals]
@@ -266,9 +289,14 @@ def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path, tide
     for text in legend.get_texts():
         text.set_color(pdp.TEXT_COLOR)
 
-    provenance = (f"Forecast recorded {recorded_at}" if recorded_at
-                  else "Forecast RECONSTRUCTED after the fact (no record existed for this "
-                       "date) — refit on rows before this day, so not the original forecast")
+    if not forecast_rows:
+        provenance = ("No forecast available for this day — actual counts only "
+                      "(see the email body for why)")
+    elif recorded_at:
+        provenance = f"Forecast recorded {recorded_at}"
+    else:
+        provenance = ("Forecast RECONSTRUCTED after the fact (no record existed for this "
+                      "date) — refit on rows before this day, so not the original forecast")
     fig.text(0.5, 0.01, provenance, fontsize=8, ha="center", va="bottom", color=pdp.MUTED_TEXT)
 
     fig.tight_layout(rect=[0, 0.04, 1, 1])
@@ -281,6 +309,10 @@ def summarize(forecast_rows, actuals):
     """Per-hour comparison text, matching each actual to its nearest forecast hour."""
     if not actuals:
         return "No counted hours for this day.", None
+    if not forecast_rows:
+        lines = [f"  {when.strftime('%-I:%M %p'):>9}   actual {count:>5.0f}"
+                 for when, count in actuals]
+        return "\n".join(lines), None
     by_hour = {r["hour"].hour: r for r in forecast_rows}
     lines, errs, inside = [], [], 0
     for when, count in actuals:
@@ -327,12 +359,25 @@ def main():
     print(f"  {len(actuals)} counted hours")
 
     recorded = load_recorded_forecast(target_date)
+    forecast_note = ""
     if recorded:
         forecast_rows, made_at = recorded
         print(f"  Using the recorded forecast (made {made_at})")
     elif args.allow_reconstruct:
         print("  No recorded forecast for this date — reconstructing from rows before it.")
-        forecast_rows, made_at = reconstruct_forecast(target_date)
+        try:
+            forecast_rows, made_at = reconstruct_forecast(target_date)
+        except RuntimeError as e:
+            # A missing forecast must not cost the whole report. The counts, the
+            # tide and the detector frames are all still worth sending, and the
+            # usual cause is an upstream predictor gap that says something in
+            # itself — a Surfline endpoint 403 nulls the weather and energy
+            # columns for the day, which drops those rows before any model sees
+            # them.
+            print(f"  Cannot reconstruct a forecast: {e}")
+            forecast_rows, made_at = [], None
+            forecast_note = (f"No forecast is shown for this day. {e}\n"
+                             f"{missing_predictor_note(target_date)}")
     else:
         print("  No recorded forecast and reconstruction disabled — nothing to send.")
         return 1
@@ -347,7 +392,7 @@ def main():
         print(f"  {label}: {stamp}, {count} detected -> {fpath.name}")
 
     table, stats = summarize(forecast_rows, actuals)
-    provenance = (f"Forecast recorded {made_at}." if made_at else
+    provenance = forecast_note if forecast_note else (f"Forecast recorded {made_at}." if made_at else
                   "NOTE: no forecast was recorded for this date, so the forecast shown was "
                   "reconstructed afterwards by refitting on data from before this day. It is "
                   "a re-enactment, not the original forecast. Days from here on will use the "
@@ -355,11 +400,14 @@ def main():
     headline = (f"Average miss {stats['mae']:.1f} surfers, bias {stats['bias']:+.1f} "
                 f"({'over' if stats['bias'] > 0 else 'under'}-forecast), "
                 f"{stats['inside']} of {stats['n']} hours inside the 80% range."
-                if stats else "No overlapping hours to score.")
+                if stats else
+                (f"{len(actuals)} hours counted, {int(max(a[1] for a in actuals))} at the busiest. "
+                 f"No forecast comparison available for this day." if actuals
+                 else "No counted hours to report."))
 
     if frames:
         frame_lines = "\n".join(
-            f"  {label}: {stamp}, {count} detected  ({fpath.name})"
+            f"  {label}: {stamp}, {count} boxes in the frame shown  ({fpath.name})"
             for label, fpath, count, stamp in frames)
         if not any(label == "Empty hour" for label, _p, _c, _s in frames):
             frame_lines += "\n  (No empty hour today — every counted hour had at least one surfer.)"

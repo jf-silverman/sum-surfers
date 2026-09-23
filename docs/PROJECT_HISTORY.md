@@ -4421,3 +4421,33 @@ and diffing.
 Also fixed a rendering bug in the summary: the line about why crowd size matters
 ended `expect. _**`, and the space before the closing underscore broke the
 emphasis, so the literal underscores were showing on the page.
+
+### 2026-09-22 (evening) — First nightly run of the report failed; two findings
+
+The 20:30 run sent a failure email. Step 10, the new evening report, raised
+`RuntimeError: No feature rows for 2026-09-22`. Steps 1-9 all succeeded.
+
+**Immediate cause, and the real one underneath.** Surfline's `weather` and
+`energy` endpoints both returned **403** during step 5, so five predictor columns
+— `temperature_f`, `pressure_mb`, `weather_condition`, `energy_offshore_kj`,
+`energy_nearshore_kj` — came back empty for every one of the day's 14 counted
+hours. Those rows still reach `training_features.csv`, but `load_and_prepare()`
+drops any row with a missing numeric feature, so the day vanished before the
+report could reconstruct a forecast for it, and the script treated that as fatal.
+
+**Fix 1 — the report degrades instead of failing.** A missing forecast now costs
+the forecast overlay and nothing else: the email still carries the day's counts,
+the tide line and the detector frames, and states plainly why no forecast is
+shown, naming the empty columns. The chart footer says the same. Verified by
+re-running against 2026-09-22.
+
+**Fix 2 — B20 logged, not fixed.** The deeper problem is that a transient 403
+permanently costs a day of training data: these endpoints are forward-looking
+only, so no later run can refill 2026-09-22. It wants a retry inside the fetch
+or an alternate source. First occurrence, so it is logged and watched rather
+than solved on one data point.
+
+Also corrected a wording trap in the frames: the banner said "28 detected" for
+an hour whose recorded count is 29. Both numbers are right — the frame shows one
+frame's boxes, while the hour's count is the mean of three — so the banner now
+reads "28 in this frame (hour counted 29)".
