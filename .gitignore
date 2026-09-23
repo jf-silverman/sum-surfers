@@ -231,3 +231,5 @@ data/reviews/night_window_review/
 data/hero_candidates/
 # Per-day forecast-vs-actual report charts (emailed, not published)
 data/charts/forecast_vs_actual_*.png
+# Per-day extreme detector frames (emailed, not published)
+data/charts/frame_*.png

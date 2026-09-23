@@ -30,6 +30,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import cv2
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -126,7 +127,89 @@ def reconstruct_forecast(target_date):
     return sorted(rows, key=lambda r: r["hour"]), None
 
 
-def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path):
+FEATURES_CSV = _PROJECT_ROOT / "data" / "training_features.csv"
+
+
+def tide_by_hour(target_date):
+    """[(datetime, tide_ft), ...] for the day, from the training features table.
+
+    Tide is already joined to every counted hour there, so it needs no second
+    API call and is exactly the value the forecast model saw.
+    """
+    if not FEATURES_CSV.exists():
+        return []
+    df = pd.read_csv(FEATURES_CSV, float_precision="round_trip")
+    df = df[(df["date"] == target_date.isoformat()) & df["tide_ft"].notna()]
+    if df.empty:
+        return []
+    # One row per hour: duplicate hours (two clips in the same hour) carry the
+    # same tide, so taking the first is enough.
+    seen, out = set(), []
+    for _, r in df.sort_values("hour_local").iterrows():
+        hour = int(r["hour_local"])
+        if hour in seen:
+            continue
+        seen.add(hour)
+        out.append((datetime(target_date.year, target_date.month, target_date.day, hour, 0),
+                    float(r["tide_ft"])))
+    return out
+
+
+def extreme_frames(target_date, model=None):
+    """Detector frames for the day's busiest hour, an empty hour, and the quietest
+    non-empty hour — the three points where counting is hardest to trust.
+
+    Returns [(label, path, count), ...]; an empty hour is included only if the
+    day had one.
+    """
+    df = pd.read_csv(PREDICTIONS_CSV, float_precision="round_trip")
+    df = df[(df["date"] == target_date.isoformat())
+            & (df["quality_ok"].astype(str) == "True")
+            & df["surfer_count"].notna()]
+    if df.empty:
+        return []
+
+    picks = []
+    busiest = df.loc[df["surfer_count"].idxmax()]
+    picks.append(("Busiest hour", busiest))
+    zeros = df[df["surfer_count"] == 0]
+    if not zeros.empty:
+        picks.append(("Empty hour", zeros.iloc[0]))
+    nonzero = df[df["surfer_count"] > 0]
+    if not nonzero.empty:
+        quietest = nonzero.loc[nonzero["surfer_count"].idxmin()]
+        if quietest["filename"] != busiest["filename"]:
+            picks.append(("Quietest hour above zero", quietest))
+
+    if model is None:
+        model = pdp.ds.load_model()
+
+    out = []
+    for label, row in picks:
+        img_path = pdp.ds.CROPS_DIR / row["filename"]
+        if not img_path.exists():
+            continue
+        frame, visible = pdp.render_detection_frame(img_path, model)
+        if frame is None:
+            continue
+        banner_h = 44
+        h, w = frame.shape[:2]
+        canvas = np.zeros((h + banner_h, w, 3), dtype=np.uint8)
+        canvas[:h] = frame
+        hh, mm = map(int, str(row["time_local"]).split(":")[:2])
+        stamp = datetime(target_date.year, target_date.month, target_date.day,
+                         hh, mm).strftime("%-I:%M %p")
+        cv2.putText(canvas, f"{label}  |  {stamp}  |  {visible} detected",
+                    (10, h + 31), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (235, 235, 235), 2,
+                    cv2.LINE_AA)
+        slug = label.lower().split()[0]
+        out_path = OUT_DIR / f"frame_{target_date.isoformat()}_{slug}.png"
+        cv2.imwrite(str(out_path), canvas)
+        out.append((label, out_path, visible, stamp))
+    return out
+
+
+def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path, tide=None):
     fig, ax = plt.subplots(figsize=(13, 6.2), facecolor=pdp.BG_COLOR)
     ax.set_facecolor(pdp.AXES_BG)
 
@@ -142,9 +225,26 @@ def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path):
     if actuals:
         ah = [a[0] for a in actuals]
         av = [a[1] for a in actuals]
-        ax.plot(ah, av, color=pdp.LIME, linewidth=2.0, linestyle="-", marker="o",
+        # Coral, not lime: lime is the tide line on the right-hand axis, and two
+        # lime lines on one chart is exactly the confusion this chart exists to
+        # avoid — the whole point is reading crowd against tide.
+        ax.plot(ah, av, color=pdp.CORAL, linewidth=2.2, linestyle="-", marker="o",
                 markersize=7, markeredgecolor="white", markeredgewidth=0.8,
                 label="Actual detected", zorder=5)
+
+    if tide:
+        # Second axis on the right, matching the daily chart's convention so the
+        # two read the same way. Tide is the strongest single predictor in the
+        # model, so a crowd peak sitting on a low tide is the first thing to
+        # look for when the forecast misses a busy hour.
+        ax2 = ax.twinx()
+        ax2.set_facecolor(pdp.AXES_BG)
+        ax2.plot([t[0] for t in tide], [t[1] for t in tide], color=pdp.LIME,
+                 linestyle="--", linewidth=2, zorder=2, label="Tide (ft)")
+        ax2.set_ylabel("Tide (ft)", color=pdp.LIME)
+        ax2.tick_params(axis="y", colors=pdp.LIME)
+        for spine in ax2.spines.values():
+            spine.set_color(pdp.GRID_COLOR)
 
     ax.set_title(f"Forecast vs. actual — {target_date.strftime('%A, %B %d, %Y')}",
                  color=pdp.TEXT_COLOR)
@@ -156,7 +256,13 @@ def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path):
         spine.set_color(pdp.GRID_COLOR)
     ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%-I %p"))
 
-    legend = ax.legend(loc="upper left", facecolor=pdp.AXES_BG, edgecolor=pdp.GRID_COLOR)
+    handles, labels = ax.get_legend_handles_labels()
+    if tide:
+        h2, l2 = ax2.get_legend_handles_labels()
+        handles += h2
+        labels += l2
+    legend = ax.legend(handles, labels, loc="upper left", facecolor=pdp.AXES_BG,
+                       edgecolor=pdp.GRID_COLOR)
     for text in legend.get_texts():
         text.set_color(pdp.TEXT_COLOR)
 
@@ -231,9 +337,14 @@ def main():
         print("  No recorded forecast and reconstruction disabled — nothing to send.")
         return 1
 
+    tide = tide_by_hour(target_date)
     out_path = OUT_DIR / f"forecast_vs_actual_{target_date.isoformat()}.png"
-    build_chart(target_date, forecast_rows, actuals, made_at, out_path)
-    print(f"  Chart: {out_path}")
+    build_chart(target_date, forecast_rows, actuals, made_at, out_path, tide=tide)
+    print(f"  Chart: {out_path}  (tide points: {len(tide)})")
+
+    frames = extreme_frames(target_date)
+    for label, fpath, count, stamp in frames:
+        print(f"  {label}: {stamp}, {count} detected -> {fpath.name}")
 
     table, stats = summarize(forecast_rows, actuals)
     provenance = (f"Forecast recorded {made_at}." if made_at else
@@ -246,12 +357,35 @@ def main():
                 f"{stats['inside']} of {stats['n']} hours inside the 80% range."
                 if stats else "No overlapping hours to score.")
 
+    if frames:
+        frame_lines = "\n".join(
+            f"  {label}: {stamp}, {count} detected  ({fpath.name})"
+            for label, fpath, count, stamp in frames)
+        if not any(label == "Empty hour" for label, _p, _c, _s in frames):
+            frame_lines += "\n  (No empty hour today — every counted hour had at least one surfer.)"
+    else:
+        frame_lines = "  (No frames available for this day.)"
+
+    tide_note = ""
+    if tide and actuals:
+        peak_hour = max(actuals, key=lambda a: a[1])[0].hour
+        tide_at_peak = dict((t[0].hour, t[1]) for t in tide).get(peak_hour)
+        lowest = min(tide, key=lambda t: t[1])
+        if tide_at_peak is not None:
+            tide_note = (f"\nTide: the day's busiest hour ({peak_hour}:00) sat at "
+                         f"{tide_at_peak:.2f} ft; the day's low was {lowest[1]:.2f} ft at "
+                         f"{lowest[0].hour}:00.\n")
+
     body = (f"Surf crowd forecast vs. actual for {target_date.strftime('%A, %B %d, %Y')}\n\n"
-            f"{headline}\n\n"
+            f"{headline}\n"
+            f"{tide_note}\n"
             f"Hour by hour:\n{table}\n\n"
+            f"Detector frames attached, at the three points where counting is hardest\n"
+            f"to trust:\n{frame_lines}\n\n"
             f"{provenance}\n\n"
-            f"Chart attached. Counts come from the detector, not a human, so they carry its\n"
-            f"own error (about 1 surfer per frame on held-out images).\n")
+            f"Chart attached, with tide on the right-hand axis. Counts come from the\n"
+            f"detector, not a human, so they carry its own error (about 1 surfer per\n"
+            f"frame on held-out images).\n")
 
     if args.no_send:
         print("\n--no-send, so here is the email that would go out:\n")
@@ -259,7 +393,7 @@ def main():
         return 0
 
     send_email(f"Surf forecast vs. actual — {target_date.strftime('%b %d, %Y')}",
-               body, attachments=[out_path] + args.attach)
+               body, attachments=[out_path] + [f[1] for f in frames] + args.attach)
     print("  Email sent.")
     return 0
 

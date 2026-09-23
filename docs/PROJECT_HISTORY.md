@@ -4363,3 +4363,20 @@ reliable is partly its width: the afternoon range ran 7-35 surfers.
 `send_email.py` gained optional attachments. A missing attachment raises rather
 than sending the report without it, since a daily email whose chart silently
 failed to attach looks the same as one with nothing to say.
+
+**Report extended the same day.** Joel asked for tide on the report chart, on a
+right-hand axis, to test whether the midday crowd peak the forecast keeps
+missing tracks the tide. On 2026-09-21 it does, cleanly: the count peaked at 30
+at 1:38 PM while the tide sat at 3.12 ft, against a day low of 3.06 ft at 2 PM
+and a morning high of 4.00 ft. The forecast called 19.7 for that hour. Tide is
+already the model's strongest predictor, so the miss is not that it lacks the
+signal — it is that the model regresses to the mean on crowded hours (L02).
+
+The actual-count line is coral rather than lime, because the tide line is lime:
+two lime lines would defeat the one comparison the chart exists to support.
+
+The email also attaches detector frames from the day's extremes — busiest hour,
+an empty hour if there was one, and the quietest hour above zero — so the
+counting can be judged by eye where it is least trustworthy. On 2026-09-21 that
+is 1:38 PM (30 detected) and 7:02 PM (1 detected); no hour that day was empty,
+and the email says so rather than silently omitting the frame.
