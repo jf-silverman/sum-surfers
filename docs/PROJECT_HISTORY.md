@@ -4851,3 +4851,41 @@ Worth being clear about what a missed run costs: **not the counts**. Clip
 collection backfills up to `CLIP_LOOKBACK_DAYS` (5), so the data arrives late but
 arrives. What is lost is that evening's *forecast* — and now its forecast record,
 which is the thing the lead-time table needs.
+
+### 2026-09-23 — Lags, lunar tide and weekday: measured and rejected
+
+Joel asked to augment the model rather than replace it: previous-*day* lags (not
+previous-hour, which he deliberately held back), tide as a lunar cycle, weekday,
+and an ensemble. All of it measured against the corrected 7.60 baseline.
+**Nothing cleared the 0.5 MAE bar, and the way it failed is the useful part.**
+
+The best combination scored **6.93 on the headline split, a 0.64 gain** — which
+reads as a pass. Across **10 rolling origins** the same feature set is
+**+0.011 MAE, paired-t p = 0.953**, better in 6 of 10, with per-origin deltas
+from −0.67 to +1.10. Two of the 24 headline test days carry nearly the whole
+apparent gain. Reproduced in-session: base 7.723, lean 7.734.
+
+That is now recorded as **L09**: a single forward split is underpowered below
+about 0.5 MAE. The B21 fix made the split correct; this says one instance of it
+is still not enough evidence at this effect size.
+
+**The lunar result is the one worth keeping in mind.** The astronomy is right —
+`spring_neap` correlates **+0.745** with observed daily tide range over 116 days,
+verified independently — and the features still hurt. The moon reaches the crowd
+only *through* the tide, and `tide_ft` is already the dominant predictor
+(importance +3.34), so re-expressing the same astronomy in a dozen coordinates
+adds noise. The raw phase terms scored negative, the worst in the matrix.
+
+Also settled: all seven one-hot day-of-week columns scored **exactly 0.0** —
+`is_weekend` carries the entire weekday effect. And the ensemble has no interior
+optimum: blending was monotone in the weight on the new-feature model, because
+two gradient-boosted models on nested feature sets make the same errors.
+
+Two findings survive as knowledge rather than shipped code: `weekend_x_hour_cos`
+ranked 4th of 72 features, meaning the weekend crowd is differently *shaped*
+across the day rather than simply larger; and `lag1d_samehour` ranked 3rd,
+beating `lag1d_daymean` decisively, so what day-to-day persistence exists is
+hour-specific rather than a day-level level shift.
+
+`code/forecast_features.py` and `code/eval_forecast_features.py` are kept
+unused, as the record of a closed question.
