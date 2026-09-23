@@ -4380,3 +4380,23 @@ an empty hour if there was one, and the quietest hour above zero — so the
 counting can be judged by eye where it is least trustworthy. On 2026-09-21 that
 is 1:38 PM (30 detected) and 7:02 PM (1 detected); no hour that day was empty,
 and the email says so rather than silently omitting the frame.
+
+**Animation tuning and page placement (2026-09-22, later).** Four changes at
+Joel's request: 2 seconds per frame instead of 1, boxes at 90% opacity instead
+of fully opaque, confidence numbers dropped as clutter, and the animation moved
+to sit directly under the "Project Summary" heading at the top of the README,
+with the forecast chart staying further down.
+
+The opacity change needed care, since 65% opacity was half of what made boxes
+render gray in the first place. Two things keep it safe at 90%: the shared
+palette now holds 256 colors rather than 128, and 90% stays close enough to the
+reserved green that quantization lands every blended box pixel on a single
+entry. Verified frame by frame — frames 1-13 all render box pixels at exactly
+(151, 215, 91), one uniform color, rather than drifting per frame. Frame 0
+differs only because it also carries the pure-green play callout.
+
+Moving the animation meant splitting the README writer. It used to rewrite one
+marked block containing both images; now there are two marker pairs
+(`DETECTION_GIF_*` and `DAILY_CHART_*`), rewritten independently, so either can
+move on the page without the nightly run dragging the other back. Checked for
+idempotency by running twice and diffing: the second run changes nothing.

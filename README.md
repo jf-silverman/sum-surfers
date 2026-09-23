@@ -2,6 +2,15 @@
 
 ## Project Summary
 
+<!-- DETECTION_GIF_START -->
+#### A Full Day of Surfer Detections: Monday, September 21, 2026
+
+Each green box below contains a surfer, according to the object detection model.  Look carefully and you may find additional surfers that the model missed or other objects which are misclassified as surfers - like the wind sock at the bottom center of the photo.  Birds, reflections, people on the beach and sun glare fool it too: [what isn't a surfer](docs/non_surfer_objects.md) catalogs each one, how to tell it apart, and what the pipeline does about it.  Each frame is one hour of that day, two seconds apart, and shows the camera's full width - the same strip the pipeline counts, so the number printed on each frame is the whole count for that hour.  The surfers are small at this width; open the image on its own to see them properly.
+![Detections through Monday, September 21, 2026](data/charts/latest_detection.gif)
+
+<!-- DETECTION_GIF_END -->
+
+
 This project collects images from a shoreline video camera and tries to answer two questions:
 - **_How many surfers were out are out there each hour of each day in the past?_**
 - **_How many will there be at each hour of the day in the upcoming days?_**
@@ -9,11 +18,6 @@ This project collects images from a shoreline video camera and tries to answer t
 **_This matters to me as a surfer because the competition for each wave becomes more intense as the crowd size increases.  It helps me choose when to go and know what to expect. _**
 
 <!-- DAILY_CHART_START -->
-#### A Full Day of Surfer Detections: Monday, September 21, 2026
-
-Each green box below contains a surfer, according to the object detection model.  Each number above a box indicates the probability that the object is a surfer.  Look carefully and you may find additional surfers that the model missed or other objects which are misclassified as surfers - like the wind sock at the bottom center of the photo.  Birds, reflections, people on the beach and sun glare fool it too: [what isn't a surfer](docs/non_surfer_objects.md) catalogs each one, how to tell it apart, and what the pipeline does about it.  Each frame is one hour of that day, one second apart, and shows the camera's full width - the same strip the pipeline counts, so the number printed on each frame is the whole count for that hour.  The surfers are small at this width; open the image on its own to see them properly.
-![Detections through Monday, September 21, 2026](data/charts/latest_detection.gif)
-
 #### The Surfer Crowd Forecast for: Wednesday, September 23, 2026
 
 Once enough hours and days were gathered along with weather and surf conditions, a surf count prediction model was built to forecast how many surfers would be present at each hour for the coming day.  This is useful for surfers to plan to avoid busy times or at least know what to expect.  The forecast still runs about one surfer low on average, and it misses by about five surfers in a typical hour - crowds depend on plenty of things the weather and surf data never see.  The detector underneath it used to undercount badly in fog and glare, which made the forecast worse; that was fixed in September 2026 by labeling those conditions and retraining, so what remains is the prediction model's own error.

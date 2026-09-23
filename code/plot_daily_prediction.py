@@ -426,8 +426,15 @@ def find_nearest_hour_crop(target_date, target_hour=8, lookback_days=7):
 # full 1280px strip at 1920px, comfortably above 2x that column.
 SIDE_CROP_FRAC = 0.0
 GIF_UPSCALE = 1.5
-GIF_FRAME_MS = 1000
-GIF_MAX_COLORS = 128          # palette size — the strip is mostly water, so this is plenty
+GIF_FRAME_MS = 2000
+GIF_MAX_COLORS = 256          # full palette: box pixels are alpha-blended (see BOX_ALPHA),
+                              # so their exact color varies with the water beneath and a
+                              # smaller palette starts discarding them
+# Boxes are drawn slightly translucent so they sit on the water rather than
+# hovering over it. Kept high: at lower opacity the blended greens drift far
+# enough from the reserved palette entry that GIF quantization starts snapping
+# them toward gray, which is the bug this whole path was fixed for once already.
+BOX_ALPHA = 0.90
 # Box color, defined once in both spaces: cv2 draws in BGR, the GIF palette
 # reserves it in RGB. Keeping a single source for it is what guarantees the
 # drawn pixels and the reserved palette entry are the same color.
@@ -515,6 +522,7 @@ def render_detection_frame(img_path, model):
     cropped = img[:, x0:x1]
     out = cv2.resize(cropped, None, fx=GIF_UPSCALE, fy=GIF_UPSCALE, interpolation=cv2.INTER_CUBIC)
 
+    overlay = out.copy()
     visible = 0
     for bx1, by1, bx2, by2, conf in boxes:
         # Drop boxes the crop removed; clip ones it cuts through.
@@ -523,15 +531,15 @@ def render_detection_frame(img_path, model):
         visible += 1
         p1 = (int(max(bx1 - x0, 0) * GIF_UPSCALE), int(by1 * GIF_UPSCALE))
         p2 = (int(min(bx2 - x0, x1 - x0) * GIF_UPSCALE), int(by2 * GIF_UPSCALE))
-        # Drawn at full opacity, directly onto the frame. These used to be
-        # composited at 65% via addWeighted, which blended every box toward the
-        # gray water under it — and a blended, frame-dependent green is exactly
-        # the kind of rare color GIF palette quantization throws away, so boxes
-        # came out green on some frames and gray on others. One exact color,
-        # reserved in the shared palette below, renders identically everywhere.
-        cv2.rectangle(out, p1, p2, BOX_COLOR_BGR, 2)
-        cv2.putText(out, f"{conf:.2f}", (p1[0], max(p1[1] - 6, 14)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, BOX_COLOR_BGR, 2, cv2.LINE_AA)
+        # Drawn onto an overlay that is composited at BOX_ALPHA below. An
+        # earlier version used 0.65 here, which pushed the blended green far
+        # enough toward the water beneath that GIF quantization dropped it on
+        # some frames and the boxes rendered gray. 0.90 stays close enough to
+        # the reserved palette entry to survive, which the regeneration check
+        # verifies frame by frame.
+        cv2.rectangle(overlay, p1, p2, BOX_COLOR_BGR, 2)
+    if visible:
+        out = cv2.addWeighted(overlay, BOX_ALPHA, out, 1.0 - BOX_ALPHA, 0)
     return out, visible
 
 
@@ -717,6 +725,12 @@ def generate_detection_gif(detection_date):
 
 README_START_MARKER = "<!-- DAILY_CHART_START -->"
 README_END_MARKER = "<!-- DAILY_CHART_END -->"
+# The animation sits high on the page, directly under the Project Summary
+# heading, while the forecast chart stays further down with the rest of the
+# summary. Two marker pairs rather than one block, so each can move
+# independently without the nightly rewrite dragging the other along.
+DETECTION_START_MARKER = "<!-- DETECTION_GIF_START -->"
+DETECTION_END_MARKER = "<!-- DETECTION_GIF_END -->"
 
 
 def update_readme(target_date, detection_capture=None):
@@ -725,9 +739,10 @@ def update_readme(target_date, detection_capture=None):
     daily; only the content between the markers changes."""
     readme_path = _PROJECT_ROOT / "README.md"
     readme = readme_path.read_text()
-    if README_START_MARKER not in readme or README_END_MARKER not in readme:
-        print(f"WARNING: README.md markers not found — skipping README update. "
-              f"Add {README_START_MARKER} / {README_END_MARKER} to enable this.")
+    if README_START_MARKER not in readme and DETECTION_START_MARKER not in readme:
+        print("WARNING: no README markers found — skipping README update. Add "
+              f"{DETECTION_START_MARKER}/{DETECTION_END_MARKER} and "
+              f"{README_START_MARKER}/{README_END_MARKER} to enable this.")
         return
 
     # Static caption text, rewritten into the README on every run. Kept
@@ -735,14 +750,13 @@ def update_readme(target_date, detection_capture=None):
     # preserves it instead of overwriting it.
     DETECTION_CAPTION = (
         "Each green box below contains a surfer, according to the object "
-        "detection model.  Each number above a box indicates the probability "
-        "that the object is a surfer.  Look carefully and you may find "
+        "detection model.  Look carefully and you may find "
         "additional surfers that the model missed or other objects which are "
         "misclassified as surfers - like the wind sock at the bottom center "
         "of the photo.  Birds, reflections, people on the beach and sun glare "
         "fool it too: [what isn't a surfer](docs/non_surfer_objects.md) "
         "catalogs each one, how to tell it apart, and what the pipeline does "
-        "about it.  Each frame is one hour of that day, one second apart, and "
+        "about it.  Each frame is one hour of that day, two seconds apart, and "
         "shows the camera's full width - the same strip the pipeline counts, "
         "so the number printed on each frame is the whole count for that hour.  "
         "The surfers are small at this width; open the image on its own to see "
@@ -762,31 +776,35 @@ def update_readme(target_date, detection_capture=None):
         "the prediction model's own error.\n"
     )
 
-    detection_block = ""
+    def replace_between(text, start, end, body):
+        if start not in text or end not in text:
+            print(f"WARNING: {start} / {end} not found in README.md — section skipped.")
+            return text
+        before, _, rest = text.partition(start)
+        _, _, after = rest.partition(end)
+        return before + start + "\n" + body + end + after
+
     if (CHARTS_DIR / "latest_detection.gif").exists() and detection_capture is not None:
-        capture_day, n_frames = detection_capture
+        capture_day, _n_frames = detection_capture
         capture_str = capture_day.strftime("%A, %B %d, %Y")
         detection_block = (
             f"#### A Full Day of Surfer Detections: {capture_str}\n\n"
             f"{DETECTION_CAPTION}"
             f"![Detections through {capture_str}](data/charts/latest_detection.gif)\n\n"
         )
+        readme = replace_between(readme, DETECTION_START_MARKER, DETECTION_END_MARKER,
+                                 detection_block)
 
     target_date_str = target_date.strftime("%A, %B %d, %Y")
-    section = (
-        f"{README_START_MARKER}\n"
-        f"{detection_block}"
+    forecast_block = (
         f"#### The Surfer Crowd Forecast for: {target_date_str}\n\n"
         f"{FORECAST_CAPTION}"
         f"![Latest daily prediction chart](data/charts/latest.png)\n\n"
-        f"{README_END_MARKER}"
     )
+    readme = replace_between(readme, README_START_MARKER, README_END_MARKER, forecast_block)
 
-    before, _, rest = readme.partition(README_START_MARKER)
-    _, _, after = rest.partition(README_END_MARKER)
-    new_readme = before + section + after
-    readme_path.write_text(new_readme)
-    print("Updated README.md daily chart section.")
+    readme_path.write_text(readme)
+    print("Updated README.md detection and forecast sections.")
 
 
 if __name__ == "__main__":
