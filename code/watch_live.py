@@ -46,6 +46,7 @@ Requires ffmpeg on PATH (brew install ffmpeg / apt install ffmpeg).
 """
 
 import argparse
+import csv
 import shutil
 import subprocess
 import sys
@@ -160,6 +161,56 @@ def check_clip_dimensions(clip_path):
         )
 
 
+def migrate_csv_header(out_csv):
+    """Bring an existing live CSV up to the detector's current column list.
+
+    The detection schema gains a column occasionally (`glare_frac` did, on
+    2026-09-19). `ds.append_row()` writes by the CURRENT header, so a file
+    created before that change keeps its old header line while new rows carry an
+    extra value — every field after the new column silently shifts by one, and a
+    reader gets `glare_frac`'s value under `human_count`. Nothing errors; the
+    numbers are just wrong, which is worse.
+
+    Rows are re-keyed by name and rewritten under the current header. Width tells
+    us which header a row was written with: a row as wide as the current header
+    came after the change, one as wide as the file's own header came before.
+    The original file is kept alongside as a `.bak` rather than overwritten.
+    """
+    if not out_csv.exists():
+        return
+    rows = list(csv.reader(out_csv.open(newline="")))
+    if not rows:
+        return
+    header, data = rows[0], rows[1:]
+    if header == ds.CSV_HEADER:
+        return
+
+    backup = out_csv.with_name(out_csv.name + f".bak_{datetime.now():%Y%m%d_%H%M%S}")
+    backup.write_bytes(out_csv.read_bytes())
+
+    migrated, dropped = [], 0
+    for r in data:
+        if len(r) == len(ds.CSV_HEADER):
+            rec = dict(zip(ds.CSV_HEADER, r))
+        elif len(r) == len(header):
+            rec = dict(zip(header, r))
+        else:
+            dropped += 1
+            continue
+        migrated.append({c: rec.get(c, "") for c in ds.CSV_HEADER})
+
+    with out_csv.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=ds.CSV_HEADER)
+        w.writeheader()
+        w.writerows(migrated)
+
+    added = [c for c in ds.CSV_HEADER if c not in header]
+    log(f"Migrated {out_csv.name} to the current schema "
+        f"(added {', '.join(added) or 'nothing'}; {len(migrated)} row(s) kept"
+        + (f", {dropped} unparseable row(s) left in {backup.name}" if dropped else "")
+        + f"). Previous file saved as {backup.name}.")
+
+
 def collect_once(model, stream_url, frames_dir, out_csv):
     """One clip -> three crops -> quality gate -> detection. Returns the row written."""
     now = datetime.now(pytz.timezone(LOCATION["timezone"]))
@@ -214,6 +265,40 @@ def collect_once(model, stream_url, frames_dir, out_csv):
     return row
 
 
+def ask_about_waiting(now, first_light, last_light):
+    """At night, ask rather than silently wait. Returns True to wait, False to stop.
+
+    The camera streams around the clock, but a night frame is unusable — the
+    quality gate rejects it, so collecting one produces a row with no count.
+    Simply sleeping until morning is worse than it sounds for someone trying the
+    script out: it looks like a hang, and it quietly assumes they are willing to
+    leave a machine awake all night. So state the situation and let them choose.
+
+    Non-interactive callers never see this (there is nobody to answer): they get
+    the waiting behaviour, which is what a long-running collector should do.
+    """
+    if now < first_light:
+        when, target = f"before first light ({first_light.strftime('%-I:%M %p')})", first_light
+    else:
+        target = first_light + timedelta(days=1)
+        when = f"after last light ({last_light.strftime('%-I:%M %p')})"
+
+    wait_hours = max((target - now).total_seconds() / 3600.0, 0)
+    print()
+    print(f"  It is {now.strftime('%-I:%M %p')}, {when}.")
+    print("  The camera streams at night, but the image is too dark to count surfers in —")
+    print("  the quality gate rejects those frames, so collecting now records nothing useful.")
+    print()
+    print(f"  Wait {wait_hours:.1f} hours and start collecting at first light "
+          f"({target.strftime('%-I:%M %p')})?")
+    print("  That means leaving this computer awake and this script running until then.")
+    try:
+        answer = input("  [y/N] ").strip().lower()
+    except EOFError:
+        answer = ""
+    return answer in ("y", "yes")
+
+
 def daylight_window(tz):
     """(first_light, last_light) for today, in local time."""
     return get_light_window(datetime.now(tz).date(), tz)
@@ -241,6 +326,8 @@ def parse_args():
     p.add_argument("--once", action="store_true", help="Collect once, then exit")
     p.add_argument("--ignore-daylight", action="store_true",
                    help="Collect regardless of the daylight window (for testing)")
+    p.add_argument("--wait", action="store_true",
+                   help="At night, wait for first light without asking")
     p.add_argument("--frames-dir", type=Path, default=DEFAULT_FRAMES_DIR)
     p.add_argument("--out-csv", type=Path, default=DEFAULT_OUT_CSV)
     return p.parse_args()
@@ -259,17 +346,30 @@ def main():
     log(f"Model: {ds.MODEL_PATH.name} on {ds.DEVICE}")
     model = ds.load_model()
 
+    migrate_csv_header(args.out_csv)
+
     stream_url = resolve_stream_url()
     stream_resolved_at = datetime.now(tz)
     log(f"Live stream resolved (no access token used): {stream_url}")
     log(f"Writing frames to {args.frames_dir} and rows to {args.out_csv}")
 
     failures = 0
+    asked_about_dark = False
     while True:
         now = datetime.now(tz)
 
         if not args.ignore_daylight:
             first_light, last_light = daylight_window(tz)
+            is_dark = now < first_light or now > last_light
+            if is_dark and not asked_about_dark:
+                # Ask once per run, not once per loop.
+                asked_about_dark = True
+                if args.wait or not sys.stdin.isatty():
+                    log("Outside the daylight window; waiting for first light.")
+                elif not ask_about_waiting(now, first_light, last_light):
+                    log("Stopping. Run again after first light, or use --ignore-daylight "
+                        "to capture a night frame anyway (it will not be countable).")
+                    return
             if now < first_light:
                 log(f"Before first light ({first_light.strftime('%H:%M')}); waiting.")
                 sleep_until(min(first_light, now + timedelta(minutes=DARK_POLL_MIN)), tz)

@@ -4473,3 +4473,37 @@ Cost: the file roughly doubled, 2.6 MB to 5.9 MB, for 14 hours at 1920x316.
 `GIF_UPSCALE` then dropped 1.5 to 1.25 to claw some of that back — 1600x271
 and 4.5 MB, still well above GitHub's ~880px column, so nothing is visibly
 lost on screen.
+
+### 2026-09-23 — `watch_live.py`: schema drift fixed, and it now asks before waiting
+
+Joel asked whether readers of the repo can really spot-test the pipeline from
+the live stream. Verified end to end with `SURFLINE_ACCESS_TOKEN` and
+`SURFLINE_CAMERA_ID` removed from the environment: the stream resolves, records,
+cuts three frames and runs the gate. **Yes — no account needed.**
+
+Two things came out of checking.
+
+**A silent column shift (F38).** When `glare_frac` joined the detection schema,
+an existing `live_predictions.csv` kept its 15-column header while
+`ds.append_row()` began writing 16 values, so every field from `glare_frac`
+onward shifted by one — a reader got `glare_frac`'s value where `human_count`
+should be, with nothing erroring. `migrate_csv_header()` now runs at startup and
+rewrites the file to the current schema, re-keying pre-change rows by name and
+already-shifted rows by position, keeping the original as a `.bak`. Verified on
+the real file: the shifted row was repaired.
+
+**Night behaviour now asks (Joel's call).** The camera streams around the clock,
+but a night frame is unusable, so the script used to wait silently until first
+light. For someone trying it out that looks like a hang, and it quietly assumes
+they will leave a machine awake all night. It now says what time it is, that the
+frame would be rejected, and asks whether to wait — naming the hours and the
+requirement to stay awake. Declining exits cleanly. Non-interactive callers, and
+`--wait`, keep the old waiting behaviour, since there is nobody there to answer.
+
+**On whether the whole pipeline could drop the token:** it could, but the token
+is not buying authentication so much as *rewind*. The live stream has no past.
+Measured on this project's own data since 2026-08-15: 36 days have counted hours
+while the pipeline only ran on 21 of them — **221 of 527 recent counted hours,
+42%, exist only because a later run backfilled days the laptop slept through.**
+A live-only pipeline would trade that for a machine that must be awake every
+daylight hour, forever.

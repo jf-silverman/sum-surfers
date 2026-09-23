@@ -406,14 +406,20 @@ python code/watch_live.py --once   # grab one frame and count it
 python code/watch_live.py          # keep collecting until you stop it
 ```
 
+Run it after dark and it will say so and ask whether to wait for first light,
+rather than collecting frames it cannot count. Answer no and it exits; add
+`--ignore-daylight` to grab a night frame anyway and watch the quality gate
+reject it.
+
 It needs [ffmpeg](https://ffmpeg.org/) on your path to read the stream
 (`brew install ffmpeg` or `apt install ffmpeg`).
 
 The limitation is the flip side of needing no account: a live stream has no
 rewind, so this collects only while your computer is awake and the script is
-running. It cannot fill in the past. Outside the daylight window it waits
-rather than collecting frames the [image quality gate](docs/HOW_IT_WORKS.md#term-image-quality-gate)
-would reject anyway.
+running. It cannot fill in the past — which is why the scheduled pipeline uses
+the account-only clip endpoint instead, and why roughly 40% of this project's
+own counted hours come from days it recovered afterwards rather than watched
+live.
 
 ### Try the detector on a demo set
 
