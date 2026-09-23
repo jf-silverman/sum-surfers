@@ -5,8 +5,11 @@ Generates the daily surfer-count prediction chart (point estimate = median
 GBT model, a continuous 10-90% prediction-interval fan built from 9 real
 fitted quantile models rendered as a smooth gradient, an 80% range side
 table, tide overlay, weather-coded markers, night-hour shading,
-model/detector info footer) to data/charts/surfer_count_YYYY-MM-DD.png,
-plus a detection-review image (real bounding boxes + labels on the day's
+model/detector info footer, per-hour 1-5 crowd level) to
+data/charts/surfer_count_YYYY-MM-DD.png, a 7-day crowd outlook
+(data/charts/latest_week.png — a day x hour grid of crowd levels, see
+generate_week_chart for why it is a separate chart rather than a wider
+daily one), plus a detection-review image (real bounding boxes + labels on the day's
 ~8am crop, with the
 model's predicted range/median for that hour overlaid) to
 data/charts/latest_detection.gif. Both get a stable, git-tracked "latest"
@@ -55,6 +58,9 @@ import detect_surfers as ds  # noqa: E402
 from fit_surfer_count_model import load_and_prepare, fit_quantile_model_robust  # noqa: E402
 from predict_surf_count import build_feature_row, add_tide_daylight_features, MEAN_KWARGS  # noqa: E402
 from build_training_features import simplify_weather_condition  # noqa: E402
+from crowd_rating import (  # noqa: E402
+    CROWD_LEVELS, RATING_QUANTILE, band_text, crowd_level, level_info, rating_from_quantiles,
+)
 import pytz  # noqa: E402
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -93,6 +99,12 @@ TRAINED_HOUR_MIN, TRAINED_HOUR_MAX = 5, 20
 # Joel found that too busy (2026-09-16), and nine fits cost nine models a run.
 FAN_LEVELS = [0.10, 0.50, 0.90]
 
+# How many days past today the week chart covers. The daily chart still
+# targets tomorrow alone; this is the outlook chart's span (tomorrow through
+# tomorrow+6). The predictor fetch asks for FORECAST_DAYS + 1 days because
+# Surfline counts `days` from today inclusive.
+FORECAST_DAYS = 7
+
 WEATHER_COLORS = {"CLEAR": "#f2c14e", "CLOUDY_OVERCAST": "#9aa0a6", "RAIN": "#4fa3d1", "FOG": "#c9c9c9"}
 WEATHER_MARKERS = {"CLEAR": "o", "CLOUDY_OVERCAST": "s", "RAIN": "^", "FOG": "D"}
 WEATHER_ABBREV = {"CLEAR": "clear", "CLOUDY_OVERCAST": "cloudy", "RAIN": "rain", "FOG": "fog"}
@@ -109,6 +121,16 @@ AQUA = "#3ab4c9"      # primary — median line / quantile bands
 LIME = "#9de35a"      # tide line, wave-energy bars
 CORAL = "#ff6f61"     # out-of-training-range warning hatch/labels
 NIGHT_COLOR = "#7a7aa8"  # night-hour shading
+# Crowd levels 1-5 are ordered magnitude, not five separate things, so they get
+# a single-hue sequential ramp rather than five hues — a categorical palette
+# here would say "different", where the data says "more". The hue is AQUA, the
+# chart's existing primary, stepped monotonically in lightness so it still
+# reads as a ramp in grayscale or with any colour vision deficiency; level 4 is
+# AQUA itself. Dark background, so the ramp runs dark (quiet) to bright
+# (packed) — the busiest hours are the brightest cells.
+CROWD_COLORS = {1: "#0f3139", 2: "#17596a", 3: "#22869c", 4: "#3ab4c9", 5: "#8fe0ef"}
+# Ink on top of each of those, chosen for contrast against it.
+CROWD_TEXT_COLORS = {1: "#e8f6f9", 2: "#e8f6f9", 3: "#04202a", 4: "#04202a", 5: "#04202a"}
 READABLE_NAMES = {
     "tide_ft": "Tide", "hour_cos": "Time of day", "hour_sin": "Time of day",
     "is_weekend": "Weekend", "energy_nearshore_kj": "Wave energy (nearshore)",
@@ -167,14 +189,20 @@ def main():
     if degenerate_levels:
         print(f"  Degenerate quantile level(s): {degenerate_levels} — drawn as flat bands.")
 
-    by_hour = add_tide_daylight_features(sp.build_predictor_map())
+    # One fetch covers both charts: today through today+FORECAST_DAYS (Surfline
+    # counts `days` from today inclusive, so +1). Deliberately a single
+    # build_predictor_map() call rather than one per chart — these endpoints
+    # have been returning intermittent Cloudflare 403s, and asking for a wider
+    # window costs exactly the same number of requests as asking for two days.
+    by_hour = add_tide_daylight_features(sp.build_predictor_map(days=FORECAST_DAYS + 1))
     local_tz = pytz.timezone(gc.LOCATION["timezone"])
 
     def predict_for_hour(hk):
         """Runs the fitted quantile models for one by_hour key. Shared by the
-        chart's day loop and the detection image's own-hour lookup below, so a
-        prediction for any hour in by_hour (today OR tomorrow, since DAYS=2)
-        is always computed the same way regardless of which date it's for."""
+        chart's day loop, the week chart, and the detection image's own-hour
+        lookup below, so a prediction for any hour in by_hour (today through
+        today+FORECAST_DAYS) is always computed the same way regardless of
+        which date it's for."""
         predictors = by_hour.get(hk)
         if predictors is None:
             return None
@@ -192,9 +220,24 @@ def main():
         weather_simple, is_night = simplify_weather_condition(predictors.get("weather_condition", ""))
         tide_ft = float(predictors.get("tide_ft", 0) or 0)
         in_training_range = TRAINED_HOUR_MIN <= hk.hour <= TRAINED_HOUR_MAX
+        # Which model features this hour actually HAS. Further out in the
+        # forecast, or after a failed endpoint fetch, a feature can simply be
+        # absent; the GBT still returns a number (it takes the "missing"
+        # branch at every split using that feature), so nothing warns you.
+        # Counting them here is what lets the charts and the CSV say which
+        # hours are standing on less than the model was trained on, instead
+        # of degrading quietly. Measured 2026-09-23: at days=8 every endpoint
+        # is complete on every day, so this normally reads zero — it is the
+        # alarm, not the routine case.
+        missing = [c for c in numeric_cols if pd.isna(feat_row.iloc[0].get(c, np.nan))]
+        level, level_value = rating_from_quantiles(quantiles)
         return dict(hour=hk, point=point, quantiles=quantiles,
                     weather_simple=weather_simple, is_night=is_night,
-                    tide_ft=tide_ft, in_training_range=in_training_range)
+                    tide_ft=tide_ft, in_training_range=in_training_range,
+                    missing_predictors=missing,
+                    crowd_level=level, crowd_level_value=level_value,
+                    crowd_level_low=crowd_level(quantiles[FAN_LEVELS[0]]),
+                    crowd_level_high=crowd_level(quantiles[FAN_LEVELS[-1]]))
 
     def predict_nearest_hour(date_, hour, minute):
         """Finds the by_hour key on date_ closest to hour:minute and predicts
@@ -219,7 +262,9 @@ def main():
     save_forecast_record(target_date, records)
 
     fig = plt.figure(figsize=(14, 6.5), facecolor=BG_COLOR)
-    gs = fig.add_gridspec(1, 2, width_ratios=[3.2, 1], wspace=0.05)
+    # The table panel carries four columns since the crowd level joined it
+    # (2026-09-23) — at the old 3.2:1 it clipped its own right-hand column.
+    gs = fig.add_gridspec(1, 2, width_ratios=[2.9, 1.1], wspace=0.11)
     ax = fig.add_subplot(gs[0], facecolor=AXES_BG)
     ax_table = fig.add_subplot(gs[1], facecolor=AXES_BG)
 
@@ -231,7 +276,7 @@ def main():
             ax.axvspan(row["hour"] - timedelta(minutes=30), row["hour"] + timedelta(minutes=30),
                        facecolor=NIGHT_COLOR, alpha=0.20, hatch="//", edgecolor=NIGHT_COLOR, linewidth=0, zorder=0)
     for _, row in d.iterrows():
-        if not row["in_training_range"]:
+        if not row["in_training_range"] or row["missing_predictors"]:
             ax.axvspan(row["hour"] - timedelta(minutes=30), row["hour"] + timedelta(minutes=30),
                        facecolor=CORAL, alpha=0.12, hatch="xx", edgecolor=CORAL, linewidth=0, zorder=0)
 
@@ -262,9 +307,12 @@ def main():
             label += "\n(night)"
         if not row["in_training_range"]:
             label += "\n(no training\ndata this hour)"
+        if row["missing_predictors"]:
+            label += f"\n({len(row['missing_predictors'])} predictors\nmissing)"
         ax.annotate(label, (row["hour"], row["point"]), textcoords="offset points",
                     xytext=(0, 10), ha="center", fontsize=8,
-                    color=CORAL if not row["in_training_range"] else MUTED_TEXT)
+                    color=CORAL if (not row["in_training_range"] or row["missing_predictors"])
+                    else MUTED_TEXT)
 
     seen_names, predictor_lines = [], []
     for feat in top_predictors.index:
@@ -287,6 +335,15 @@ def main():
         f"|  Surfer detector (YOLOv8s, Sept 2026 fog retrain — actual training log): "
         f"precision {DETECTOR_PRECISION:.1%}, recall {DETECTOR_RECALL:.1%}"
     )
+    info_text += "\n" + crowd_key_text()
+    incomplete = [r for r in records if r["missing_predictors"]]
+    if incomplete:
+        # Never silent: an hour the model scored on fewer inputs than it was
+        # trained on is a weaker forecast, and saying so is the same courtesy
+        # the "no training data this hour" hatch already extends.
+        worst = max(len(r["missing_predictors"]) for r in incomplete)
+        info_text += (f"\n{len(incomplete)} of {len(records)} hours are missing up to {worst} "
+                      f"predictor(s) — those hours are marked and are weaker forecasts")
     if degenerate_levels:
         # Say so on the chart itself: a band pinned flat is a real statement
         # about the data, and a reader should not mistake it for a fitted curve.
@@ -335,21 +392,32 @@ def main():
     # before that the table showed only the range, which left the reader no
     # single number to act on.
     ax_table.axis("off")
-    ax_table.set_title("Predicted count and 80% range", fontsize=10, pad=10, color=TEXT_COLOR)
+    ax_table.set_title("Predicted count, 80% range, crowd level", fontsize=10, pad=10, color=TEXT_COLOR)
+    # The Crowd column is read off the RATING_QUANTILE reading of the same
+    # fitted quantiles, not off the Predicted column beside it — see
+    # code/crowd_rating.py for why, and code/eval_crowd_rating.py for the
+    # held-out numbers. The two can therefore disagree by a level, which is
+    # the point: the median under-reports crowded hours.
     cell_text = [[row["hour"].strftime("%-I:%M %p"),
                   f"{row['point']:.0f}",
-                  f"{row['quantiles'][0.10]:.0f}–{row['quantiles'][0.90]:.0f}"]
+                  f"{row['quantiles'][0.10]:.0f}–{row['quantiles'][0.90]:.0f}",
+                  f"{row['crowd_level']} {level_info(row['crowd_level'])['name']}"]
                  for _, row in d.iterrows()]
-    tbl = ax_table.table(cellText=cell_text, colLabels=["Time", "Predicted", "Range"],
-                          cellLoc="center", loc="upper center")
+    table_h = min(0.95, 0.062 * (len(cell_text) + 1))
+    tbl = ax_table.table(cellText=cell_text, colLabels=["Time", "Count", "80% range", "Crowd"],
+                          cellLoc="center", bbox=[0.0, 0.96 - table_h, 1.0, table_h])
     tbl.auto_set_font_size(False)
-    tbl.set_fontsize(9)
-    tbl.scale(1, 1.35)
+    tbl.set_fontsize(8.5)
+    crowd_col = 3
     for (r, c), cell in tbl.get_celld().items():
         cell.set_edgecolor(GRID_COLOR)
         if r == 0:
             cell.set_facecolor(AQUA)
             cell.set_text_props(color="black", weight="bold")
+        elif c == crowd_col:
+            lvl = int(d.iloc[r - 1]["crowd_level"])
+            cell.set_facecolor(CROWD_COLORS[lvl])
+            cell.set_text_props(color=CROWD_TEXT_COLORS[lvl], weight="bold")
         elif r % 2 == 0:
             cell.set_facecolor("#1a1a1a")
             cell.set_text_props(color=TEXT_COLOR)
@@ -375,8 +443,19 @@ def main():
     latest_path = CHARTS_DIR / "latest.png"
     fig.savefig(latest_path, dpi=150, facecolor=fig.get_facecolor())
 
+    # The week outlook reuses the models already fitted above — it is a second
+    # chart, not a second fit, and it costs no extra API requests either (the
+    # single predictor fetch above already covers the whole horizon).
+    made_date = datetime.now().date()
+    week_start = target_date if args.date else made_date + timedelta(days=1)
+    day_records = collect_week_records(week_start, by_hour, predict_for_hour, local_tz)
+    week_result = generate_week_chart(made_date, day_records, len(df))
+    save_week_forecast_record(made_date, day_records)
+
     detection_capture = generate_detection_gif(detection_date)
-    update_readme(target_date, detection_capture)
+    update_readme(target_date, detection_capture,
+                  week_days=len(day_records) if week_result else 0,
+                  week_start=week_start)
 
 
 def find_nearest_hour_crop(target_date, target_hour=8, lookback_days=7):
@@ -560,6 +639,51 @@ def render_detection_frame(img_path, model, draw_boxes=True, boxes=None):
 FORECASTS_DIR = _PROJECT_ROOT / "data" / "forecasts"
 
 
+def crowd_key_text(n_rows=None):
+    """One footer line defining what each crowd level means in surfers."""
+    parts = "  ".join(f"{b['level']} {b['name']} {band_text(b['level'], units=False)}"
+                      for b in CROWD_LEVELS)
+    basis = f" of {n_rows:,} recorded hours" if n_rows else ""
+    return (f"Crowd level (surfers): {parts}  —  equal fifths{basis}, read off the forecast's "
+            f"{RATING_QUANTILE:.0%} percentile, not its median (code/crowd_rating.py)")
+
+
+def forecast_row(target_date, r):
+    """One CSV row for one forecast hour.
+
+    Shared by the per-day record and the week record so the two files have the
+    same column meanings. Columns added 2026-09-23 (crowd_*, missing_*) are
+    appended after the originals; code/email_daily_report.py reads this file by
+    column name, so extra columns are additive and do not disturb it.
+    """
+    q = r["quantiles"]
+    return {
+        "date": target_date.isoformat(),
+        "hour_local": r["hour"].strftime("%H:%M"),
+        "predicted": round(r["point"], 2),
+        "lower_q10": round(q[FAN_LEVELS[0]], 2),
+        "upper_q90": round(q[FAN_LEVELS[-1]], 2),
+        "weather_simple": r["weather_simple"],
+        "tide_ft": round(r["tide_ft"], 2),
+        "in_training_range": r["in_training_range"],
+        "forecast_made_at": datetime.now().isoformat(timespec="seconds"),
+        # The rating and what it was read off — keeping the value means a later
+        # audit can tell a level-4 that only just cleared the band edge from one
+        # well inside it, without refitting anything.
+        "crowd_level": r["crowd_level"],
+        "crowd_label": level_info(r["crowd_level"])["name"],
+        "crowd_band": band_text(r["crowd_level"]),
+        "crowd_level_quantile": RATING_QUANTILE,
+        "crowd_level_value": round(r["crowd_level_value"], 2),
+        "crowd_level_low": r["crowd_level_low"],
+        "crowd_level_high": r["crowd_level_high"],
+        # Empty in the normal case; a semicolon-joined list of model features
+        # this hour had no value for when it is not.
+        "n_missing_predictors": len(r["missing_predictors"]),
+        "missing_predictors": ";".join(r["missing_predictors"]),
+    }
+
+
 def save_forecast_record(target_date, records):
     """Writes the day's forecast to `data/forecasts/forecast_<date>.csv`.
 
@@ -577,23 +701,212 @@ def save_forecast_record(target_date, records):
     if out.exists():
         return out
 
-    rows = []
-    for r in records:
-        q = r["quantiles"]
-        rows.append({
-            "date": target_date.isoformat(),
-            "hour_local": r["hour"].strftime("%H:%M"),
-            "predicted": round(r["point"], 2),
-            "lower_q10": round(q[FAN_LEVELS[0]], 2),
-            "upper_q90": round(q[FAN_LEVELS[-1]], 2),
-            "weather_simple": r["weather_simple"],
-            "tide_ft": round(r["tide_ft"], 2),
-            "in_training_range": r["in_training_range"],
-            "forecast_made_at": datetime.now().isoformat(timespec="seconds"),
-        })
-    pd.DataFrame(rows).to_csv(out, index=False)
-    print(f"Saved forecast record ({len(rows)} hours) to {out}")
+    pd.DataFrame([forecast_row(target_date, r) for r in records]).to_csv(out, index=False)
+    print(f"Saved forecast record ({len(records)} hours) to {out}")
     return out
+
+
+def save_week_forecast_record(made_date, day_records):
+    """Writes the whole 7-day outlook to `data/forecasts/week_<made>.csv`.
+
+    A separate file, named for the day the forecast was MADE, rather than
+    seven `forecast_<date>.csv` files. Those are deliberately write-once (see
+    save_forecast_record): if this run wrote one for six days out, the run on
+    the eve of that day — the one with the freshest data, and the one
+    `code/email_daily_report.py` scores against — would find the file already
+    there and skip it, quietly replacing tomorrow's forecast with a week-old
+    one. The per-day record keeps meaning "the last forecast before the day";
+    the week record is its own artifact, with `lead_days` on every row so
+    forecast skill by lead time can be measured later.
+    """
+    FORECASTS_DIR.mkdir(parents=True, exist_ok=True)
+    out = FORECASTS_DIR / f"week_{made_date.isoformat()}.csv"
+    rows = []
+    for day, records in day_records:
+        for r in records:
+            row = forecast_row(day, r)
+            row["lead_days"] = (day - made_date).days
+            rows.append(row)
+    if not rows:
+        return None
+    pd.DataFrame(rows).to_csv(out, index=False)
+    print(f"Saved week forecast record ({len(rows)} hours, {len(day_records)} days) to {out}")
+    return out
+
+
+WEEK_CHART_NAME = "latest_week.png"
+
+
+def collect_week_records(start_date, by_hour, predict_for_hour, local_tz):
+    """[(date, [hour record, ...]), ...] for FORECAST_DAYS days from start_date.
+
+    Days the predictor fetch didn't reach are left out rather than filled with
+    anything — the caller reports the shortfall instead of drawing a day the
+    forecast does not have.
+    """
+    out = []
+    for offset in range(FORECAST_DAYS):
+        day = start_date + timedelta(days=offset)
+        dawn, dusk = gc.get_light_window(day, local_tz)
+        hours = sorted(hk for hk in by_hour
+                       if hk.date() == day and dawn.hour <= hk.hour <= dusk.hour)
+        records = [r for r in (predict_for_hour(hk) for hk in hours) if r is not None]
+        if records:
+            out.append((day, records))
+    return out
+
+
+def generate_week_chart(made_date, day_records, n_train_rows):
+    """The 7-day outlook, as its OWN chart rather than a widened daily chart.
+
+    Why separate: the daily chart already carries an hourly median line, a
+    shaded 80% band, a tide curve on a second axis, per-hour weather markers
+    and labels, night shading and a side table, at a width the README embeds
+    fixed. Seven days of that is roughly a hundred hourly points and seven
+    tide curves in the same space — the fan and the labels would be illegible
+    long before the week was readable. The two charts also answer different
+    questions: "what does tomorrow look like hour by hour" wants the interval
+    and the tide; "which day this week should I go" wants one comparable
+    number per day-hour. So the week gets the form that question needs — a
+    day x hour grid of crowd levels, the count printed in each cell — and the
+    daily chart is left alone.
+
+    Returns (out_path, notes) where notes is the list of caveat strings shown
+    on the chart, or None if there is nothing to draw.
+    """
+    if not day_records:
+        print("No forecast days available for the week chart — skipping.")
+        return None
+
+    all_hours = sorted({r["hour"].hour for _, records in day_records for r in records})
+    hour_cols = list(range(all_hours[0], all_hours[-1] + 1))
+    n_rows, n_cols = len(day_records), len(hour_cols)
+
+    fig = plt.figure(figsize=(15, 7.6), facecolor=BG_COLOR)
+    gs = fig.add_gridspec(1, 2, width_ratios=[4.3, 1.1], wspace=0.04)
+    ax = fig.add_subplot(gs[0], facecolor=AXES_BG)
+    ax_table = fig.add_subplot(gs[1], facecolor=AXES_BG)
+
+    flagged = 0
+    for row_i, (day, records) in enumerate(day_records):
+        by_hour_num = {r["hour"].hour: r for r in records}
+        for col_i, hour in enumerate(hour_cols):
+            r = by_hour_num.get(hour)
+            if r is None:
+                # Outside this day's light window — the day is shorter than the
+                # widest day on the chart. Left as bare background.
+                continue
+            level = r["crowd_level"]
+            ax.add_patch(plt.Rectangle((col_i + 0.03, row_i + 0.05), 0.94, 0.90,
+                                       facecolor=CROWD_COLORS[level], edgecolor=AXES_BG,
+                                       linewidth=1.5, zorder=2))
+            low_confidence = (not r["in_training_range"]) or r["missing_predictors"]
+            if low_confidence:
+                flagged += 1
+                # Same coral cross-hatch the daily chart uses for an hour the
+                # model has no training data for, extended to cover an hour
+                # scored on fewer predictors than the model was trained on.
+                ax.add_patch(plt.Rectangle((col_i + 0.03, row_i + 0.05), 0.94, 0.90,
+                                           facecolor="none", hatch="xx", edgecolor=CORAL,
+                                           linewidth=0, zorder=3))
+            ax.text(col_i + 0.5, row_i + 0.5, f"{r['point']:.0f}",
+                    ha="center", va="center", fontsize=9, zorder=4,
+                    weight="bold", color=CROWD_TEXT_COLORS[level])
+
+    ax.set_xlim(0, n_cols)
+    ax.set_ylim(n_rows, 0)
+    ax.set_xticks([i + 0.5 for i in range(n_cols)])
+    ax.set_xticklabels([datetime(2000, 1, 1, h).strftime("%-I%p").lower() for h in hour_cols])
+    ax.set_yticks([i + 0.5 for i in range(n_rows)])
+    ax.set_yticklabels([d.strftime("%a %-d %b") for d, _ in day_records])
+    ax.tick_params(axis="both", colors=TEXT_COLOR, length=0)
+    ax.set_title(f"Crowd outlook — {day_records[0][0].strftime('%a %-d %b')} to "
+                 f"{day_records[-1][0].strftime('%a %-d %b %Y')}", color=TEXT_COLOR)
+    ax.set_xlabel("Hour (first light to last light)", color=TEXT_COLOR)
+    for spine in ax.spines.values():
+        spine.set_color(GRID_COLOR)
+    ax.grid(False)
+
+    handles = [Patch(facecolor=CROWD_COLORS[b["level"]], edgecolor=AXES_BG,
+                     label=f"{b['level']} {b['name']} {band_text(b['level'], units=False)}")
+               for b in CROWD_LEVELS]
+    handles.append(Patch(facecolor="none", hatch="xx", edgecolor=CORAL,
+                         label="lower confidence (see footer)"))
+    legend = ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.11),
+                       ncol=6, fontsize=8, facecolor=AXES_BG, edgecolor=GRID_COLOR)
+    for text in legend.get_texts():
+        text.set_color(TEXT_COLOR)
+
+    # Side table: one line per day, for the "which day should I go" read.
+    ax_table.axis("off")
+    ax_table.set_title("Busiest hour each day", fontsize=10, pad=10, color=TEXT_COLOR)
+    cell_text, busiest_levels = [], []
+    for day, records in day_records:
+        busiest = max(records, key=lambda r: r["crowd_level_value"])
+        cell_text.append([day.strftime("%a %-d"),
+                          busiest["hour"].strftime("%-I%p").lower(),
+                          f"{busiest['point']:.0f}",
+                          f"{busiest['crowd_level']} {level_info(busiest['crowd_level'])['name']}"])
+        busiest_levels.append(busiest["crowd_level"])
+    # Explicit bbox rather than loc="upper center": the auto-sized table is laid
+    # out to its text width and left a wide empty gutter beside it, squeezing
+    # the grid that is the actual chart.
+    table_h = min(0.92, 0.085 * (len(cell_text) + 1))
+    tbl = ax_table.table(cellText=cell_text, colLabels=["Day", "Peak", "Count", "Crowd"],
+                         cellLoc="center", bbox=[0.0, 0.95 - table_h, 1.0, table_h])
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(9)
+    for (r, c), cell in tbl.get_celld().items():
+        cell.set_edgecolor(GRID_COLOR)
+        if r == 0:
+            cell.set_facecolor(AQUA)
+            cell.set_text_props(color="black", weight="bold")
+        elif c == 3:
+            lvl = busiest_levels[r - 1]
+            cell.set_facecolor(CROWD_COLORS[lvl])
+            cell.set_text_props(color=CROWD_TEXT_COLORS[lvl], weight="bold")
+        elif r % 2 == 0:
+            cell.set_facecolor("#1a1a1a")
+            cell.set_text_props(color=TEXT_COLOR)
+        else:
+            cell.set_facecolor(AXES_BG)
+            cell.set_text_props(color=TEXT_COLOR)
+
+    notes = []
+    short = FORECAST_DAYS - len(day_records)
+    if short:
+        notes.append(f"{short} of the {FORECAST_DAYS} requested days had no forecast data "
+                     f"and are not shown")
+    incomplete = [r for _, records in day_records for r in records if r["missing_predictors"]]
+    if incomplete:
+        worst = max(len(r["missing_predictors"]) for r in incomplete)
+        notes.append(f"{len(incomplete)} hour(s) are missing up to {worst} predictor(s) and are "
+                     f"hatched — the model scored them on less than it was trained on")
+    else:
+        notes.append("every hour shown has the full predictor set")
+    if flagged and not incomplete:
+        notes.append(f"{flagged} hatched hour(s) fall outside the hours the model has training "
+                     f"data for")
+
+    footer = (
+        f"Each cell is the predicted surfer count for that hour; its colour is the crowd level.  "
+        f"Numbers this far out move — day 7 is the same model on a week-old view of the weather.\n"
+        f"{crowd_key_text(n_train_rows)}\n"
+        + "  |  ".join(notes)
+    )
+    fig.text(0.5, 0.045, footer, fontsize=7.5, ha="center", va="bottom", color=MUTED_TEXT)
+    # Explicit margins, not tight_layout: the table axes makes tight_layout warn
+    # and then lay the footer over the x-axis label and the legend.
+    fig.subplots_adjust(left=0.075, right=0.985, top=0.91, bottom=0.26)
+
+    CHARTS_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = CHARTS_DIR / WEEK_CHART_NAME
+    fig.savefig(out_path, dpi=150, facecolor=fig.get_facecolor())
+    fig.savefig(CHARTS_DIR / f"week_{made_date.isoformat()}.png", dpi=150,
+                facecolor=fig.get_facecolor())
+    plt.close(fig)
+    print(f"Saved week chart ({len(day_records)} days) to {out_path}")
+    return out_path, notes
 
 
 def quantize_to_shared_palette(frames):
@@ -760,7 +1073,7 @@ README_END_MARKER = "<!-- DAILY_CHART_END -->"
 # the nightly rewrite never touches it.
 
 
-def update_readme(target_date, detection_capture=None):
+def update_readme(target_date, detection_capture=None, week_days=0, week_start=None):
     """Replaces the marked section of README.md with the latest detection image
     (if one was generated) + chart-with-table image. Idempotent — safe to run
     daily; only the content between the markers changes."""
@@ -801,7 +1114,9 @@ def update_readme(target_date, detection_capture=None):
         "see.  The detector underneath it used to undercount badly in fog and "
         "glare, which made the forecast worse; that was fixed in September "
         "2026 by labeling those conditions and retraining, so what remains is "
-        "the prediction model's own error.\n"
+        "the prediction model's own error.  The right-hand column rates each "
+        "hour from 1 (near-empty) to 5 (packed), using the five equal slices "
+        "of every hour the camera has counted so far.\n"
     )
 
     detection_block = ""
@@ -814,6 +1129,30 @@ def update_readme(target_date, detection_capture=None):
             f"![Detections through {capture_str}](data/charts/latest_detection.gif)\n\n"
         )
 
+    WEEK_CAPTION = (
+        "The same model, run out to a week. Every hour gets a crowd level from "
+        "1 (near-empty) to 5 (packed); the levels are the five equal slices of "
+        "every hour the camera has counted so far, so level 3 is literally an "
+        "average hour and level 5 is the busiest fifth of them. The number in "
+        "each cell is the predicted count, and the colour is the level. The "
+        "level is not read off that number: the forecast pulls toward the "
+        "middle, so the middle of its range under-calls busy hours, and the "
+        "level comes from a point higher up the range that was measured to "
+        "catch them. Surf and weather data run the full seven days, but a "
+        "forecast seven days out is still a forecast seven days out - read the "
+        "far right of the grid as a shape, not a number.\n"
+    )
+
+    week_block = ""
+    if week_days and week_start is not None:
+        week_range = (f"{week_start.strftime('%B %d')} - "
+                      f"{(week_start + timedelta(days=week_days - 1)).strftime('%B %d, %Y')}")
+        week_block = (
+            f"#### The Week Ahead: {week_range}\n\n"
+            f"{WEEK_CAPTION}"
+            f"![Crowd outlook for the week ahead](data/charts/{WEEK_CHART_NAME})\n\n"
+        )
+
     target_date_str = target_date.strftime("%A, %B %d, %Y")
     section = (
         f"{README_START_MARKER}\n"
@@ -821,6 +1160,7 @@ def update_readme(target_date, detection_capture=None):
         f"#### The Surfer Crowd Forecast for: {target_date_str}\n\n"
         f"{FORECAST_CAPTION}"
         f"![Latest daily prediction chart](data/charts/latest.png)\n\n"
+        f"{week_block}"
         f"{README_END_MARKER}"
     )
 

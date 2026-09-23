@@ -28,6 +28,7 @@ analysis/training_data_expansion/labeling_candidates.csv
 data/cvat_out_coco/reimport_existing_57/
 data/cvat_out_coco/reimport_existing_57.zip
 data/charts/surfer_count_*.png
+data/charts/week_*.png
 data/charts/detection_*.png
 data/charts/detection_*.gif
 data/.last_local_success
