@@ -4587,3 +4587,61 @@ having the chart reuse step 5's CSV instead of re-fetching. Both touch files a
 concurrent task is editing, so they wait for that to land. Together they would cut
 forecast-endpoint traffic in half and turn each remaining burst into a paced
 sequence.
+
+### 2026-09-23 — Time-series research, and a leaky validation split (B21)
+
+Commissioned research into whether a time-series model would help the forecast.
+The answer to that question is mostly no, but the investigation turned up
+something more important about how accuracy has been measured all along.
+
+**The reported accuracy is measured on a leaky split.** `fit_surfer_count_model.py`
+uses `train_test_split(..., random_state=42)`. At roughly 13 rows per day, a
+random 20% split puts hours from the same day on *both* sides: the model learns
+that specific day's level from its own hours, then is scored on the rest of it.
+
+Reproduced independently in-session, with a separate implementation:
+
+| split | MAE |
+|---|---:|
+| random 80/20 (current practice) | **5.53** |
+| whole days held out (5 splits: 6.35, 6.35, 6.98, 7.40, 6.68) | **6.75** |
+| train on past, test on future (3 cutoffs: 7.40, 7.80, 7.49) | **7.57** |
+
+So the day-ahead number is about **2 MAE worse** than the figure in the README
+and in `data/model_release/release_metadata.json`. Two mechanisms: same-day
+leakage, and no forward-in-time constraint across a real level shift (October to
+November day-means of 12.1 and 9.4 against July and August at 18.9 and 18.1).
+This is the standard argument against random CV on temporal data
+(Hyndman, [Cross-validation for time series](https://robjhyndman.com/hyndsight/tscv/);
+[FPP3 §5.10](https://otexts.com/fpp3/tscv.html)). Logged as **B21, P1** — it
+distorts the reported quality of every forecast and every past model comparison.
+
+**On time series specifically: not worth building.** The research measured the
+headroom rather than assuming it.
+
+- Weekly seasonality does not exist here: same-hour-last-week r = **0.014**.
+  That removes the main selling point of SARIMAX, Prophet and TBATS.
+- The hourly grid is **17.2% occupied** — nights are structurally absent and
+  there are gaps of 51, 54 and 95 days — which rules out anything needing a
+  regular grid.
+- The project's own recorded hypothesis, "busy by 7am means busy all day", is
+  **false**: r = 0.069 across 114 days.
+- Day-level residual persistence is r = 0.354, and an *oracle* day-level shift
+  would cut MAE only 7.39 to 6.29. That is the entire prize, with perfect
+  foresight.
+- Lag features tested: best combination 7.27 against 7.52, a 3.3% gain that was
+  worse in 2 of 5 folds. An online level correction made things worse.
+
+**One temporal idea does pay, and it is a different product:** a same-day
+nowcast, carrying the previous observed hour's residual forward shrunk by its
+0.541 correlation, cut walk-forward MAE **7.39 to 6.17 (−16.5%)**, better in 5
+of 6 blocks. Recorded in the ideas doc; it answers "how busy at 3pm" from noon,
+which the evening-before forecast cannot.
+
+**One cheap cross-sectional idea also worth trying:** day-mean weather instead of
+instantaneous. Beachgoers plan from the day's forecast rather than the conditions
+at the moment they arrive; tested here, 7.52 to 7.33. It may explain part of L05
+("weather carries little signal"). The supporting paper is
+[Castelldefels beach attendance from video counts](https://doi.org/10.3390/jmse13061181),
+whose full text could not be fetched — the replication on this project's data is
+the evidence that matters.
