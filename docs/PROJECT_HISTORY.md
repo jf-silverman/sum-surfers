@@ -4865,3 +4865,41 @@ hour-specific rather than a day-level level shift.
 
 `code/forecast_features.py` and `code/eval_forecast_features.py` are kept
 unused, as the record of a closed question.
+
+### 2026-09-23 — Year-over-year weekday charts, and why the paired-month version does not exist
+
+Joel asked for paired-month weekday and weekend counts between 2025 and 2026.
+That comparison cannot be built: **the two years share no month.** 2025 holds
+Oct/Nov/Dec and 2026 holds Mar, May, Jul, Aug and Sep, so the set of months with
+data on both sides is empty — the pipeline started in October 2025 and 2026 has
+not reached October. Any 2025-vs-2026 difference in these counts is a season
+difference wearing a year label.
+
+What is comparable is the weekday shape *inside* each month, since that contrast
+never crosses a month boundary. Subtracting each month's own mean and pooling all
+eight months gives a clean result: **weekends run +8.10 surfers above their
+month's average** (95% CI [5.37, 10.83], 40 weekend days against 81 weekday days,
+hours 08–16 on quality-passed frames). It is not a conditions artifact — with
+month fixed effects plus `surf_max_ft`, swell period, wind, rating, tide and
+nearshore energy in an OLS, the weekend coefficient is **+8.91** (se 1.12), so
+controlling for surf makes it slightly *stronger*, not weaker.
+
+The structure is a step, not a curve. Mon–Fri are statistically
+indistinguishable from one another (one-way ANOVA F = 0.32, **p = 0.87**), and
+Saturday and Sunday are indistinguishable from each other (p = 0.67). Wednesday
+looks like the quietest day on the chart at −4.3, but with 12 days behind it that
+is noise.
+
+This independently confirms the modeling choice already in place rather than
+challenging it. The 2026-09-23 feature work found all seven one-hot day-of-week
+columns scoring exactly 0.0 importance and concluded `is_weekend` carries the
+entire weekday effect; the measurement above is why — there is nothing for the
+one-hots to add, because no individual day separates from its own side of the
+split. Restricting to hours 08–16 matters for the same reason the split does:
+December's usable day is much shorter than July's, so unrestricted daily means
+compare different frame mixes.
+
+Charts: `analysis/weekday_weekend_patterns/plot_weekday_by_year.py` (panel A the
+per-year view, labelled as confounded; panel B the month-centered view that is
+the one to read) and `plot_year_coverage.py` (every day of both years on one
+calendar axis, which is the picture of the empty overlap).
