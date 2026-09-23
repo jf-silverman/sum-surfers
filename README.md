@@ -8,7 +8,7 @@ This project collects images from a shoreline video camera and tries to answer t
 - **_How many surfers were out there each hour of each day in the past?_**
 - **_How many will there be at each hour of the day in the upcoming days?_**
 
-**_This matters to surfers because the competition for each wave increases as the crowd size grows.  Forecast the crowd size can help a surfers know when conditions match their preference._**
+**_This matters to surfers because the competition for each wave increases as the crowd size grows.  Forecasting the crowd size can help surfers know when conditions match their preference._**
 
 <!-- DAILY_CHART_START -->
 #### A Full Day of Surfer Detections: Tuesday, September 22, 2026
