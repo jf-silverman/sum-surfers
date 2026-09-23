@@ -39,7 +39,16 @@ REQUIRED = ["date", "hour_local", "predicted", "lower_q10", "upper_q90"]
 
 
 def load_forecasts():
-    files = sorted(FORECASTS_DIR.glob("forecast_*.csv"))
+    """Every forecast ever recorded: the eve-of-day ones and the week outlooks.
+
+    Both are included on purpose. `forecast_<date>.csv` is the day-ahead call,
+    written the evening before; `week_<made-date>.csv` is that run's whole 7-day
+    outlook, so the same target date appears up to seven times at different lead
+    times. Keeping them all is what makes forecast skill measurable *by lead
+    time* — the open question of whether a day-7 band should be wider than a
+    day-1 band, which right now it is not.
+    """
+    files = sorted(FORECASTS_DIR.glob("forecast_*.csv")) + sorted(FORECASTS_DIR.glob("week_*.csv"))
     files = [f for f in files if f.name != OUT_CSV.name]
     frames = []
     for f in files:
@@ -49,6 +58,7 @@ def load_forecasts():
             print(f"  WARNING: {f.name} lacks {missing} — skipped")
             continue
         df["forecast_file"] = f.name
+        df["forecast_kind"] = "week" if f.name.startswith("week_") else "day_ahead"
         frames.append(df)
     if not frames:
         return pd.DataFrame(columns=REQUIRED)
@@ -84,8 +94,14 @@ def build():
         else bool(r["lower_q10"] <= r["actual"] <= r["upper_q90"]), axis=1)
     merged["band_width"] = merged["upper_q90"] - merged["lower_q10"]
 
+    # Week files record lead_days themselves; day-ahead files carry the time the
+    # forecast was made, so derive it there and keep whatever is already present.
+    existing_lead = merged["lead_days"] if "lead_days" in merged.columns else None
     lead = []
-    for _, r in merged.iterrows():
+    for i, (_, r) in enumerate(merged.iterrows()):
+        if existing_lead is not None and pd.notna(existing_lead.iloc[i]):
+            lead.append(int(existing_lead.iloc[i]))
+            continue
         made = str(r.get("forecast_made_at", "") or "")
         try:
             made_date = datetime.fromisoformat(made).date()
@@ -95,11 +111,12 @@ def build():
             lead.append("")
     merged["lead_days"] = lead
 
-    front = ["date", "hour_local", "hour", "predicted", "lower_q10", "upper_q90",
+    front = ["date", "hour_local", "hour", "forecast_kind", "lead_days",
+             "predicted", "lower_q10", "upper_q90",
              "band_width", "actual", "actual_clips", "error", "abs_error",
-             "inside_band", "lead_days"]
+             "inside_band"]
     rest = [c for c in merged.columns if c not in front]
-    merged = merged[front + rest].sort_values(["date", "hour"])
+    merged = merged[front + rest].sort_values(["date", "hour", "lead_days"])
 
     FORECASTS_DIR.mkdir(parents=True, exist_ok=True)
     merged.to_csv(OUT_CSV, index=False)
@@ -121,6 +138,15 @@ def summarize(df):
           f"({'forecast runs low' if scored['error'].mean() > 0 else 'forecast runs high'})")
     print(f"  inside the 80% band : {inside} of {len(scored)} ({inside / len(scored):.0%})")
     print(f"  mean band width     : {scored['band_width'].mean():.1f} surfers")
+    by_lead = scored[scored["lead_days"] != ""]
+    if not by_lead.empty and by_lead["lead_days"].nunique() > 1:
+        print("\n  By lead time (does a forecast further out do worse, and does its band widen?):")
+        print(f"    {'lead':>4} {'hours':>6} {'MAE':>7} {'in band':>8} {'mean width':>11}")
+        for lead, g in by_lead.groupby("lead_days"):
+            hit = g["inside_band"].astype(str).eq("True").mean()
+            print(f"    {lead:>4} {len(g):>6} {g['abs_error'].mean():>7.2f} "
+                  f"{hit:>7.0%} {g['band_width'].mean():>11.1f}")
+
     if scored["date"].nunique() > 1:
         print("\n  By day:")
         for date, g in scored.groupby("date"):

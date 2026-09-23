@@ -4808,3 +4808,46 @@ is refused, so one bad run cannot pin its own emptiness in place for 90 minutes.
 Combined with the light-window caching earlier in the day, a nightly run's
 requests to `services.surfline.com` fall from about 34 to about 17, and the
 bursts are gone.
+
+### 2026-09-23 — Forecast log covers the week outlook; schedule investigated
+
+**The log now includes week forecasts.** `build_forecast_log.py` read only
+`forecast_<date>.csv` and ignored `week_<made-date>.csv`, so the seven-day
+outlook accumulated without ever being scored. It now reads both, tags each row
+`day_ahead` or `week`, and carries `lead_days` from the week files directly
+(deriving it for day-ahead rows from `forecast_made_at`). `--summary` reports
+MAE, in-band rate and mean band width **by lead time**.
+
+That table is the instrument for the open question the week chart shipped with:
+a day-7 forecast is currently drawn with the same 80% band as a day-1 forecast,
+which is almost certainly too narrow. Nothing is scored yet — 126 outstanding
+hours — but every run from here adds rows at seven lead times.
+
+**Two things Joel asked for turned out to already be true**, verified rather
+than rebuilt:
+
+- The week chart already starts at *tomorrow* and covers seven days, so the
+  chart posted after an evening run shows day-of plus six as the next day
+  passes. `week_2026-09-23.csv` covers 2026-09-24 to 09-30 with `lead_days` 1-7.
+- Week forecasts are already kept per run, named by the date they were *made*,
+  so nothing is overwritten as a target date approaches. The same target hour
+  accumulates up to seven forecasts at different lead times, which is precisely
+  what makes the lead-time table possible.
+
+**The pipeline is also already scheduled daily** — `StartCalendarInterval` with
+an hour and minute and no weekday key, 20:30 every day. It does not *run* daily:
+21 of the 39 days since 2026-08-15. The cause is visible in `pmset -g sched`:
+
+    Repeating power events:
+      wakepoweron at 6:25PM weekdays only
+
+That wake belongs to another project. This pipeline runs at 20:30, by which time
+the Mac has often slept again, and weekends have no wake at all. Of 22 runs since
+August 15, **14 fired at 20:xx and 8 fired at other hours** — seven of those at
+18:xx, which is launchd running the missed 20:30 job the moment that 18:25 wake
+happens. So the misses are a sleeping laptop, not a schedule.
+
+Worth being clear about what a missed run costs: **not the counts**. Clip
+collection backfills up to `CLIP_LOOKBACK_DAYS` (5), so the data arrives late but
+arrives. What is lost is that evening's *forecast* — and now its forecast record,
+which is the thing the lead-time table needs.
