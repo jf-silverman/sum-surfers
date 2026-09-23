@@ -4834,18 +4834,20 @@ than rebuilt:
   accumulates up to seven forecasts at different lead times, which is precisely
   what makes the lead-time table possible.
 
-**The pipeline is also already scheduled daily** — `StartCalendarInterval` with
-an hour and minute and no weekday key, 20:30 every day. It does not *run* daily:
-21 of the 39 days since 2026-08-15. The cause is visible in `pmset -g sched`:
-
-    Repeating power events:
-      wakepoweron at 6:25PM weekdays only
-
-That wake belongs to another project. This pipeline runs at 20:30, by which time
-the Mac has often slept again, and weekends have no wake at all. Of 22 runs since
-August 15, **14 fired at 20:xx and 8 fired at other hours** — seven of those at
-18:xx, which is launchd running the missed 20:30 job the moment that 18:25 wake
-happens. So the misses are a sleeping laptop, not a schedule.
+**The pipeline is also already scheduled daily**, and has been. It does not
+*run* daily: 21 of the 39 days since 2026-08-15. The cause is a sleeping laptop,
+not a schedule — the machine was only being woken on weekday evenings, for
+another project, and at a time about two hours before this pipeline fires. Of 22
+runs since August 15, 14 happened at the scheduled time and 8 at other hours,
+which is the scheduler running the missed job whenever the machine next woke.
+**This closes something an earlier session had to reject.** When the LaunchAgent
+was built, retargeting the machine's wake was considered and turned down for a
+good reason: only one repeating wake exists for the whole machine, and taking it
+would have removed the wake another project depended on. The workaround then was
+to lean on launchd running a missed job at the next wake, which is why runs kept
+appearing hours late. Joel resolved the conflict on 2026-09-23 by moving that
+other project to the same time, so the wake could finally be retargeted. Fixed
+the same day; the specifics live in the private ops notes.
 
 Worth being clear about what a missed run costs: **not the counts**. Clip
 collection backfills up to `CLIP_LOOKBACK_DAYS` (5), so the data arrives late but
