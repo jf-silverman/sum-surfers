@@ -425,7 +425,7 @@ def find_nearest_hour_crop(target_date, target_hour=8, lookback_days=7):
 # either way; it only keeps the image sharp on high-DPI displays. 1.5x puts the
 # full 1280px strip at 1920px, comfortably above 2x that column.
 SIDE_CROP_FRAC = 0.0
-GIF_UPSCALE = 1.5
+GIF_UPSCALE = 1.25
 # Each hour appears twice: bare frame, then the same frame with boxes. The bare
 # one holds longer because that is the half asking the viewer to do something —
 # find the specks — while the reveal only has to be read.

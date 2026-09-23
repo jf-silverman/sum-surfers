@@ -4470,3 +4470,6 @@ The sidecar and the return value now report *hours*, not frames, since frames
 are twice the hours and the caption is written in hours.
 
 Cost: the file roughly doubled, 2.6 MB to 5.9 MB, for 14 hours at 1920x316.
+`GIF_UPSCALE` then dropped 1.5 to 1.25 to claw some of that back — 1600x271
+and 4.5 MB, still well above GitHub's ~880px column, so nothing is visibly
+lost on screen.
