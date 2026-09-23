@@ -4545,3 +4545,45 @@ already stamps a training snapshot in its footer, so the provenance slot exists.
 Not implemented yet — it touches a file another task is editing.
 
 **Audit: request volume against the 403s.** See the entry below.
+
+### 2026-09-23 — Request-rate audit against the 403s
+
+Every script that contacts `services.surfline.com`, and what one nightly run
+actually sends. Counts are from the 2026-09-22 run's own log plus the call sites.
+
+| step | script | requests to services.surfline.com | spacing |
+|---|---|---:|---|
+| 1 | `get_clips.py` | 1 `sunlight` + 1 POST per clip needing download (15 that night) | 0.35s + up to 0.25s jitter |
+| 5 | `get_surf_predictors.py` | 8 (one per forecast endpoint) | **none** |
+| 7 | `build_training_features.py` | 1 `sunlight` | n/a |
+| 9 | `plot_daily_prediction.py` | 8 (**the same eight again**) + 1 `sunlight` | **none** |
+| 10 | `email_daily_report.py` | 0 — reads local files only | n/a |
+
+About 34 requests in roughly two minutes. The average rate is mild; the shape is
+not. **The eight forecast endpoints are fetched back to back with no delay, twice
+per run, about 50 seconds apart** — the same eight values, because step 9 re-fetches
+what step 5 already wrote to `surfline_predictors.csv`. Half of that traffic is
+redundant by construction.
+
+`sunlight` was worse per unit of value: three identical requests a night for a
+number that changes once a day, and in `watch_live.py` **one per collection
+cycle — about 87 over a daylight day** at the default 9-minute interval. That is
+in the script the README invites readers to run.
+
+**So: no, the request pattern was not in line with the backoff.** The retry
+schedule now waits 20s/60s/150s after a 403, but normal traffic still went out in
+unspaced bursts. Politeness in the retry does not excuse impoliteness in the
+request.
+
+**Fixed now:** `get_light_window()` caches per process and per date, so the live
+`sunlight` endpoint is asked once a day instead of three times a night and 87
+times a day in the watcher. Verified: five calls for one date produce one fetch.
+The fallback is cached too — if the endpoint is refusing us, asking again in nine
+minutes makes it worse, and astral is within a couple of minutes of the live
+value anyway.
+
+**Not fixed yet, and the bigger win:** spacing the eight-endpoint loop, and
+having the chart reuse step 5's CSV instead of re-fetching. Both touch files a
+concurrent task is editing, so they wait for that to land. Together they would cut
+forecast-endpoint traffic in half and turn each remaining burst into a paced
+sequence.

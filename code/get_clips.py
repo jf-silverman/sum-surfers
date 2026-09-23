@@ -184,6 +184,9 @@ def send_auth_failure_email(auth_failure_count):
         print(f"Could not send auth-failure warning email: {exc}")
 
 
+_LIGHT_WINDOW_CACHE = {}
+
+
 def get_light_window(date, local_tz):
     """Returns (first_light, last_light) datetimes for the clip-collection window.
 
@@ -213,11 +216,25 @@ def get_light_window(date, local_tz):
     this location), and it inherited whatever error was in the hardcoded
     coordinates. First light / last light is the actual concept wanted here.
     """
+    # First and last light change once a day, so ask once a day. Without this
+    # the live endpoint was hit far more often than the value changes: three
+    # times a night across the pipeline (clip collection, feature rebuild, chart)
+    # for the same date, and in watch_live.py once per collection cycle — about
+    # 87 times over a daylight day at the default 9-minute interval. That is
+    # exactly the kind of request pattern that earns a Cloudflare 403, and
+    # 403s on these endpoints have already cost this project a day of predictors
+    # (see B20). Cached per process and per date, so a long-running watcher
+    # still picks up tomorrow's window when the date rolls over.
+    cache_key = (date, str(local_tz))
+    if cache_key in _LIGHT_WINDOW_CACHE:
+        return _LIGHT_WINDOW_CACHE[cache_key]
+
     loc = LocationInfo(**LOCATION)
     astral_result = sun(loc.observer, date=date, tzinfo=local_tz)
     astral_window = (astral_result["dawn"], astral_result["dusk"])
 
     if date != datetime.now(local_tz).date():
+        _LIGHT_WINDOW_CACHE[cache_key] = astral_window
         return astral_window
 
     try:
@@ -229,9 +246,13 @@ def get_light_window(date, local_tz):
         day = resp[0]
         dawn = datetime.fromtimestamp(day["dawn"], tz=pytz.utc).astimezone(local_tz)
         dusk = datetime.fromtimestamp(day["dusk"], tz=pytz.utc).astimezone(local_tz)
+        _LIGHT_WINDOW_CACHE[cache_key] = (dawn, dusk)
         return dawn, dusk
     except Exception as e:
         print(f"  WARNING: live Surfline sunlight fetch failed ({e}), falling back to astral")
+        # Cached too: if the endpoint is refusing us, asking again in nine
+        # minutes makes that worse, and astral is within a couple of minutes.
+        _LIGHT_WINDOW_CACHE[cache_key] = astral_window
         return astral_window
 
 
