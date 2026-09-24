@@ -11,10 +11,10 @@ This project collects images from a shoreline video camera and tries to answer t
 **_This matters to surfers because the competition for each wave increases as the crowd size grows.  Forecasting the crowd size can help surfers know when conditions match their preference._**
 
 <!-- DAILY_CHART_START -->
-#### A Full Day of Surfer Detections: Tuesday, September 22, 2026
+#### A Full Day of Surfer Detections: Wednesday, September 23, 2026
 
 Each green box below contains a surfer, according to the object detection model.  Look carefully and you may find additional surfers that the model missed or other objects which are misclassified as surfers - like the wind sock at the bottom center of the photo.  Birds, reflections, people on the beach and sun glare fool it too: [what isn't a surfer](docs/non_surfer_objects.md) catalogs each one, how to tell it apart, and what the pipeline does about it.  **Each hour is shown twice: first the bare frame, so you can hunt for the surfers yourself as small dark specks, then the same frame with the model's boxes drawn.**  Try it before the boxes appear - it shows how hard these are to see, which is the whole problem the model is solving.  Each frame shows the camera's full width, the same strip the pipeline counts, so the number printed is the whole count for that hour.
-![Detections through Tuesday, September 22, 2026](data/charts/latest_detection.gif)
+![Detections through Wednesday, September 23, 2026](data/charts/latest_detection.gif)
 
 #### The Surfer Crowd Forecast for: Thursday, September 24, 2026
 
