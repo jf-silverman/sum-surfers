@@ -11,17 +11,17 @@ This project collects images from a shoreline video camera and tries to answer t
 **_This matters to surfers because the competition for each wave increases as the crowd size grows.  Forecasting the crowd size can help surfers know when conditions match their preference._**
 
 <!-- DAILY_CHART_START -->
-#### A Full Day of Surfer Detections: Wednesday, September 23, 2026
+#### A Full Day of Surfer Detections: Thursday, September 24, 2026
 
 Each green box below contains a surfer, according to the object detection model.  Look carefully and you may find additional surfers that the model missed or other objects which are misclassified as surfers - like the wind sock at the bottom center of the photo.  Birds, reflections, people on the beach and sun glare fool it too: [what isn't a surfer](docs/non_surfer_objects.md) catalogs each one, how to tell it apart, and what the pipeline does about it.  **Each hour is shown twice: first the bare frame, so you can hunt for the surfers yourself as small dark specks, then the same frame with the model's boxes drawn.**  Try it before the boxes appear - it shows how hard these are to see, which is the whole problem the model is solving.  Each frame shows the camera's full width, the same strip the pipeline counts, so the number printed is the whole count for that hour.
-![Detections through Wednesday, September 23, 2026](data/charts/latest_detection.gif)
+![Detections through Thursday, September 24, 2026](data/charts/latest_detection.gif)
 
-#### The Surfer Crowd Forecast for: Thursday, September 24, 2026
+#### The Surfer Crowd Forecast for: Friday, September 25, 2026
 
 Once enough hours and days were gathered along with weather and surf conditions, a surf count prediction model was built to forecast how many surfers would be present at each hour for the coming day.  This is useful for surfers to plan to avoid busy times or at least know what to expect.  The forecast still runs about one surfer low on average, and it misses by about five surfers in a typical hour - crowds depend on plenty of things the weather and surf data never see.  The detector underneath it used to undercount badly in fog and glare, which made the forecast worse; that was fixed in September 2026 by labeling those conditions and retraining, so what remains is the prediction model's own error.  The right-hand column rates each hour from 1 (near-empty) to 5 (packed), using the five equal slices of every hour the camera has counted so far.
 ![Latest daily prediction chart](data/charts/latest.png)
 
-#### The Week Ahead: September 24 - September 30, 2026
+#### The Week Ahead: September 25 - October 01, 2026
 
 The same model, run out to a week. Every hour gets a crowd level from 1 (near-empty) to 5 (packed); the levels are the five equal slices of every hour the camera has counted so far, so level 3 is literally an average hour and level 5 is the busiest fifth of them. The number in each cell is the predicted count, and the colour is the level. The level is not read off that number: the forecast pulls toward the middle, so the middle of its range under-calls busy hours, and the level comes from a point higher up the range that was measured to catch them. Surf and weather data run the full seven days, but a forecast seven days out is still a forecast seven days out - read the far right of the grid as a shape, not a number.
 ![Crowd outlook for the week ahead](data/charts/latest_week.png)
