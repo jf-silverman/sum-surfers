@@ -10,6 +10,19 @@ This project collects images from a shoreline video camera and tries to answer t
 
 **_Why does this matter? As a surfer, I know that as as the crowd size grows, so does the competition for each wave.  It becomes difficult to not "drop in" on someone who is already on the wave or have to avoid surfers who drop in on you.  Forecasting surfer crowd size can help surfers know avoid peak crowding - or at least be ready for it._**
 
+<!-- ====================================================================
+     AUTO-GENERATED BLOCK - DO NOT EDIT BETWEEN THE MARKERS BELOW.
+     Everything between the DAILY_CHART_START and DAILY_CHART_END markers is
+     deleted and rewritten in full by code/plot_daily_prediction.py
+     (update_readme) on every nightly run. Hand edits inside that region
+     survive until 20:30 and are then silently lost.
+
+     To change this wording, edit the caption templates in that file:
+         DETECTION_CAPTION   the detection-GIF paragraph
+         FORECAST_CAPTION    the daily-forecast-chart paragraph
+         WEEK_CAPTION        the week-ahead-grid paragraph
+     The headings and image links are assembled in update_readme() itself.
+     ==================================================================== -->
 <!-- DAILY_CHART_START -->
 #### A Full Day of Surfer Detections: Friday, September 25, 2026
 
@@ -27,6 +40,10 @@ The same model, run out to a week. Every hour gets a crowd level from 1 (near-em
 ![Crowd outlook for the week ahead](data/charts/latest_week.png)
 
 <!-- DAILY_CHART_END -->
+<!-- ====================================================================
+     END AUTO-GENERATED BLOCK. Everything below here is hand-written and is
+     never touched by the nightly run.
+     ==================================================================== -->
 
 ## How Accurate Is This Forecast Right Now?
 
