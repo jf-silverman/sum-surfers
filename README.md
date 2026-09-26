@@ -8,7 +8,7 @@ This project collects images from a shoreline video camera and tries to answer t
 - **_How many surfers were out there each hour of each day in the past?_**
 - **_How many will there be at each hour of the day in the upcoming days?_**
 
-**_This matters to surfers because the competition for each wave increases as the crowd size grows.  Forecasting the crowd size can help surfers know when conditions match their preference._**
+**_Why does this matter? As a surfer, I know that as as the crowd size grows, so does the competition for each wave.  It becomes difficult to not "drop in" on someone who is already on the wave or have to avoid surfers who drop in on you.  Forecasting surfer crowd size can help surfers know avoid peak crowding - or at least be ready for it._**
 
 <!-- DAILY_CHART_START -->
 #### A Full Day of Surfer Detections: Friday, September 25, 2026
@@ -356,6 +356,30 @@ The pattern is consistent enough to state as a rule for reading this chart: a
 coverage number near its target is only good news once you have checked that
 both edges can actually be missed. See
 [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md) for the full investigation.
+
+### How Accurate Is This Forecast Right Now?
+
+Surfer counts swing hard across a single day at this spot — from an empty
+lineup to more than 70 in one hour — but average about **15 surfers per
+daylight hour**. Against that, the forecast lands **within ±8 surfers about 80%
+of the time**. Every forecast is written down before the day happens and scored
+against what the detector later counted, so the record cannot be rewritten
+after the fact.
+
+![Forecast vs. actual surfer counts for the most recently scored day, with tide](data/charts/latest_forecast_vs_actual.png)
+
+*The most recently scored day, rebuilt and overwritten each night — the blue
+line is what was forecast the evening before, the coral line is what the
+detector counted, the shaded band is the 80% prediction range, and the dashed
+green line is tide on the right-hand axis. This is the same chart that goes out
+in the nightly email.*
+
+Measured on 83 scored forecast-hours as of 2026-09-26, so treat it as an early
+reading. For the fuller picture — per-hour error spread, accuracy by lead time,
+and why the prediction bands are overconfident — see
+[Model Calibration](#model-calibration) above and
+[`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md). The raw scored record is
+[`data/forecasts/forecast_log.csv`](data/forecasts/forecast_log.csv).
 
 ### Exploratory Findings
 

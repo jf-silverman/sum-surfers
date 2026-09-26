@@ -26,6 +26,7 @@ Usage:
 """
 
 import argparse
+import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -386,6 +387,15 @@ def main():
     out_path = OUT_DIR / f"forecast_vs_actual_{target_date.isoformat()}.png"
     build_chart(target_date, forecast_rows, actuals, made_at, out_path, tide=tide)
     print(f"  Chart: {out_path}  (tide points: {len(tide)})")
+
+    # A stable, git-tracked copy for the README's accuracy section, mirroring the
+    # latest.png / latest_week.png convention used by plot_daily_prediction.py.
+    # The dated file stays the per-day record and remains gitignored; this one is
+    # the single published image, overwritten nightly so the README never goes
+    # stale. Named so it does not match the forecast_vs_actual_*.png ignore rule.
+    latest_path = OUT_DIR / "latest_forecast_vs_actual.png"
+    shutil.copyfile(out_path, latest_path)
+    print(f"  Published copy: {latest_path}")
 
     frames = extreme_frames(target_date)
     for label, fpath, count, stamp in frames:

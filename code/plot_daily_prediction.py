@@ -588,16 +588,23 @@ GIF_UPSCALE = 1.25
 # Each hour appears twice: bare frame, then the same frame with boxes. The bare
 # one holds longer because that is the half asking the viewer to do something —
 # find the specks — while the reveal only has to be read.
-GIF_LOOK_MS = 2500
-GIF_REVEAL_MS = 2000
+GIF_LOOK_MS = 1875
+GIF_REVEAL_MS = 1500
 GIF_MAX_COLORS = 256          # full palette: box pixels are alpha-blended (see BOX_ALPHA),
                               # so their exact color varies with the water beneath and a
                               # smaller palette starts discarding them
 # Boxes are drawn slightly translucent so they sit on the water rather than
-# hovering over it. Kept high: at lower opacity the blended greens drift far
-# enough from the reserved palette entry that GIF quantization starts snapping
-# them toward gray, which is the bug this whole path was fixed for once already.
-BOX_ALPHA = 0.90
+# hovering over it. There is a floor on how low this can go: the drawn pixel is
+# BOX_ALPHA * green + (1 - BOX_ALPHA) * water, so as it falls the blended color
+# drifts away from the reserved palette entry and GIF quantization starts
+# snapping it toward gray — that is the bug this path was fixed for once
+# already, at 0.65. 0.80 was measured frame by frame after the change (see the
+# check in PROJECT_HISTORY) and still lands on the reserved entry.
+BOX_ALPHA = 0.80
+# Rectangle line width in pixels, before GIF_UPSCALE. Thin on purpose: the
+# boxes mark specks a few pixels across, and a heavy line hides the surfer it
+# is pointing at.
+BOX_THICKNESS = 1
 # Box color, defined once in both spaces: cv2 draws in BGR, the GIF palette
 # reserves it in RGB. Keeping a single source for it is what guarantees the
 # drawn pixels and the reserved palette entry are the same color.
@@ -706,11 +713,11 @@ def render_detection_frame(img_path, model, draw_boxes=True, boxes=None):
         # Drawn onto an overlay that is composited at BOX_ALPHA below. An
         # earlier version used 0.65 here, which pushed the blended green far
         # enough toward the water beneath that GIF quantization dropped it on
-        # some frames and the boxes rendered gray. 0.90 stays close enough to
-        # the reserved palette entry to survive, which the regeneration check
+        # some frames and the boxes rendered gray. BOX_ALPHA stays close enough
+        # to the reserved palette entry to survive, which the regeneration check
         # verifies frame by frame.
         if draw_boxes:
-            cv2.rectangle(overlay, p1, p2, BOX_COLOR_BGR, 2)
+            cv2.rectangle(overlay, p1, p2, BOX_COLOR_BGR, BOX_THICKNESS)
     if visible and draw_boxes:
         out = cv2.addWeighted(overlay, BOX_ALPHA, out, 1.0 - BOX_ALPHA, 0)
     return out, visible
