@@ -18,7 +18,7 @@ Each green box below contains a surfer, according to the object detection model.
 
 #### The Surfer Crowd Forecast for: Saturday, September 26, 2026
 
-Once enough hours and days were gathered along with weather and surf conditions, a surf count prediction model was built to forecast how many surfers would be present at each hour for the coming day.  This is useful for surfers to plan to avoid busy times or at least know what to expect.  The forecast still runs about one surfer low on average, and it misses by about five surfers in a typical hour - crowds depend on plenty of things the weather and surf data never see.  The detector underneath it used to undercount badly in fog and glare, which made the forecast worse; that was fixed in September 2026 by labeling those conditions and retraining, so what remains is the prediction model's own error.  The right-hand column rates each hour from 1 (near-empty) to 5 (packed), using the five equal slices of every hour the camera has counted so far.
+Once enough hours and days were gathered along with weather and surf conditions, a surf count prediction model was built to forecast how many surfers would be present at each hour for the coming day.  This is useful for surfers to plan to avoid busy times or at least know what to expect.  The forecast still runs about one surfer low on average, and it misses by about five surfers in a typical hour - crowds depend on plenty of things the weather and surf data never see.  The detector underneath it used to undercount badly in fog and glare, which made the forecast worse; that was fixed in September 2026 by labeling those conditions and retraining, so what remains is the prediction model's own error.  The right-hand column rates each hour from 1 (near-empty) to 5 (packed), using the five equal slices of every hour the camera has counted so far.  [How to Read This Chart](#how-to-read-the-daily-chart)
 ![Latest daily prediction chart](data/charts/latest.png)
 
 #### The Week Ahead: September 26 - October 02, 2026
@@ -27,6 +27,31 @@ The same model, run out to a week. Every hour gets a crowd level from 1 (near-em
 ![Crowd outlook for the week ahead](data/charts/latest_week.png)
 
 <!-- DAILY_CHART_END -->
+
+## How Accurate Is This Forecast Right Now?
+
+Surfer counts swing hard across a single day at this spot — from an empty
+lineup to more than 70 in one hour — but average about **15 surfers per
+daylight hour**. Against that, the forecast lands **within ±8 surfers about 80%
+of the time**. Every forecast is written down before the day happens and scored
+against what the detector later counted, so the record cannot be rewritten
+after the fact.
+
+![Forecast vs. actual surfer counts for the most recently scored day, with tide](data/charts/latest_forecast_vs_actual.png)
+
+*The most recently scored day, rebuilt and overwritten each night — the blue
+line is what was forecast the evening before, the coral line is what the
+detector counted, the shaded band is the 80% prediction range, and the dashed
+green line is tide on the right-hand axis. This is the same chart that goes out
+in the nightly email.*
+
+Measured on 83 scored forecast-hours as of 2026-09-26, so treat it as an early
+reading. For the fuller picture — per-hour error spread, accuracy by lead time,
+and why the prediction bands are overconfident — see
+[Model Calibration](#model-calibration) below and
+[`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md). The raw scored record is
+[`data/forecasts/forecast_log.csv`](data/forecasts/forecast_log.csv).
+
 
 ## How It Works, Step by Step
 
@@ -109,37 +134,6 @@ detail and a link to the in-depth write-up.
    anything by hand, which is why the two images above are never more than a
    day old.
    → [The pipeline, end to end](docs/HOW_IT_WORKS.md#the-pipeline-end-to-end)
-
-### How to Read the Daily Chart
-
-- **Aqua line** — the model's single best-guess ("median") count for each
-  hour.
-- **Shaded band + side table** — the model's
-  [prediction interval](docs/HOW_IT_WORKS.md#term-prediction-interval): the
-  range the real count is expected to fall in on most days, shown as a single
-  shaded 80% band around the line and repeated as plain numbers in the table,
-  where the "Predicted" column is that hour's single best guess and "Range" is
-  the band. **It isn't perfectly calibrated** — see
-  [Model Calibration](#model-calibration) below for the real, measured accuracy
-  of this range, not just the claimed one.
-- **Weather markers** (circle/square/triangle/diamond) — the model's
-  predicted weather condition for that hour, plotted at the median
-  count.
-- **Green dashed line (right-hand axis)** — predicted tide height, in
-  feet.
-- **Hatched band / "no training data" label** — flags hours with little
-  or no real training data behind them (night hours, or hours outside
-  the model's normal range) — treat those points as a rough
-  extrapolation, not a confident prediction.
-- **Caption** — the conditions driving that day's forecast, plus the
-  detector's actual [precision](docs/HOW_IT_WORKS.md#term-precision) and
-  [recall](docs/HOW_IT_WORKS.md#term-recall), measured on held-out images
-  for the checkpoint actually deployed (not estimated).
-
-See [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for a deeper walkthrough of
-the detection pipeline and a glossary of every term used on this page,
-and [PROJECT_HISTORY.md](docs/PROJECT_HISTORY.md) for the full history
-of how the forecast model was built, tested, and tuned.
 
 ## Object Detection: Model, Training Data & Tools
 
@@ -357,30 +351,6 @@ coverage number near its target is only good news once you have checked that
 both edges can actually be missed. See
 [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md) for the full investigation.
 
-### How Accurate Is This Forecast Right Now?
-
-Surfer counts swing hard across a single day at this spot — from an empty
-lineup to more than 70 in one hour — but average about **15 surfers per
-daylight hour**. Against that, the forecast lands **within ±8 surfers about 80%
-of the time**. Every forecast is written down before the day happens and scored
-against what the detector later counted, so the record cannot be rewritten
-after the fact.
-
-![Forecast vs. actual surfer counts for the most recently scored day, with tide](data/charts/latest_forecast_vs_actual.png)
-
-*The most recently scored day, rebuilt and overwritten each night — the blue
-line is what was forecast the evening before, the coral line is what the
-detector counted, the shaded band is the 80% prediction range, and the dashed
-green line is tide on the right-hand axis. This is the same chart that goes out
-in the nightly email.*
-
-Measured on 83 scored forecast-hours as of 2026-09-26, so treat it as an early
-reading. For the fuller picture — per-hour error spread, accuracy by lead time,
-and why the prediction bands are overconfident — see
-[Model Calibration](#model-calibration) above and
-[`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md). The raw scored record is
-[`data/forecasts/forecast_log.csv`](data/forecasts/forecast_log.csv).
-
 ### Exploratory Findings
 
 Tide and weekend/weekday are the two strongest predictors of surfer count
@@ -573,3 +543,33 @@ folder under `analysis/`, holding whatever mix of CSVs, charts, and
 plotting/analysis scripts that investigation produced — see
 [`PROJECT_FILES.md`](docs/PROJECT_FILES.md) for what's in each one.
 
+## How to Read the Daily Chart
+
+- **Aqua line** — the model's single best-guess ("median") count for each
+  hour.
+- **Shaded band + side table** — the model's
+  [prediction interval](docs/HOW_IT_WORKS.md#term-prediction-interval): the
+  range the real count is expected to fall in on most days, shown as a single
+  shaded 80% band around the line and repeated as plain numbers in the table,
+  where the "Predicted" column is that hour's single best guess and "Range" is
+  the band. **It isn't perfectly calibrated** — see
+  [Model Calibration](#model-calibration) above for the real, measured accuracy
+  of this range, not just the claimed one.
+- **Weather markers** (circle/square/triangle/diamond) — the model's
+  predicted weather condition for that hour, plotted at the median
+  count.
+- **Green dashed line (right-hand axis)** — predicted tide height, in
+  feet.
+- **Hatched band / "no training data" label** — flags hours with little
+  or no real training data behind them (night hours, or hours outside
+  the model's normal range) — treat those points as a rough
+  extrapolation, not a confident prediction.
+- **Caption** — the conditions driving that day's forecast, plus the
+  detector's actual [precision](docs/HOW_IT_WORKS.md#term-precision) and
+  [recall](docs/HOW_IT_WORKS.md#term-recall), measured on held-out images
+  for the checkpoint actually deployed (not estimated).
+
+See [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for a deeper walkthrough of
+the detection pipeline and a glossary of every term used on this page,
+and [PROJECT_HISTORY.md](docs/PROJECT_HISTORY.md) for the full history
+of how the forecast model was built, tested, and tuned.

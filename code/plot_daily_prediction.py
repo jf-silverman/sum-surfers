@@ -1203,7 +1203,11 @@ def update_readme(target_date, detection_capture=None, week_days=0, week_start=N
         "2026 by labeling those conditions and retraining, so what remains is "
         "the prediction model's own error.  The right-hand column rates each "
         "hour from 1 (near-empty) to 5 (packed), using the five equal slices "
-        "of every hour the camera has counted so far.\n"
+        "of every hour the camera has counted so far."
+        # Points at the reference section, which lives at the foot of the
+        # README. Kept here rather than in README.md because this caption is
+        # rewritten from this string on every run.
+        "  [How to Read This Chart](#how-to-read-the-daily-chart)\n"
     )
 
     detection_block = ""
