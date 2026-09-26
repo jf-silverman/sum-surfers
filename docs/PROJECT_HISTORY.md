@@ -4952,3 +4952,55 @@ which behaves like summer. It is late autumn and early winter that are empty,
 not a clean half-year. And Oct–Dec is entirely 2025 while Apr–Sep is entirely
 2026, so season and year remain fully confounded until the October pairs land
 (L10).
+
+### 2026-09-25 — Morning temperature tracks the winter empty hours, but does not explain them
+
+Following the inverted daily rhythm recorded above, Joel's next hypothesis was
+that the empty winter mornings are driven by the before-work light window: the
+fall-back hands back morning light, so mornings should get *easier*, while the
+evening window closes. The light arithmetic is exactly right — hours of light
+outside a 9–5, by month:
+
+| month | before 09:00 | after 17:00 |
+|---|---|---|
+| 2025-10 | 2.10 h | 1.83 h |
+| 2025-11 | **2.73 h** | **0.46 h** |
+| 2025-12 | 2.41 h | 0.33 h |
+| 2026-03 | 2.11 h | **2.67 h** |
+| 2026-07 | 3.46 h | 3.90 h |
+
+**But the crowd moves the other way.** November gains morning light and the
+weekday before-09:00 crowd collapses from 5.5 to 1.3 surfers, empty hours 15% →
+54%. The test that settles it is the weekend: if a 9–5 were the binding
+constraint, weekend mornings should not care, and they collapse just as hard
+(15.2 → 2.2, empty 0% → 54%). Nobody's work schedule changed on 2 November.
+
+Where the workday *does* show is the opposite end. Weekend/weekday ratios by
+slot: Oct–Mar 1.72× before 09:00, 1.72× during 09:00–17:00, but **1.21× after
+17:00**; Apr–Sep 1.51×, 1.53×, and **1.02×**. Read within a day type, the
+weekend crowd halves from midday into the evening (24.0 → 12.0) while the
+weekday crowd barely moves (15.6 → 11.8). The after-work session is real here;
+the before-work session is weak, or the before-09:00 ratio would also approach
+parity.
+
+**The temperature gradient (the reason for this entry).** Within Oct–Mar
+mornings, colder is emptier and the gradient is monotonic:
+
+| morning temp | n | mean count | empty |
+|---|---|---|---|
+| < 48 °F | 24 | 1.1 | 62.5% |
+| 48–52 °F | 29 | 2.8 | 41.4% |
+| 52–56 °F | 50 | 4.9 | 42.0% |
+| 56–60 °F | 12 | 4.8 | 25.0% |
+| 60+ °F | 8 | 5.2 | 12.5% |
+
+r = **+0.232** (p = 0.010) against count and **−0.252** (p = 0.005) against
+being empty, on observed Open-Meteo temperature.
+
+**It is a contributor, not the mechanism.** October and November mornings sit
+within half a degree of each other — **54.2 °F against 53.7 °F** — while
+emptiness goes 11% → 54%. December reached 83% empty with **0% precipitation**,
+and precipitation never exceeds 15% of morning hours in any month, so rain is
+not available as the explanation either. Something separates October from
+November at the same temperature, and at n = 18 for December and n = 10 for
+March this history cannot say what. Left open deliberately pending more winters.
