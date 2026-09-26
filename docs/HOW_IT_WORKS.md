@@ -219,6 +219,52 @@ box only appears if the model's confidence for it was 0.195 or higher, and
 each box's label is that confidence score. The image's own caption repeats
 the threshold so it's readable without cross-referencing this doc.
 
+## Detector accuracy: the deployed checkpoint
+
+The production detector is the September 2026 retrain, which added labeled fog,
+glare and pose data and ran 60 epochs. The checkpoint actually deployed is
+`best.pt` — **epoch 46**, the epoch with the best mAP@0.5:0.95, which is what
+the training run saves as "best" — not the last epoch. Validation DFL loss
+creeps back up after about epoch 40 while training DFL loss keeps falling, a
+mild sign of overfitting, and that is why the run does not simply keep the end
+of training.
+
+On the validation set that checkpoint scores **precision 88.5%, recall 81.3%,
+[mAP](#term-map)@0.5 86.8%, mAP@0.5:0.95 38.5%**. These are the numbers quoted
+in the daily chart's caption. They sit on a harder validation set than the
+previous model's, which now includes hazy fog frames, so they do not compare
+directly with its 85.6% / 82.0%.
+
+mAP@0.5:0.95 (38.5%) being far below mAP@0.5 (86.8%) is expected rather than
+alarming: it averages over much stricter box-overlap requirements, up to
+near-perfect box placement, which is not what this project needs — a box that
+lands on the right surfer counts that surfer correctly whether or not it hugs
+the outline.
+
+![YOLOv8s detector training metrics — loss, precision, recall, mAP over 60 epochs](../analysis/detector_training_metrics/detector_training_metrics.png)
+
+The per-epoch training log above is real, not reconstructed after the fact. The
+white dotted line on each chart is a 5-epoch rolling average. The top and bottom
+rows' first three charts are training and validation [loss](#term-loss) (box,
+class, DFL); the validation row is the meaningful one, since it is measured on
+images the model never trains on. The last two charts in each row are
+[precision](#term-precision) / [recall](#term-recall) and mAP, all computed on
+validation data each epoch. Precision and recall climb from noisy starting
+values to roughly 88% and 81%, flattening by about epoch 40 — training had
+largely converged well before epoch 60.
+
+**What the retrain was worth, measured on whole-frame counts rather than
+validation boxes**, on frames neither model trained on: on hazy frames the new
+model finds **98%** of the real surfers against **59%** for the old one, and
+across all held-out frames the average error per frame fell from 5.16 surfers to
+0.94. Against independent hand counts its average error per frame halved, 2.61 →
+1.28. The one regression was ordinary clear-day frames, counted about 3–7% high;
+most of that was one surfer boxed twice, a small box nested inside a larger one,
+which survives overlap-based de-duplication because the two boxes share little
+area relative to the larger one. Suppressing nested boxes brought clear-day
+counts to **102%** of the human count and cut average error there by 38%, with
+hand-counted frames landing at exactly 100%.
+
 ## Predictors: weather, tide, swell, wind, energy, consistency
 
 Separate from detection, `code/get_surf_predictors.py` pulls conditions
@@ -237,6 +283,53 @@ manually-run script (not part of the scheduled pipeline) that uses this
 to backfill predictors for existing `predictions.csv` rows. See that
 script's docstring for usage, and `PROJECT_HISTORY.md` for how the
 mechanism was discovered.
+
+## Forecast accuracy and calibration
+
+The forecast model is off by about **7.6 surfers** ([MAE](#term-mae)) on a
+typical count of around 16 when asked to predict days it has never seen. Treat
+its outputs as directional estimates, not precise counts.
+
+**That number went up on 2026-09-23, and the model did not get worse.** Until
+then accuracy was measured with a random 80/20 split of *hours*. At roughly 13
+hours per day that puts hours from the same day on both sides of the split: the
+model learned a day's crowd level from that day's own hours and was then scored
+on the rest of it, which is not a forecast but a fill-in. Splitting by whole day
+costs about 1.2 MAE, and holding out the most recent days rather than random ones
+costs about another 0.8, because the model then also has to cope with a genuine
+seasonal level shift. The published figure is now the forward-in-time one: fit on
+the past, scored on days that had not happened yet, which is the only version
+that matches how the forecast is used.
+
+Empirical coverage of the GBT quantile [prediction intervals](#term-prediction-interval)
+is checked directly against a held-out split by
+`analysis/surf_count_model_calibration/plot_calibration.py`, rather than trusted
+from the nominal target:
+
+![Prediction-interval calibration for the surf-count model](../analysis/surf_count_model_calibration/calibration_plot.png)
+
+Measured 2026-09-23, holding out the most recent days as a block: **15% vs 20%,
+26% vs 40%, 36% vs 60%, and 71.9% vs 80%**. Every band is overconfident — real
+counts fall outside them more often than the nominal level says — and the narrow
+bands badly so. The 80% band misses **9.4% low and 18.8% high** against a 10%
+target on each side. The low edge is about right; the high edge is where the
+model loses, which is the same mean-reversion that makes it under-call crowded
+hours.
+
+**A rule for reading any coverage number here**, learned twice the hard way:
+a coverage figure near its target is only good news once you have checked that
+both edges can actually be missed. Before the night-frame review this check read
+82% coverage while missing low only 4.6% of the time — the band's bottom edge sat
+under 1 surfer for 72% of hours, so there was almost nothing left to undershoot,
+and the apparent calibration came from a floor rather than from the model.
+Resolving 46 frames recorded outside the light window (28 genuinely unusable, and
+entering the record as empty hours or phantom counts) un-pinned that lower bound,
+which now sits under 1 surfer for 22% of hours instead of 72%. Coverage fell from
+82% to 75.5% *because* the interval became informative. The same thing happened on
+2026-09-08, when correcting the swell data moved the lower bound off zero and
+dropped coverage from 82.8% to 72%.
+
+Full investigation in `PROJECT_HISTORY.md`.
 
 ## Known limitations (short version)
 

@@ -65,12 +65,12 @@ in the nightly email.*
 Measured on 83 scored forecast-hours as of 2026-09-26, so treat it as an early
 reading. For the fuller picture — per-hour error spread, accuracy by lead time,
 and why the prediction bands are overconfident — see
-[Model Calibration](#model-calibration) below and
+[forecast accuracy and calibration](docs/HOW_IT_WORKS.md#forecast-accuracy-and-calibration) and
 [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md). The raw scored record is
 [`data/forecasts/forecast_log.csv`](data/forecasts/forecast_log.csv).
 
 
-## How It Works, Step by Step
+## How This Project Works
 
 Each step below starts with the plain-language version, then the technical
 detail and a link to the in-depth write-up.
@@ -110,6 +110,8 @@ detail and a link to the in-depth write-up.
    tile, the same surfer is proportionally much larger. This is the same family
    of technology behind pedestrian detection in self-driving cars.
    → [The model: YOLOv8](docs/HOW_IT_WORKS.md#the-model-yolov8)
+   · [How it was trained](docs/HOW_IT_WORKS.md#the-training-data-cvat)
+   · [How accurate the detector is](docs/HOW_IT_WORKS.md#detector-accuracy-the-deployed-checkpoint)
 
 5. **Merge the overlaps.**
    ***A surfer sitting on the seam between two tiles would be counted twice, so overlapping boxes are merged back into one.***
@@ -140,7 +142,7 @@ detail and a link to the in-depth write-up.
    Gradient-boosted trees fit the counts against those conditions: one model
    for the expected count, two more for the edges of an 80%
    [prediction interval](docs/HOW_IT_WORKS.md#term-prediction-interval). It is
-   a forecast, not a guarantee — see [Model Calibration](#model-calibration)
+   a forecast, not a guarantee — see [forecast accuracy and calibration](docs/HOW_IT_WORKS.md#forecast-accuracy-and-calibration)
    for how often that range actually holds, measured rather than claimed.
    → [Known limitations](docs/HOW_IT_WORKS.md#known-limitations-short-version)
 
@@ -152,229 +154,13 @@ detail and a link to the in-depth write-up.
    day old.
    → [The pipeline, end to end](docs/HOW_IT_WORKS.md#the-pipeline-end-to-end)
 
-## Object Detection: Model, Training Data & Tools
-
-The step that actually counts surfers in a picture — step 4 above — is an
-**object detection** model. Object detection is a
-computer-vision task: given an image, find every instance of a chosen
-object type and draw a box around each one, rather than just labeling
-the image as a whole ("this photo contains a surfer" vs. exactly where
-and how many). It's the same underlying technology behind a photo app
-circling faces or a self-driving car outlining nearby pedestrians — here
-it's just pointed at a stretch of ocean, looking for surfers instead.
-
-A model like this doesn't know what a surfer looks like on its own. It
-has to be *trained*: shown a large number of real images where a human
-has already drawn the correct box around every surfer, and left to
-gradually adjust itself until its own boxes start matching those
-examples closely. More and more varied examples generally make it
-better at telling a real surfer apart from a bird, a shadow, or a patch
-of whitewater.
-
-### The Model: YOLO
-
-This project uses **YOLO** ("You Only Look Once"), a well-known family
-of object-detection models — specifically **YOLOv8s**, the "small," CPU-
-friendly variant of version 8, via the open-source
-[Ultralytics library](docs/HOW_IT_WORKS.md#main-resources). "Single-pass"
-here means the model looks at the whole image once and predicts every
-box, and how confident it is in each one, in one step — rather than
-scanning it multiple times — which is what makes it fast enough to run
-on an ordinary laptop with no dedicated graphics card. Because surfers
-are small relative to the wide strip of ocean the camera sees, each
-frame is first split into 4 overlapping tiles and the model runs on each
-tile separately (see "Technical Overview" above) — a small object is
-easier to find in a smaller, more zoomed-in image.
-
-### Training Data & Labeling: CVAT
-
-Training a model requires real, hand-labeled examples. This project's
-57 training images (1,451 hand-drawn boxes total) were labeled using
-[CVAT](docs/HOW_IT_WORKS.md#main-resources) (Computer Vision Annotation
-Tool), an open-source browser tool made for exactly this kind of work —
-a person opens each image, draws a box around every surfer in it, and
-CVAT exports the result in a format the model can train on. Those 57
-images were split 32/15/10 into training, validation, and test sets (a
-model is trained only on the training set, and checked against images
-it's never seen — validation and test — so its reported accuracy
-reflects genuine performance, not memorization), and were tiled the same
-4-way split described above before training, so the model learns on
-exactly the shape of image it sees in production. See
-[HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for the full training walkthrough
-and [`train_model.py`](code/train_model.py) for the retraining script
-itself.
-
-### Detector Training Metrics
-
-Real per-[epoch](docs/HOW_IT_WORKS.md#term-epoch) training log for the
-production YOLOv8s surfer detector — the September 2026 retrain, which added
-labeled fog, glare and pose data (60 epochs) — 10 charts tracking how
-training went, not estimated after the fact. The white dotted line on
-each chart is a 5-epoch rolling average, to make the trend easier to
-see through the epoch-to-epoch noise.
-
-- **Top row, first 3 charts (aqua): training [loss](docs/HOW_IT_WORKS.md#term-loss)** —
-  box loss, class loss, and DFL loss, measured on the data the model was
-  actually training on. All three should generally trend downward, and
-  do here — the model is getting better at matching its own training
-  examples.
-- **Bottom row, first 3 charts (aqua): validation loss** — the same
-  three loss measurements, but on the held-out validation images the
-  model never trains on. This is the more meaningful set of loss
-  charts, since it shows how the model does on images it hasn't
-  memorized. Box and class loss trend downward with more visible noise (validation
-  is a much smaller set than training). **DFL loss creeps back up after
-  about epoch 40** while the training DFL loss keeps falling — a mild
-  sign of overfitting, and the reason the deployed checkpoint is taken
-  from epoch 46 rather than the end of training.
-- **Top row, last 2 charts (lime): [precision](docs/HOW_IT_WORKS.md#term-precision)
-  and [recall](docs/HOW_IT_WORKS.md#term-recall)** — both computed on
-  the validation set each epoch, not the training data, so they reflect
-  genuine model performance rather than how well it memorized what it
-  trained on. Both climb from noisy, mediocre starting values to about 88% and
-  81%, with a rough patch in the first ~15 epochs
-  where the model still hasn't learned much and both metrics swing
-  widely epoch to epoch.
-- **Bottom row, last 2 charts (lime): [mAP](docs/HOW_IT_WORKS.md#term-map)@0.5
-  and mAP@0.5:0.95** — single-number summaries that combine precision
-  and recall at one confidence threshold (0.5) or averaged across many
-  stricter ones (0.5:0.95), also on the validation set. Same overall
-  shape as precision/recall: noisy early on, climbing and flattening out
-  by around epoch 40, which is a sign training had mostly converged by
-  then rather than still improving at epoch 60.
-
-![YOLOv8s detector training metrics — loss, precision, recall, mAP over 60 epochs](analysis/detector_training_metrics/detector_training_metrics.png)
-
-The charts run to epoch 60, but the checkpoint actually deployed is
-`best.pt` — **epoch 46** (dashed line), the epoch with the best
-mAP@0.5:0.95, which is what the training run saves as "best". On the
-validation set it gets **precision 88.5%, recall 81.3%, mAP@0.5 86.8%,
-mAP@0.5:0.95 38.5%**. These are the numbers cited in the daily chart's
-caption. They are measured on a harder validation set than the previous
-model's, which now includes hazy fog frames, so they don't compare directly
-with its 85.6%/82.0%.
-
-The comparison that matters is whole-frame surfer counts on frames neither
-model trained on. On hazy frames the new model finds **98%** of the real
-surfers, against **59%** for the previous one; across all held-out frames
-the average error per frame fell from 5.16 surfers to 0.94. Against
-independent hand counts, its average error per frame halved (2.61 → 1.28).
-The one regression was on ordinary clear-day frames, where it counted about
-3–7% high. Most of that turned out to be one surfer drawn twice — a small box
-nested inside a larger one, which survives overlap-based de-duplication because
-the two boxes share little area relative to the larger one. Suppressing nested
-boxes brought clear-day counts to **102%** of the human count and cut the
-average error there by 38%, with hand-counted frames landing at exactly 100%.
-
-Note that mAP@0.5:0.95 (38.5%) is much lower than mAP@0.5 (86.8%): it's an
-average over much stricter box-overlap requirements (up to near-perfect box
-placement), not a sign the model is worse than the headline number
-suggests.
-
-## Surfer Count Prediction Model
-
-A separate modeling pipeline on top of `data/predictions/predictions.csv` +
-`data/predictor_vars/surfline_predictors.csv`, built in three phases (see
-[`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md) for the full story,
-including bugs found and fixed along the way). Scripts below
-live in `code/`:
-
-- `backfill_openmeteo_weather.py` — adds real observed historical
-  weather (Open-Meteo archive API, free/no-auth) to
-  `data/predictor_vars/openmeteo_weather.csv`.
-- `build_training_features.py` — joins predictions (target) with
-  predictors (features) for `quality_ok=True` rows, adds derived
-  time-of-day/day-of-week/month features. Writes `data/training_features.csv`.
-- `fit_surfer_count_model.py` — fits and compares a Poisson
-  [GLM](docs/HOW_IT_WORKS.md#term-glm), a negative-binomial GLM, and
-  [gradient-boosted trees (GBT)](docs/HOW_IT_WORKS.md#term-gbt) — GBT is
-  the best performer, off by about 7.6 surfers on average
-  ([MAE](docs/HOW_IT_WORKS.md#term-mae)) when asked to predict days it has
-  never seen — plus GBT-based prediction intervals (see
-  [Model Calibration](#model-calibration) below).
-- `predict_surf_count.py` — pulls live tomorrow's forecast and outputs
-  a prediction with an 80% range:
-    ```bash
-    python code/predict_surf_count.py                          # tomorrow, default hours
-    python code/predict_surf_count.py --date 2026-08-28 --hours 07:10,12:00
-    ```
-- `demo_predictions.py` — shows N random held-out predictions
-  alongside the actual count and conditions, for eyeballing model behavior.
-- `plot_daily_prediction.py` + `daily_chart.sh` — generates a daily
-  prediction chart (median line + a continuous 10-90% prediction-interval
-  gradient with a side-by-side 80%-range table, tide, weather, night
-  shading) and a detection-review image (real boxes/labels on the day's
-  ~8am crop with the predicted range overlaid), auto-committed to the top
-  of this README. Runs as the last step of the nightly pipeline, so it
-  trains on detections written minutes earlier. See "How to Read the Daily
-  Chart" below for what everything on it means.
-
-Caveat: held-out MAE is about 7.6 surfers on a typical count of ~16 — treat
-outputs as directional estimates, not precise counts.
-
-**That number went up on 2026-09-23, and the model did not get worse.** Until
-then accuracy was measured with a random 80/20 split of *hours*. At roughly 13
-hours per day, that puts hours from the same day on both sides of the split: the
-model got to learn a particular day's crowd level from that day's own hours, and
-was then scored on the rest of it — which is not a forecast, it is a fill-in.
-Splitting by whole day costs about 1.2 MAE, and holding out the most recent days
-rather than random ones costs about another 0.8, because the model then also has
-to cope with a genuine seasonal level shift. The published figure is now the
-forward-in-time one: fit on the past, scored on days that had not happened yet,
-which is the only version that matches how the forecast is used.
-
-See [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for how the real-world
-condition data above (weather, tide, swell, wind, wave energy) is
-collected, and [PROJECT_FILES.md](docs/PROJECT_FILES.md) for a map of
-every script and data file in this repo, including the clip-download and
-detection scripts not listed above.
-
-### Model Calibration
-
-Empirical coverage of the GBT quantile prediction intervals, checked
-directly against a held-out test split (`analysis/surf_count_model_calibration/plot_calibration.py`)
-rather than trusted from the nominal target:
-
-![Prediction-interval calibration for the surf-count model](analysis/surf_count_model_calibration/calibration_plot.png)
-
-Measured 2026-09-23, holding out the most recent days as a block rather than
-random hours: 15% vs 20%, 26% vs 40%, 36% vs 60%, and **71.9% vs 80%**. Every
-band is overconfident — real counts fall outside them more often than the
-nominal level says — and the narrow bands badly so.
-
-The 80% band misses **9.4% low and 18.8% high** against a 10% target on each
-side. The low edge is about right; the high edge is where the model loses, which
-is the same mean-reversion that makes it under-call crowded hours.
-
-These numbers are worse than the ones published here the day before (18/36/52/75.5%),
-and the model did not change. The split did: measuring on randomly chosen hours
-let the model see part of every test day during training. See the accuracy caveat
-above for what that was worth.
-
-Before the night-frame review, the check read 82% coverage, but it missed low
-only 4.6% of the time — the band's bottom edge sat under 1 surfer for 72% of
-hours, so there was almost nothing left to undershoot, and the apparent
-calibration came from a floor rather than from the model. The review resolved
-46 frames recorded outside the light window: 28 were genuinely unusable and
-had been entering the record as empty hours or phantom counts. Removing them
-cut the share of empty hours enough to un-pin the lower bound, which now sits
-under 1 surfer for 22% of hours instead of 72%. Coverage fell from 82% to
-75.5% *because* the interval became informative — the same thing that happened
-on 2026-09-08, when correcting the swell data moved the lower bound off zero
-and dropped coverage from 82.8% to 72%.
-
-The pattern is consistent enough to state as a rule for reading this chart: a
-coverage number near its target is only good news once you have checked that
-both edges can actually be missed. See
-[`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md) for the full investigation.
-
-### Exploratory Findings
+## Exploratory Findings
 
 Tide and weekend/weekday are the two strongest predictors of surfer count
 at this spot (see [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md) for the full
 GBT permutation-importance breakdown). A closer look at the weekend effect:
 
-#### Weekday vs. Weekend
+### Weekday vs. Weekend
 
 1. The weekend-to-weekday ratio varies noticeably by month — from about
    1.16-1.18x in March, May, and July 2026 up to nearly 2x in November
@@ -388,7 +174,7 @@ GBT permutation-importance breakdown). A closer look at the weekend effect:
 
 ![Mean surfer count by month, weekday vs weekend](analysis/weekday_weekend_patterns/weekday_weekend_by_month_2026-08-28.png)
 
-#### Daily Mean Count Kernel Density Estimate (KDE)
+### Daily Mean Count Kernel Density Estimate (KDE)
 
 1. Each curve is normalized to its own group (n=61 weekdays, n=31
    weekends) — the taller weekday peak isn't a sample-size artifact.
@@ -570,7 +356,7 @@ plotting/analysis scripts that investigation produced — see
   shaded 80% band around the line and repeated as plain numbers in the table,
   where the "Predicted" column is that hour's single best guess and "Range" is
   the band. **It isn't perfectly calibrated** — see
-  [Model Calibration](#model-calibration) above for the real, measured accuracy
+  [forecast accuracy and calibration](docs/HOW_IT_WORKS.md#forecast-accuracy-and-calibration) for the real, measured accuracy
   of this range, not just the claimed one.
 - **Weather markers** (circle/square/triangle/diamond) — the model's
   predicted weather condition for that hour, plotted at the median
