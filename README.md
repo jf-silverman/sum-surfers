@@ -358,10 +358,19 @@ where the day-level-aggregate idea in the backlog comes from.
 
 ## License
 
-[MIT](LICENSE) — code, model weights, and data alike. Use it, change it, build
-on it; attribution is appreciated but the only requirement is keeping the
-copyright notice. The camera footage itself is Surfline's and is not
-redistributed here.
+Two licenses, because code and data are different things:
+
+- **Code** (`code/`, `analysis/`) — [GNU AGPL v3.0](LICENSE). You may use,
+  modify and run it, including commercially, but derivatives and **hosted
+  services built on it must publish their source** under the same terms. The
+  network clause is deliberate: this is a pipeline someone could run as a
+  service without ever distributing a file.
+- **Data and model weights** — [CC BY-SA 4.0](LICENSE-DATA). Share and adapt
+  with attribution, under the same license.
+
+The camera footage itself is Surfline's and is not redistributed here; the
+counts, labels and derived measurements are this project's own work. Open-Meteo
+values are CC BY 4.0.
 
 ## Analysis
 

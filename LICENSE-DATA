@@ -1,0 +1,39 @@
+Data and Model Weights License
+==============================
+
+The SOFTWARE in this repository (everything under `code/` and `analysis/`, and
+any other source file) is licensed under the GNU Affero General Public License
+v3.0 — see LICENSE.
+
+The DATA and MODEL WEIGHTS are licensed separately, under the
+
+    Creative Commons Attribution-ShareAlike 4.0 International
+    (CC BY-SA 4.0)
+
+license. Full legal code: https://creativecommons.org/licenses/by-sa/4.0/legalcode
+Human-readable summary:    https://creativecommons.org/licenses/by-sa/4.0/
+
+This covers, among other things:
+
+  - data/predictions/            surfer counts per frame
+  - data/predictor_vars/         weather, tide, swell, wind, energy predictors
+  - data/training_features.csv   the joined modelling table
+  - data/forecasts/              recorded forecasts and the scored log
+  - data/model_release/          the released model bundle and held-out set
+  - data/model_out/              trained detector weights
+  - data/cvat_out_*/             labels and annotation exports
+  - data/charts/                 generated charts and animations
+
+In short: you may share and adapt this data, including commercially, provided
+you give appropriate credit and license your derivative under CC BY-SA 4.0.
+
+Copyright (c) 2025-2026 Joel Silverman
+
+NOT COVERED BY EITHER LICENSE
+-----------------------------
+The underlying camera footage is Surfline's property and is not redistributed
+in this repository. The counts, labels, derived measurements and generated
+images above are this project's own work product and are what CC BY-SA 4.0
+applies to. Third-party data retains its own terms: Surfline forecast values
+are used under their public API's terms, and Open-Meteo data is CC BY 4.0
+(https://open-meteo.com/en/license).
