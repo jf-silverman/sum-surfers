@@ -4903,3 +4903,52 @@ Charts: `analysis/weekday_weekend_patterns/plot_weekday_by_year.py` (panel A the
 per-year view, labelled as confounded; panel B the month-centered view that is
 the one to read) and `plot_year_coverage.py` (every day of both years on one
 calendar axis, which is the picture of the empty overlap).
+
+### 2026-09-25 — Empty daylight hours by season, and an inverted daily rhythm
+
+Joel asked for the share of daylight hours that are empty per season, on the
+grounds that a proportion removes day length from the comparison. It does, and
+the seasonal gap survives it — but a raw proportion still hides one confound,
+and removing that one turned up something larger.
+
+Daylight is astral civil twilight at the corrected Pleasure Point coordinates,
+the same first light / last light definition the clip pipeline uses: **11.60 h**
+mean in Oct–Mar against **14.36 h** in Apr–Sep.
+
+**Raw empty share** (quality-passed frames, count == 0): Oct–Mar **24.5%**
+weekday / **23.3%** weekend, Apr–Sep **7.9%** / **10.4%**. Wilson 95% intervals
+do not overlap between seasons.
+
+The remaining confound is edge composition. A short day has proportionally more
+first-light and last-light hours, and those are structurally the emptiest, so a
+whole-window proportion still flatters summer. Restricting to the **middle 50%
+of each day's light window** removes it entirely, and the gap widens rather than
+closes: Oct–Mar **24.7%** weekday and **28.0%** weekend against Apr–Sep **9.9%**
+and **8.7%** — **2.5× and 3.2×**. So day length is not what is driving this.
+
+**The larger finding is that the daily rhythm inverts between seasons**, which
+the position breakdown exposed and clock-hour rates confirmed (so it is not an
+artefact of normalising by window position):
+
+| clock hour | Oct–Mar empty | Apr–Sep empty |
+|---|---|---|
+| 07:00 | 44% | 1% |
+| 09:00 | 46% | 4% |
+| 12:00 | 14% | 11% |
+| 16:00 | 6% | 15% |
+| 19:00 | 0% (n=5) | 13% |
+
+Winter surfing here is an afternoon activity and summer surfing is a morning
+one. Supporting context, not a tested mechanism: the sea-breeze build is
+stronger in summer (morning 2.3 → afternoon 6.6 mph, against 2.1 → 4.8 in
+winter), and winter mornings are genuinely cold (56.1 °F at 06:00–10:00). The
+wind half fits the earlier result that hour-of-lightest-wind is the strongest
+predictor of the daily peak hour (r = +0.304). Neither is established here —
+6.6 mph is not blown out, so wind alone is unlikely to carry it.
+
+**Two caveats on reading any of this as seasonal.** The Oct–Mar bucket is not
+homogeneous: October 15.6%, November 33.8%, December 38.9%, but March **2.9%**,
+which behaves like summer. It is late autumn and early winter that are empty,
+not a clean half-year. And Oct–Dec is entirely 2025 while Apr–Sep is entirely
+2026, so season and year remain fully confounded until the October pairs land
+(L10).
