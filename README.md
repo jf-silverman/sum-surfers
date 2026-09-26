@@ -348,6 +348,13 @@ Optional:
   `data/model_out/20260921_fog/train/weights/best.pt`. The October 2025
   model it replaced is at `data/model_out/20251013/train/runs/detect/train13/weights/best.pt`.
 
+## License
+
+[MIT](LICENSE) — code, model weights, and data alike. Use it, change it, build
+on it; attribution is appreciated but the only requirement is keeping the
+copyright notice. The camera footage itself is Surfline's and is not
+redistributed here.
+
 ## Analysis
 
 One-off analyses (not part of the scheduled pipeline) each get their own
