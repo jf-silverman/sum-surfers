@@ -30,6 +30,10 @@ CLIP_DURATION_SEC = 5  # 5-second clips (standing default — see resolve_clip_d
 # occasional one-off experiments (e.g. testing whether longer clips reduce frame-edge/
 # wave-occlusion count variability) without risking eating into clip storage long-term.
 CLIP_DURATION_OVERRIDE_FILE = _PROJECT_ROOT / "data" / ".clip_duration_override"
+# 5 is the camera's own limit, not a tuning choice: the site exposes five days
+# of rewind INCLUDING today, so the reachable past is today plus four. Raising
+# CLIP_LOOKBACK_DAYS past 5 buys nothing — those days are simply gone, for any
+# account. Confirmed against the site 2026-09-26.
 DAY_LOOKBACK_DAYS = int(os.environ.get("CLIP_LOOKBACK_DAYS", "5"))
 REQUEST_TIMEOUT_SEC = float(os.environ.get("CLIP_REQUEST_TIMEOUT_SEC", "20"))
 REQUEST_BASE_DELAY_SEC = float(os.environ.get("CLIP_REQUEST_DELAY_SEC", "0.35"))
