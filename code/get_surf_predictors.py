@@ -10,13 +10,12 @@ backfill history).
 
 Endpoints used (no accesstoken required for forward-looking data — omitting
 it avoids a 403 on `rating` that occurs when a token IS passed):
-  https://services.surfline.com/kbyg/spots/forecasts/weather
-  https://services.surfline.com/kbyg/spots/forecasts/rating
-  https://services.surfline.com/kbyg/spots/forecasts/tides
-  https://services.surfline.com/kbyg/spots/forecasts/wave
-  https://services.surfline.com/kbyg/spots/forecasts/wind
-  https://services.surfline.com/kbyg/spots/forecasts/energy
-  https://services.surfline.com/kbyg/spots/forecasts/consistency
+  https://services.surfline.com/kbyg/spots/forecasts/{weather,rating,tides,
+                                                      surf,swells,wind,
+                                                      energy,consistency}
+  (the live list is ENDPOINT_PATHS below — all eight verified anonymous on
+  2026-09-26, 7 days forward, 168 hourly rows each. This block previously
+  listed a `wave` endpoint, which 404s; the real pair is `surf` + `swells`.)
 
 These only return forward-looking data (today onward) for anonymous
 requests. Historical dates ARE available from the same endpoints via a
