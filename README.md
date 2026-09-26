@@ -348,6 +348,14 @@ Optional:
   `data/model_out/20260921_fog/train/weights/best.pt`. The October 2025
   model it replaced is at `data/model_out/20251013/train/runs/detect/train13/weights/best.pt`.
 
+## Works Cited
+
+Academic literature consulted for this project, and what each piece actually
+contributes, is in [`works_cited.md`](docs/works_cited.md). The short version:
+no published work forecasts surfer counts at a break from conditions — the
+closest analogue is beach-attendance forecasting from camera counts, which is
+where the day-level-aggregate idea in the backlog comes from.
+
 ## License
 
 [MIT](LICENSE) — code, model weights, and data alike. Use it, change it, build
