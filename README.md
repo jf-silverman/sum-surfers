@@ -195,9 +195,27 @@ Both are safe to run manually any time; see each script for details.
 
 ## Run It Yourself (No Account Needed)
 
-Most of this repo's collection path depends on a paid camera account, which
-makes it hard for anyone else to reproduce. Three things do not need one:
-collecting live data, checking the detector, and checking the forecast model.
+**None of the forecast's inputs are behind a paywall.** All eight Surfline
+forecast endpoints this project reads — weather, rating, tides, surf, swells,
+wind, energy, consistency — answer anonymous requests, seven days forward, at
+one row per hour (re-verified 2026-09-26). The observed-weather backfill from
+Open-Meteo is free too, and the camera's live stream is public. A machine that
+stays awake can therefore run this entire pipeline from end to end without an
+account: collect counts, collect predictors, build the feature table, fit the
+model, draw the charts.
+
+What a paid account buys is **the past, and not much of it**. It unlocks two
+backfill paths — the clip endpoint that rewinds the camera, and a `start=`
+parameter that returns predictors for dates already gone. Neither reaches far:
+the rewind window is about a week deep, and this project only asks it for five
+days (`CLIP_LOOKBACK_DAYS`). Nobody, paying or not, can reconstruct months of
+history for a spot they were not already watching.
+
+So the practical gap is smaller than it looks. You cannot have this repo's
+existing record, but you can start your own from today and let it accumulate —
+which is exactly how this record was built. For scale, this repo's record stands at
+roughly 1,650 counted hours across 125 days as of 2026-09-26, gathered since
+October 2025.
 
 ### Collect live data
 
@@ -229,12 +247,14 @@ reject it.
 It needs [ffmpeg](https://ffmpeg.org/) on your path to read the stream
 (`brew install ffmpeg` or `apt install ffmpeg`).
 
-The limitation is the flip side of needing no account: a live stream has no
-rewind, so this collects only while your computer is awake and the script is
-running. It cannot fill in the past — which is why the scheduled pipeline uses
-the account-only clip endpoint instead, and why roughly 40% of this project's
-own counted hours come from days it recovered afterwards rather than watched
-live.
+The one real constraint is uptime, not access: a live stream has no rewind, so
+this collects only while your computer is awake and the script is running. On
+an always-on desktop that is no constraint at all. On a laptop that travels and
+gets closed it is the binding one — which is why the scheduled pipeline here
+also uses the account-only clip endpoint to recover missed days, and why roughly
+40% of this project's own counted hours come from days it recovered afterwards
+rather than watched live. Swap the laptop for a machine that never sleeps and
+that 40% is simply collected live instead.
 
 ### Try the detector on a demo set
 
