@@ -193,7 +193,7 @@ their own recurring schedule on the machine hosting the pipeline —
 `local_pipeline.sh` a couple times a week, `daily_chart.sh` once a day.
 Both are safe to run manually any time; see each script for details.
 
-## Run It Yourself (No Account Needed)
+## Run It Yourself
 
 **You can build a dataset like this one yourself, starting today.** Everything
 the forecast runs on is publicly reachable: the camera's live stream is open,
