@@ -368,9 +368,13 @@ Two licenses, because code and data are different things:
 - **Data and model weights** — [CC BY-SA 4.0](LICENSE-DATA). Share and adapt
   with attribution, under the same license.
 
-The camera footage itself is Surfline's and is not redistributed here; the
-counts, labels and derived measurements are this project's own work. Open-Meteo
-values are CC BY 4.0.
+Neither license reaches the camera footage — that is Surfline's and is not
+mine to license, so it is not redistributed here. What is licensed above is
+this project's own work derived from watching it: the counts, the labels, the
+measurements and the charts. Third-party predictor data keeps its own terms
+too: Surfline's API values are Surfline's, and Open-Meteo's observed weather is
+CC BY 4.0 licensed by Open-Meteo. See [LICENSE-DATA](LICENSE-DATA) for the
+full breakdown.
 
 ## Analysis
 

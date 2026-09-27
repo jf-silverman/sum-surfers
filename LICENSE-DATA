@@ -31,9 +31,18 @@ Copyright (c) 2025-2026 Joel Silverman
 
 NOT COVERED BY EITHER LICENSE
 -----------------------------
-The underlying camera footage is Surfline's property and is not redistributed
-in this repository. The counts, labels, derived measurements and generated
-images above are this project's own work product and are what CC BY-SA 4.0
-applies to. Third-party data retains its own terms: Surfline forecast values
-are used under their public API's terms, and Open-Meteo data is CC BY 4.0
-(https://open-meteo.com/en/license).
+The underlying camera footage is Surfline's property and is NOT MINE TO
+LICENSE. None of the terms above apply to it, and it is not redistributed in
+this repository. What CC BY-SA 4.0 covers is this project's own work product
+derived from viewing that footage: the counts, the labels, the measurements and
+the generated charts.
+
+Third-party data likewise carries its own license, not mine:
+
+  - Surfline forecast values (weather, rating, tide, surf, swell, wind, energy,
+    consistency) are retrieved from their public API and remain subject to
+    Surfline's terms.
+  - Open-Meteo observed weather is licensed CC BY 4.0 by Open-Meteo
+    (https://open-meteo.com/en/license), not by me.
+  - NOAA CO-OPS tide predictions (see code/backfill_tide.py) are US Government
+    public domain work.
