@@ -348,6 +348,13 @@ Optional:
   `data/model_out/20260921_fog/train/weights/best.pt`. The October 2025
   model it replaced is at `data/model_out/20251013/train/runs/detect/train13/weights/best.pt`.
 
+## Model Card
+
+Intended use, architecture, measured performance and known failure modes for
+both models — the detector and the forecast — are in
+[`MODEL_CARD.md`](MODEL_CARD.md), including the failure modes and the
+measurement caveats behind each headline number.
+
 ## Works Cited
 
 Academic literature consulted for this project, and what each piece actually
