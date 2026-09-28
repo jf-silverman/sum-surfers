@@ -844,14 +844,24 @@ def collect_week_records(start_date, by_hour, predict_for_hour, local_tz):
     return out
 
 
-# Crowd level is carried by LIGHTNESS in CROWD_COLORS (a single-hue aqua ramp),
-# which leaves HUE free to carry a second variable. These are the same five
-# colours rotated to green at identical lightness and saturation, so a cell's
-# level reads exactly as before while its hue says "good tide". Checked under
-# simulated deuteranopia and protanopia before adopting: the aqua/green pair at
-# each level stays 29-57 dE apart, because cyan-to-green is mostly a blue-channel
-# move and red-green deficiencies retain it.
-GOOD_TIDE_COLORS = {1: "#16390f", 2: "#256a17", 3: "#369c22", 4: "#52c93a", 5: "#9fef8f"}
+# Good-tide hours are marked with a green RING, not a green fill.
+#
+# A green fill was tried first (the same aqua ramp rotated to green at matched
+# lightness, so level still read through shade). It was legible and colourblind-
+# safe, but useless in practice: low tide and busy hours are the same hours at
+# this spot, so 17 of 19 highlighted cells landed on one crowd level and the
+# green ramp never varied. Hue and lightness cannot encode two variables that
+# are this correlated.
+#
+# Colouring the NUMBER instead fails for a different reason: on the three light
+# fills, any green with enough contrast (#041a02 scores 4.3-12.2) is so dark it
+# is indistinguishable from the near-black ink already used there.
+#
+# A ring works because it sits on the cell edge against the dark gutter, so its
+# contrast does not depend on the fill behind it, and it leaves the whole aqua
+# ramp free to do the one job it is good at.
+GOOD_TIDE_RING = "#8fff3d"
+GOOD_TIDE_RING_WIDTH = 2.6
 GOOD_TIDE_MAX_FT = 3.0          # what counts as a good tide for this highlight
 GOOD_TIDE_MIN_FRAC = 0.5        # a cell is highlighted above this share of the hour
 
@@ -936,10 +946,11 @@ def generate_week_chart(made_date, day_records, n_train_rows):
             good_tide = low_frac.get(hour, 0.0) > GOOD_TIDE_MIN_FRAC
             if good_tide:
                 good_tide_cells += 1
-            palette = GOOD_TIDE_COLORS if good_tide else CROWD_COLORS
             ax.add_patch(plt.Rectangle((col_i + 0.03, row_i + 0.05), 0.94, 0.90,
-                                       facecolor=palette[level], edgecolor=AXES_BG,
-                                       linewidth=1.5, zorder=2))
+                                       facecolor=CROWD_COLORS[level],
+                                       edgecolor=GOOD_TIDE_RING if good_tide else AXES_BG,
+                                       linewidth=GOOD_TIDE_RING_WIDTH if good_tide else 1.5,
+                                       zorder=3 if good_tide else 2))
             low_confidence = (not r["in_training_range"]) or r["missing_predictors"]
             if low_confidence:
                 flagged += 1
@@ -970,12 +981,12 @@ def generate_week_chart(made_date, day_records, n_train_rows):
     handles = [Patch(facecolor=CROWD_COLORS[b["level"]], edgecolor=AXES_BG,
                      label=f"{b['level']} {b['name']} {band_text(b['level'], units=False)}")
                for b in CROWD_LEVELS]
-    handles.append(Patch(facecolor=GOOD_TIDE_COLORS[4], edgecolor=AXES_BG,
-                         label=f"green = mostly under {GOOD_TIDE_MAX_FT:.0f} ft tide"))
+    handles.append(Patch(facecolor=CROWD_COLORS[3], edgecolor=GOOD_TIDE_RING, linewidth=2.2,
+                         label=f"green outline = mostly under {GOOD_TIDE_MAX_FT:.0f} ft tide"))
     handles.append(Patch(facecolor="none", hatch="xx", edgecolor=CORAL,
                          label="lower confidence (see footer)"))
     legend = ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.11),
-                       ncol=6, fontsize=8, facecolor=AXES_BG, edgecolor=GRID_COLOR)
+                       ncol=7, fontsize=8, facecolor=AXES_BG, edgecolor=GRID_COLOR)
     for text in legend.get_texts():
         text.set_color(TEXT_COLOR)
 
@@ -1016,9 +1027,9 @@ def generate_week_chart(made_date, day_records, n_train_rows):
 
     notes = []
     if good_tide_cells:
-        notes.append(f"{good_tide_cells} hour(s) are shown in green: more than half the hour "
-                     f"sits under {GOOD_TIDE_MAX_FT:.0f} ft of tide, which is when this spot "
-                     f"is busiest. Shade still reads the crowd level; only the hue changes")
+        notes.append(f"{good_tide_cells} hour(s) are outlined in green: more than half the hour "
+                     f"sits under {GOOD_TIDE_MAX_FT:.0f} ft of tide, which is when this spot is "
+                     f"busiest. The fill still reads the crowd level")
     short = FORECAST_DAYS - len(day_records)
     if short:
         notes.append(f"{short} of the {FORECAST_DAYS} requested days had no forecast data "
