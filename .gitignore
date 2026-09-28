@@ -230,6 +230,16 @@ data/reviews/night_window_review/
 
 # Hero-image candidates (working set; the chosen one gets committed on its own)
 data/hero_candidates/
+# Nightly images are published to the orphan `assets` branch instead of main
+# (code/publish_assets.sh): they are rewritten every night, and keeping every
+# past version in main's history was adding ~9 MB/day to the clone size. They
+# stay reproducible from the data, which is why discarding their history is
+# acceptable.
+data/charts/latest.png
+data/charts/latest_week.png
+data/charts/latest_detection.gif
+data/charts/latest_forecast_vs_actual.png
+data/charts/latest_detection.json
 # Per-day forecast-vs-actual report charts (emailed, not published)
 data/charts/forecast_vs_actual_*.png
 # Per-day extreme detector frames (emailed, not published)

@@ -88,12 +88,10 @@ fi
 # specifically so the latest chart is visible on GitHub without a manual step.
 # Non-fatal: a git/network failure here must never be treated as the whole daily
 # chart job failing (the chart itself already generated fine above).
-# Added individually, not as one `git add a b c` — a missing pathspec (e.g. no
-# detection image yet some days) fails the ENTIRE add and blocks staging the
-# others too if done as one command; per-file `|| true` avoids that.
-git add data/charts/latest.png 2>&1 || true
-git add data/charts/latest_week.png 2>&1 || true
-git add data/charts/latest_detection.gif 2>&1 || true
+# Images go to the orphan `assets` branch, not main -- one force-pushed commit
+# that never accumulates history. Only the README text (which carries the day's
+# dates and the cache-busting ?v= stamps) is committed here.
+bash "$PROJECT_ROOT/code/publish_assets.sh" 2>&1 || true
 git add README.md 2>&1 || true
 if git diff --cached --quiet; then
     log "No changes to commit (chart/table/README identical to last run)."

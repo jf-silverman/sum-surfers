@@ -34,6 +34,7 @@ day (e.g. for backfill/testing a specific past date).
 import argparse
 import csv
 import json
+import re
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -1153,6 +1154,18 @@ def generate_detection_gif(detection_date):
     return day, n_hours
 
 
+# Nightly images live on the orphan `assets` branch, not in main -- see
+# code/publish_assets.sh for why. GitHub proxies README images through its camo
+# cache, so each URL carries a ?v= stamp that changes daily; without it a reader
+# can be served yesterday's chart for hours.
+ASSETS_URL = "https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets"
+
+
+def asset(name, stamp):
+    """URL for a nightly image on the assets branch, cache-busted for today."""
+    return f"{ASSETS_URL}/{name}?v={stamp}"
+
+
 README_START_MARKER = "<!-- DAILY_CHART_START -->"
 README_END_MARKER = "<!-- DAILY_CHART_END -->"
 # One rewritten block holding the animation above the forecast chart. The static
@@ -1166,6 +1179,12 @@ def update_readme(target_date, detection_capture=None, week_days=0, week_start=N
     daily; only the content between the markers changes."""
     readme_path = _PROJECT_ROOT / "README.md"
     readme = readme_path.read_text()
+    stamp = datetime.now().strftime("%Y%m%d")
+    # Also refresh the stamp on asset URLs written by hand outside the markers
+    # (the accuracy section's forecast-vs-actual image), so those do not sit in
+    # GitHub's image cache while the block-managed ones update.
+    readme = re.sub(r"(raw\.githubusercontent\.com/[^)\s]+?\?v=)\d+",
+                    lambda m: m.group(1) + stamp, readme)
     if README_START_MARKER not in readme or README_END_MARKER not in readme:
         print(f"WARNING: README.md markers not found — skipping README update. "
               f"Add {README_START_MARKER} / {README_END_MARKER} to enable this.")
@@ -1217,7 +1236,7 @@ def update_readme(target_date, detection_capture=None, week_days=0, week_start=N
         detection_block = (
             f"#### A Full Day of Surfer Detections: {capture_str}\n\n"
             f"{DETECTION_CAPTION}"
-            f"![Detections through {capture_str}](data/charts/latest_detection.gif)\n\n"
+            f"![Detections through {capture_str}]({asset('latest_detection.gif', stamp)})\n\n"
         )
 
     WEEK_CAPTION = (
@@ -1241,7 +1260,7 @@ def update_readme(target_date, detection_capture=None, week_days=0, week_start=N
         week_block = (
             f"#### The Week Ahead: {week_range}\n\n"
             f"{WEEK_CAPTION}"
-            f"![Crowd outlook for the week ahead](data/charts/{WEEK_CHART_NAME})\n\n"
+            f"![Crowd outlook for the week ahead]({asset(WEEK_CHART_NAME, stamp)})\n\n"
         )
 
     target_date_str = target_date.strftime("%A, %B %d, %Y")
@@ -1250,7 +1269,7 @@ def update_readme(target_date, detection_capture=None, week_days=0, week_start=N
         f"{detection_block}"
         f"#### The Surfer Crowd Forecast for: {target_date_str}\n\n"
         f"{FORECAST_CAPTION}"
-        f"![Latest daily prediction chart](data/charts/latest.png)\n\n"
+        f"![Latest daily prediction chart]({asset('latest.png', stamp)})\n\n"
         f"{week_block}"
         f"{README_END_MARKER}"
     )
