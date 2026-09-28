@@ -844,6 +844,53 @@ def collect_week_records(start_date, by_hour, predict_for_hour, local_tz):
     return out
 
 
+# Crowd level is carried by LIGHTNESS in CROWD_COLORS (a single-hue aqua ramp),
+# which leaves HUE free to carry a second variable. These are the same five
+# colours rotated to green at identical lightness and saturation, so a cell's
+# level reads exactly as before while its hue says "good tide". Checked under
+# simulated deuteranopia and protanopia before adopting: the aqua/green pair at
+# each level stays 29-57 dE apart, because cyan-to-green is mostly a blue-channel
+# move and red-green deficiencies retain it.
+GOOD_TIDE_COLORS = {1: "#16390f", 2: "#256a17", 3: "#369c22", 4: "#52c93a", 5: "#9fef8f"}
+GOOD_TIDE_MAX_FT = 3.0          # what counts as a good tide for this highlight
+GOOD_TIDE_MIN_FRAC = 0.5        # a cell is highlighted above this share of the hour
+
+
+def low_tide_fraction(records):
+    """{hour: share of that hour spent under GOOD_TIDE_MAX_FT}.
+
+    Predictors give one tide reading per hour, but a cell covers the whole hour,
+    so the share is taken from the straight line between this hour's reading and
+    the next one. That is an approximation of a curve, but over sixty minutes of
+    a semidiurnal tide the error is small, and the alternative -- treating the
+    reading on the hour as if it held for the hour -- flips cells near the
+    threshold on and off for no real reason.
+
+    The final hour of a day has no following reading, so it falls back to its own
+    value: all or nothing.
+    """
+    by_hour = {r["hour"].hour: r.get("tide_ft") for r in records}
+    hours = sorted(by_hour)
+    out = {}
+    for i, h in enumerate(hours):
+        a = by_hour[h]
+        if a is None:
+            continue
+        b = by_hour[hours[i + 1]] if i + 1 < len(hours) and hours[i + 1] == h + 1 else None
+        if b is None:
+            out[h] = 1.0 if a < GOOD_TIDE_MAX_FT else 0.0
+            continue
+        lo, hi = GOOD_TIDE_MAX_FT > a, GOOD_TIDE_MAX_FT > b
+        if lo and hi:
+            out[h] = 1.0
+        elif not lo and not hi:
+            out[h] = 0.0
+        else:
+            t = (GOOD_TIDE_MAX_FT - a) / (b - a)      # crossing point in [0, 1]
+            out[h] = t if lo else 1.0 - t
+    return out
+
+
 def generate_week_chart(made_date, day_records, n_train_rows):
     """The 7-day outlook, as its OWN chart rather than a widened daily chart.
 
@@ -875,9 +922,10 @@ def generate_week_chart(made_date, day_records, n_train_rows):
     ax = fig.add_subplot(gs[0], facecolor=AXES_BG)
     ax_table = fig.add_subplot(gs[1], facecolor=AXES_BG)
 
-    flagged = 0
+    flagged = good_tide_cells = 0
     for row_i, (day, records) in enumerate(day_records):
         by_hour_num = {r["hour"].hour: r for r in records}
+        low_frac = low_tide_fraction(records)
         for col_i, hour in enumerate(hour_cols):
             r = by_hour_num.get(hour)
             if r is None:
@@ -885,8 +933,12 @@ def generate_week_chart(made_date, day_records, n_train_rows):
                 # widest day on the chart. Left as bare background.
                 continue
             level = r["crowd_level"]
+            good_tide = low_frac.get(hour, 0.0) > GOOD_TIDE_MIN_FRAC
+            if good_tide:
+                good_tide_cells += 1
+            palette = GOOD_TIDE_COLORS if good_tide else CROWD_COLORS
             ax.add_patch(plt.Rectangle((col_i + 0.03, row_i + 0.05), 0.94, 0.90,
-                                       facecolor=CROWD_COLORS[level], edgecolor=AXES_BG,
+                                       facecolor=palette[level], edgecolor=AXES_BG,
                                        linewidth=1.5, zorder=2))
             low_confidence = (not r["in_training_range"]) or r["missing_predictors"]
             if low_confidence:
@@ -918,6 +970,8 @@ def generate_week_chart(made_date, day_records, n_train_rows):
     handles = [Patch(facecolor=CROWD_COLORS[b["level"]], edgecolor=AXES_BG,
                      label=f"{b['level']} {b['name']} {band_text(b['level'], units=False)}")
                for b in CROWD_LEVELS]
+    handles.append(Patch(facecolor=GOOD_TIDE_COLORS[4], edgecolor=AXES_BG,
+                         label=f"green = mostly under {GOOD_TIDE_MAX_FT:.0f} ft tide"))
     handles.append(Patch(facecolor="none", hatch="xx", edgecolor=CORAL,
                          label="lower confidence (see footer)"))
     legend = ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.11),
@@ -961,6 +1015,10 @@ def generate_week_chart(made_date, day_records, n_train_rows):
             cell.set_text_props(color=TEXT_COLOR)
 
     notes = []
+    if good_tide_cells:
+        notes.append(f"{good_tide_cells} hour(s) are shown in green: more than half the hour "
+                     f"sits under {GOOD_TIDE_MAX_FT:.0f} ft of tide, which is when this spot "
+                     f"is busiest. Shade still reads the crowd level; only the hue changes")
     short = FORECAST_DAYS - len(day_records)
     if short:
         notes.append(f"{short} of the {FORECAST_DAYS} requested days had no forecast data "

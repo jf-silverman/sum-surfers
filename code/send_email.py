@@ -28,12 +28,19 @@ from email import encoders
 from pathlib import Path
 
 
-def send_email(subject: str, body: str, attachments=None) -> None:
+def send_email(subject: str, body: str, attachments=None, html: str = None) -> None:
     """Send an email using credentials from env vars, optionally with files attached.
 
     `attachments` is a list of paths. A missing file raises rather than sending a
     report with its evidence silently absent — a daily report whose chart quietly
     failed to attach looks the same as one with nothing to say.
+
+    `html`, when given, is sent as a multipart/alternative alongside `body`:
+    clients that render HTML show the rich version, everything else falls back
+    to the plain text. This exists because Gmail renders text/plain in a
+    proportional font, so a column-aligned table built with spaces collapses
+    into a jumble — the only reliable way to send a table is to send a table.
+    `body` must still say everything the report needs to say on its own.
     """
     smtp_user = os.environ.get("SMTP_USER", "").strip()
     smtp_password = os.environ.get("SMTP_APP_PASSWORD", "").strip()
@@ -46,11 +53,20 @@ def send_email(subject: str, body: str, attachments=None) -> None:
     if not email_to:
         raise EnvironmentError("EMAIL_TO (or SMTP_USER as fallback) must be set.")
 
-    msg = MIMEMultipart()
+    # "mixed" holds the attachments; the text alternatives are nested inside a
+    # multipart/alternative so a client picks one of them rather than showing
+    # both. Order matters: least-preferred first, so HTML must come last.
+    msg = MIMEMultipart("mixed")
     msg["From"] = smtp_user
     msg["To"] = email_to
     msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
+    if html:
+        alt = MIMEMultipart("alternative")
+        alt.attach(MIMEText(body, "plain"))
+        alt.attach(MIMEText(html, "html"))
+        msg.attach(alt)
+    else:
+        msg.attach(MIMEText(body, "plain"))
 
     for path in (attachments or []):
         path = Path(path)
