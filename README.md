@@ -312,17 +312,33 @@ cp .env.example .env
 bash code/local_pipeline.sh
 ```
 
-## Required Environment Variables
+## Environment Variables
 
-Create `.env` from `.env.example` and set:
+**Nothing here is needed to try the project.** Collecting from the live stream,
+running the detector on the demo frames and checking the forecast model against
+the held-out set all read no environment variables at all — no `.env`, no
+account, no token. See [Run It Yourself](#run-it-yourself).
+
+Variables only matter once you want the scheduled pipeline, which downloads
+recorded clips rather than watching the stream. Copy `.env.example` to `.env`
+and fill in what you need:
+
+**For the clip-download path only** (`get_clips.py`, and therefore
+`local_pipeline.sh`):
 
 - `SURFLINE_CAMERA_ID`
 - `SURFLINE_ACCESS_TOKEN`
 
-Optional:
+Leave both empty and everything else still works; the clip step raises a message
+naming what is missing, and only when it actually runs — the check is inside
+`clip_api_url()`, not at import, so nothing else in the project is blocked by
+their absence.
 
-- `MODEL_PATH` (override default YOLO weights path)
-- `SMTP_USER` / `SMTP_APP_PASSWORD` / `EMAIL_TO` (Gmail App Password, for storage-warning emails)
+**Optional, everywhere:**
+
+- `MODEL_PATH` (override the default YOLO weights path)
+- `SMTP_USER` / `SMTP_APP_PASSWORD` / `EMAIL_TO` (Gmail App Password, for the
+  nightly report and storage warnings)
 - `CLIPS_DIR_LIMIT_GB` (local clip storage warning threshold, default 2.0)
 - `DETECT_MODE` / `DETECT_RECENT_DAYS` / `DETECT_START_DATE` (detection scope)
 - `SURFLINE_HISTORICAL_TOKEN` (only for `backfill_historical_predictors.py`,
