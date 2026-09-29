@@ -319,20 +319,8 @@ running the detector on the demo frames and checking the forecast model against
 the held-out set all read no environment variables at all — no `.env`, no
 account, no token. See [Run It Yourself](#run-it-yourself).
 
-Variables only matter once you want the scheduled pipeline, which downloads
-recorded clips rather than watching the stream. Copy `.env.example` to `.env`
-and fill in what you need:
-
-**For the clip-download path only** (`get_clips.py`, and therefore
-`local_pipeline.sh`):
-
-- `SURFLINE_CAMERA_ID`
-- `SURFLINE_ACCESS_TOKEN`
-
-Leave both empty and everything else still works; the clip step raises a message
-naming what is missing, and only when it actually runs — the check is inside
-`clip_api_url()`, not at import, so nothing else in the project is blocked by
-their absence.
+Variables only matter once you want more than that. Copy `.env.example` to
+`.env` and fill in whichever apply:
 
 **Optional, everywhere:**
 
@@ -343,6 +331,24 @@ their absence.
 - `DETECT_MODE` / `DETECT_RECENT_DAYS` / `DETECT_START_DATE` (detection scope)
 - `SURFLINE_HISTORICAL_TOKEN` (only for `backfill_historical_predictors.py`,
   never read by the scheduled pipeline — see that script's docstring)
+
+**For the clip-download path only** (`get_clips.py`, and therefore
+`local_pipeline.sh`):
+
+- `SURFLINE_CAMERA_ID`
+- `SURFLINE_ACCESS_TOKEN`
+
+This pair is what buys the *recent past*. The live stream is public and free, but
+it only gives you the moment you are watching — close your laptop and those
+hours are gone. Reaching back to pull the clips you missed uses Surfline's
+recorded-clip endpoint, and that **needs a paid subscription**. Even then the
+window is short: the camera keeps five days including today, so the furthest
+back anyone can reach is four days, subscription or not.
+
+Leave both empty and everything else still works; the clip step raises a message
+naming what is missing, and only when it actually runs — the check is inside
+`clip_api_url()`, not at import, so nothing else in the project is blocked by
+their absence.
 
 ## Data Locations
 
