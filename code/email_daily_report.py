@@ -156,6 +156,70 @@ def tide_by_hour(target_date):
     return out
 
 
+# The crops the detector runs on are a 1280x180 strip cut from y=420 of the
+# camera's 1280x720 frame (ROI_* in get_cropped_frame.py). That strip is all the
+# model ever sees, and until 2026-09-28 it was also all the email showed, which
+# made the attached frames hard to place -- a band of water with no beach, no
+# horizon and no sense of where along the point you were looking.
+#
+# The full frame is not saved anywhere, but the clip it was cut from is, so it
+# can be re-extracted. Boxes are produced in strip coordinates and shifted down
+# by ROI_Y to land correctly on the full frame.
+CLIPS_DIR = _PROJECT_ROOT / "data" / "not_needed_in_repo" / "surf_clips"
+ROI_X, ROI_Y, ROI_W, ROI_H = 0, 420, 1280, 180
+CLIP_FRAME_TIME_SEC = 2.5          # matches FRAME_TIME_SEC in get_cropped_frame.py
+
+
+def full_frame_for(target_date, time_local):
+    """The uncropped camera frame behind a crop, re-read from its clip.
+
+    Returns None when the clip is gone -- manage_clips.py deletes old ones once
+    storage passes its limit -- so callers fall back to the strip rather than
+    losing the attachment entirely.
+    """
+    hh, mm = str(time_local).split(":")[:2]
+    clip = CLIPS_DIR / target_date.isoformat() / f"{hh}_{mm}" / "clip.mp4"
+    if not clip.exists():
+        return None
+    cap = cv2.VideoCapture(str(clip))
+    cap.set(cv2.CAP_PROP_POS_MSEC, CLIP_FRAME_TIME_SEC * 1000)
+    ok, frame = cap.read()
+    cap.release()
+    return frame if ok else None
+
+
+def draw_on_full_frame(frame, boxes):
+    """Detector boxes on the full frame, with the ROI strip outlined.
+
+    The outline matters: without it a reader sees surfers up the beach that the
+    model did not box and concludes it missed them, when in fact they are simply
+    outside the band it is given. Drawing the boundary makes 'not looked at'
+    visibly different from 'looked at and missed'.
+    """
+    out = frame.copy()
+    # Dashed rather than solid: a continuous line reads as part of the scene
+    # (the horizon, a wire), while a dashed one reads as an annotation.
+    y0, y1 = ROI_Y, ROI_Y + ROI_H
+    for x in range(ROI_X, ROI_X + ROI_W, 24):
+        for yy in (y0, y1):
+            cv2.line(out, (x, yy), (min(x + 12, ROI_X + ROI_W), yy), (250, 250, 250), 1,
+                     cv2.LINE_AA)
+    label = "detector's view"
+    (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+    cv2.rectangle(out, (ROI_X + 8, y0 - th - 10), (ROI_X + 14 + tw, y0 - 2),
+                  (0, 0, 0), -1)
+    cv2.putText(out, label, (ROI_X + 11, y0 - 7),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (250, 250, 250), 1, cv2.LINE_AA)
+    overlay = out.copy()
+    visible = 0
+    for bx1, by1, bx2, by2, _conf in boxes:
+        visible += 1
+        cv2.rectangle(overlay, (int(bx1), int(by1) + ROI_Y),
+                      (int(bx2), int(by2) + ROI_Y), (90, 227, 157), 2)
+    out = cv2.addWeighted(overlay, 0.85, out, 0.15, 0)
+    return out, visible
+
+
 def extreme_frames(target_date, model=None, forecast_rows=None):
     """Detector frames at the day's telling hours.
 
@@ -218,7 +282,14 @@ def extreme_frames(target_date, model=None, forecast_rows=None):
         img_path = pdp.ds.CROPS_DIR / row["filename"]
         if not img_path.exists():
             continue
-        frame, visible = pdp.render_detection_frame(img_path, model)
+        # Prefer the whole camera frame; fall back to the strip if the clip has
+        # been cleaned up.
+        boxes = pdp.ds.run_inference_with_boxes(model, img_path)
+        full = full_frame_for(target_date, row["time_local"])
+        if full is not None:
+            frame, visible = draw_on_full_frame(full, boxes)
+        else:
+            frame, visible = pdp.render_detection_frame(img_path, model, boxes=boxes)
         if frame is None:
             continue
         banner_h = 44
