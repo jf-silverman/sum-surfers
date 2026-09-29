@@ -18,7 +18,6 @@ import pytz
 from pathlib import Path
 from datetime import datetime, timedelta
 
-from ultralytics import YOLO
 
 # ---------- CONFIG ----------
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -137,6 +136,11 @@ def load_model():
     if not MODEL_PATH.exists():
         raise FileNotFoundError(f"Model weights not found: {MODEL_PATH}")
     print(f"Loading model from {MODEL_PATH}  (device={DEVICE})")
+    # Imported here rather than at module scope: ultralytics pulls in the whole
+    # training stack, and ten other modules import this file only for the
+    # geometry helpers, the paths or the quality gate. Keeping it lazy lets them
+    # -- and the geometry tests -- run without it.
+    from ultralytics import YOLO
     return YOLO(str(MODEL_PATH))
 
 
