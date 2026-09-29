@@ -1,0 +1,39 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# The nightly run force-pushes images to the `assets` branch; there is nothing
+# to test there and building it would waste a runner every night.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  geometry:
+    name: detection geometry
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      # CPU-only torch deliberately: the default wheels pull ~2 GB of CUDA that
+      # this project never uses (inference runs on a laptop CPU), and it turns a
+      # one-minute job into a five-minute one.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu \
+                      torch==2.8.0 torchvision==0.23.0
+          pip install numpy==2.2.6 opencv-python-headless==4.12.0.88 \
+                      pytz==2025.2 astral==3.2 pytest
+
+      - name: Run geometry tests
+        run: python -m pytest tests/ -q
