@@ -100,6 +100,11 @@ log "Step 2 done."
 # Emails a warning if clips folder exceeds CLIPS_DIR_LIMIT_GB; never fails the pipeline.
 log "Step 3/10 — Checking clips storage..."
 "$PYTHON" code/manage_clips.py --check || true
+# The per-day chart/frame artefacts are gitignored, so they never reach the
+# repo, but nothing pruned them either and they accumulate at ~5 MB a night.
+# Folded in here rather than as a new step: this IS the storage step, and
+# renumbering the other nine would break every log grep that references them.
+"$PYTHON" code/prune_charts.py --keep-days 30 || true
 log "Step 3 done."
 
 # ── Step 4: Run detection locally ────────────────────────────────────────────
