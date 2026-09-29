@@ -156,12 +156,20 @@ def tide_by_hour(target_date):
     return out
 
 
-def extreme_frames(target_date, model=None):
-    """Detector frames for the day's busiest hour, an empty hour, and the quietest
-    non-empty hour — the three points where counting is hardest to trust.
+def extreme_frames(target_date, model=None, forecast_rows=None):
+    """Detector frames at the day's telling hours.
 
-    Returns [(label, path, count), ...]; an empty hour is included only if the
-    day had one.
+    Three are about where COUNTING is hardest to trust — the busiest hour, an
+    empty hour, and the quietest non-empty one. The fourth, added 2026-09-28, is
+    about where FORECASTING went wrong: the hour whose predicted count missed the
+    counted one by the most. That is the frame worth actually looking at, because
+    it is the one place a bad number and the picture behind it can be compared
+    directly, which separates "the model was wrong" from "the detector was wrong".
+
+    `forecast_rows` is optional; without it the divergence frame is simply
+    omitted rather than failing, since some days have no recorded forecast.
+
+    Returns [(label, path, visible_count, stamp), ...].
     """
     df = pd.read_csv(PREDICTIONS_CSV, float_precision="round_trip")
     df = df[(df["date"] == target_date.isoformat())
@@ -170,23 +178,43 @@ def extreme_frames(target_date, model=None):
     if df.empty:
         return []
 
-    picks = []
+    picks = []          # (label, row, extra banner text)
     busiest = df.loc[df["surfer_count"].idxmax()]
-    picks.append(("Busiest hour", busiest))
+    picks.append(("Busiest hour", busiest, ""))
     zeros = df[df["surfer_count"] == 0]
     if not zeros.empty:
-        picks.append(("Empty hour", zeros.iloc[0]))
+        picks.append(("Empty hour", zeros.iloc[0], ""))
     nonzero = df[df["surfer_count"] > 0]
     if not nonzero.empty:
         quietest = nonzero.loc[nonzero["surfer_count"].idxmin()]
         if quietest["filename"] != busiest["filename"]:
-            picks.append(("Quietest hour above zero", quietest))
+            picks.append(("Quietest hour above zero", quietest, ""))
+
+    # The hour the forecast missed by the most. Matched on the hour number, the
+    # same way the hour-by-hour table matches, so a clip taken at 10:02 is
+    # scored against the 10:00 forecast.
+    if forecast_rows:
+        by_hour = {r["hour"].hour: r for r in forecast_rows}
+        best_gap, best_row, best_f = -1.0, None, None
+        for _i, row in df.iterrows():
+            hr = int(str(row["time_local"]).split(":")[0])
+            f = by_hour.get(hr)
+            if f is None:
+                continue
+            gap = abs(f["point"] - row["surfer_count"])
+            if gap > best_gap:
+                best_gap, best_row, best_f = gap, row, f
+        already = {r["filename"] for _l, r, _e in picks}
+        if best_row is not None and best_row["filename"] not in already and best_gap > 0:
+            direction = "over" if best_f["point"] > best_row["surfer_count"] else "under"
+            picks.append((f"Biggest forecast miss", best_row,
+                          f"  |  forecast {best_f['point']:.1f}, {direction} by {best_gap:.1f}"))
 
     if model is None:
         model = pdp.ds.load_model()
 
     out = []
-    for label, row in picks:
+    for label, row, extra in picks:
         img_path = pdp.ds.CROPS_DIR / row["filename"]
         if not img_path.exists():
             continue
@@ -201,7 +229,7 @@ def extreme_frames(target_date, model=None):
         stamp = datetime(target_date.year, target_date.month, target_date.day,
                          hh, mm).strftime("%-I:%M %p")
         cv2.putText(canvas, f"{label}  |  {stamp}  |  {visible} in this frame "
-                    f"(hour counted {row['surfer_count']:.0f})",
+                    f"(hour counted {row['surfer_count']:.0f}){extra}",
                     (10, h + 31), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (235, 235, 235), 2,
                     cv2.LINE_AA)
         slug = label.lower().split()[0]
@@ -444,7 +472,7 @@ def main():
     shutil.copyfile(out_path, latest_path)
     print(f"  Published copy: {latest_path}")
 
-    frames = extreme_frames(target_date)
+    frames = extreme_frames(target_date, forecast_rows=forecast_rows)
     for label, fpath, count, stamp in frames:
         print(f"  {label}: {stamp}, {count} detected -> {fpath.name}")
 
