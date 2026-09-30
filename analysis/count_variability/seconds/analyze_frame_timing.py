@@ -19,7 +19,7 @@ compute_image_quality()/run_inference_with_boxes() from detect_surfers.py
 directly -- does not reimplement any of that logic.
 
 Usage:
-    python analysis/frame_timing_variability/analyze_frame_timing.py
+    python analysis/count_variability/seconds/analyze_frame_timing.py
 """
 
 import csv

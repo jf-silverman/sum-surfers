@@ -5004,3 +5004,32 @@ and precipitation never exceeds 15% of morning hours in any month, so rain is
 not available as the explanation either. Something separates October from
 November at the same temperature, and at n = 18 for December and n = 10 for
 March this history cannot say what. Left open deliberately pending more winters.
+
+### 2026-09-30 — Three variability studies folded into one folder
+
+`analysis/` had grown three separate investigations of the same question --
+how much does a surfer count move, and over what interval -- each named after
+the occasion that prompted it rather than the thing it measured. Someone asking
+"how stable is an hourly count?" had to find all three and notice they were
+related.
+
+They are now one folder, with the leaves named by sampling density, which is
+the actual difference between them:
+
+| was | is | what it samples |
+|---|---|---|
+| `frame_timing_variability/` | `count_variability/seconds/` | 1 frame/sec across 14 sixty-second clips |
+| `hourly_variability_8to9am/` | `count_variability/hour_dense/` | 1 frame/sec across a full hour (~3,600 frames) |
+| `wave_set_variability/` | `count_variability/hour_sparse/` | 3 frames per clip, 15 clips 4 min apart |
+
+Each study kept its own files rather than being flattened into one namespace:
+the three have overlapping filenames and cross-references, and moving whole
+directories with `git mv` preserves history where renaming nineteen files would
+not. `wave_set_variability` was the worst of the three names -- it was named
+after a hypothesis that the probe went on to disprove.
+
+Self-referencing usage paths inside the seven scripts, the two `.gitignore`
+rules and the `PROJECT_FILES.md` rows were updated. **The three older
+references in this file were deliberately left pointing at the old paths**,
+because they record what those folders were called on the day each entry was
+written; this entry is the forwarding address.

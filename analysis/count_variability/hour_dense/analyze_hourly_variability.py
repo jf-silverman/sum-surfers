@@ -1,21 +1,26 @@
 """
-analyze_hourly_variability_full.py
-------------------------------------
-One-off analysis script (not part of the scheduled pipeline). Full-density
-version of analyze_hourly_variability.py: instead of sampling 5 frames per
-5-minute clip, extracts 1 ROI-cropped frame per second across all 12
-back-to-back clips in data/not_needed_in_repo/hourly_variability/<date>/
-(downloaded via pull_hourly_variability_clips.py) — 12 clips x ~300s each,
-about 3600 frames total ("60 x 60": 60 minutes x 60 frames/minute).
+analyze_hourly_variability.py
+------------------------------
+One-off analysis script (not part of the scheduled pipeline). Uses the 12
+back-to-back 5-minute clips from data/not_needed_in_repo/hourly_variability/
+(downloaded via pull_hourly_variability_clips.py) to see how much the surfer
+count varies across a single hour.
 
-Runs the production image-quality gate and the production tiling/NMS/
-false-positive-filtered detector on every frame, so poor-quality seconds
-are flagged/skipped exactly like the real pipeline would. Reuses ROI_X/Y/W/H
-from get_cropped_frame.py and load_model()/compute_image_quality()/
-run_inference_with_boxes() from detect_surfers.py.
+For each 5-minute clip: extracts 5 ROI-cropped frames spread evenly across
+the clip's ~300s span (seconds 0, 75, 150, 225, 299), runs the production
+image-quality gate and the production tiling/NMS/false-positive-filtered
+detector on each frame that passes, and averages the surviving frames to get
+one count estimate per 5-minute window. This spread (5 frames across the
+full clip) follows the finding in analyze_frame_timing.py/docs/PROJECT_HISTORY.md
+that spacing frames apart reduces detector noise far more than bunching them
+close together.
+
+Reuses ROI_X/Y/W/H from get_cropped_frame.py and load_model()/
+compute_image_quality()/run_inference_with_boxes() from detect_surfers.py --
+does not reimplement any of that logic.
 
 Usage:
-    python analysis/hourly_variability_8to9am/analyze_hourly_variability_full.py [--date YYYY-MM-DD]
+    python analysis/count_variability/hour_dense/analyze_hourly_variability.py [--date YYYY-MM-DD]
 """
 import argparse
 import csv
@@ -31,17 +36,19 @@ from get_cropped_frame import ROI_X, ROI_Y, ROI_W, ROI_H  # noqa: E402
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 HERE = Path(__file__).resolve().parent
 BASE_DIR = _PROJECT_ROOT / "data" / "not_needed_in_repo" / "hourly_variability"
-OUT_FRAMES_DIR = _PROJECT_ROOT / "data" / "not_needed_in_repo" / "hourly_variability_frames_full"
-OUT_CSV = HERE / "hourly_variability_full.csv"
+OUT_FRAMES_DIR = _PROJECT_ROOT / "data" / "not_needed_in_repo" / "hourly_variability_frames"
+OUT_CSV = HERE / "hourly_variability_analysis.csv"
+
+SAMPLE_SECONDS = [0, 75, 150, 225, 299]  # 5 frames spread across a ~300s clip
 
 CSV_HEADER = ["date", "clip_time", "second", "quality_ok", "quality_reason",
               "brightness", "lap_var", "count"]
 
 
-def extract_all_seconds(video_path, out_dir):
+def extract_at_seconds(video_path, out_dir, target_seconds):
     """Open the clip once, read sequentially, and save one ROI-cropped frame
-    per integer second across the whole clip. Sequential-read only --
-    cap.set() seeking is unreliable on these clips (see get_cropped_frame.py)."""
+    at each requested integer second. Sequential-read only -- cap.set()
+    seeking is unreliable on these clips (see get_cropped_frame.py)."""
     out_dir.mkdir(parents=True, exist_ok=True)
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
@@ -51,20 +58,21 @@ def extract_all_seconds(video_path, out_dir):
         cap.release()
         raise RuntimeError(f"Cannot get FPS for {video_path}")
 
+    wanted = sorted(target_seconds)
     saved = []
+    idx_wanted = 0
     frame_idx = 0
-    next_second = 0
-    while True:
+    while idx_wanted < len(wanted):
         ret, frame = cap.read()
         if not ret:
             break
         t = frame_idx / fps
-        if t >= next_second:
+        if t >= wanted[idx_wanted]:
             crop = frame[ROI_Y:ROI_Y + ROI_H, ROI_X:ROI_X + ROI_W]
-            out_path = out_dir / f"sec_{next_second:03d}.jpg"
+            out_path = out_dir / f"sec_{wanted[idx_wanted]:03d}.jpg"
             cv2.imwrite(str(out_path), crop, [cv2.IMWRITE_JPEG_QUALITY, 100])
-            saved.append((next_second, out_path))
-            next_second += 1
+            saved.append((wanted[idx_wanted], out_path))
+            idx_wanted += 1
         frame_idx += 1
     cap.release()
     return saved
@@ -83,15 +91,15 @@ def main():
     model = ds.load_model()
     rows = []
 
-    for ci, clip_time in enumerate(clip_times, 1):
+    for clip_time in clip_times:
         clip_path = day_dir / clip_time / "clip.mp4"
         if not clip_path.exists():
             print(f"WARNING: missing clip {clip_path}, skipping")
             continue
 
         out_dir = OUT_FRAMES_DIR / args.date / clip_time
-        frames = extract_all_seconds(clip_path, out_dir)
-        print(f"[{ci}/{len(clip_times)}] {clip_time}: extracted {len(frames)} frames, running detection...")
+        frames = extract_at_seconds(clip_path, out_dir, SAMPLE_SECONDS)
+        print(f"{clip_time}: extracted {len(frames)} frames")
 
         for second, img_path in frames:
             try:
@@ -122,14 +130,14 @@ def main():
                 "count": len(boxes),
             })
 
-        # Flush progress after every clip so a long run can be checked on partway through.
-        with open(OUT_CSV, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=CSV_HEADER)
-            writer.writeheader()
-            writer.writerows(rows)
+    with open(OUT_CSV, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=CSV_HEADER)
+        writer.writeheader()
+        writer.writerows(rows)
 
     print(f"\nWrote {len(rows)} rows to {OUT_CSV}")
 
+    # Per-clip summary
     from collections import defaultdict
     by_clip = defaultdict(list)
     for r in rows:
@@ -141,7 +149,7 @@ def main():
         vals = by_clip.get(ct, [])
         if vals:
             mean = sum(vals) / len(vals)
-            print(f"  {ct}: mean={mean:.1f}  n={len(vals)}  min={min(vals)}  max={max(vals)}")
+            print(f"  {ct}: mean={mean:.1f}  n={len(vals)}  raw={vals}")
         else:
             print(f"  {ct}: no quality_ok frames")
 

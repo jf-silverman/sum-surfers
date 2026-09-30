@@ -10,7 +10,7 @@ Uses Joel's real human counts (data/reviews/count_60sec_var/review_counts.csv,
 70 usable points across 7 clips -- set1/05_50 excluded, "lens condensation"
 throughout, unusable) as ground truth, matched against the model's real
 per-second detection counts for the same clips/seconds
-(analysis/frame_timing_variability/frame_variability_analysis.csv, every
+(analysis/count_variability/seconds/frame_variability_analysis.csv, every
 second 0-62 already computed).
 
 For each human-labeled second, computes error (model - human) for several
@@ -25,7 +25,7 @@ Reports real MAE and bias (mean signed error) per strategy, pooled across
 all 7 usable clips -- the actual accuracy comparison, not just stdev.
 
 Usage:
-    python analysis/frame_timing_variability/validate_against_human_counts.py
+    python analysis/count_variability/seconds/validate_against_human_counts.py
 """
 import numpy as np
 import pandas as pd

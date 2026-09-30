@@ -19,7 +19,7 @@ numbers used to write findings back to the user -- every number here comes
 directly from this run, nothing is estimated.
 
 Usage:
-    python analysis/frame_timing_variability/summarize_frame_variability.py
+    python analysis/count_variability/seconds/summarize_frame_variability.py
 """
 
 from collections import defaultdict

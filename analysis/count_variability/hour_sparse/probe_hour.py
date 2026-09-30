@@ -14,12 +14,12 @@ the pipeline uses. 45 images in total, each with its own count, Laplacian
 variance and brightness, so within-clip variation (seconds) can be separated
 from across-clip variation (minutes).
 
-Writes analysis/wave_set_variability/hour_probe.csv. Nothing touches
+Writes analysis/count_variability/hour_sparse/hour_probe.csv. Nothing touches
 predictions.csv -- these are extra looks at one hour, not pipeline observations.
 
 Usage:
-    python analysis/wave_set_variability/probe_hour.py
-    python analysis/wave_set_variability/probe_hour.py --date 2026-09-29 --centre 18:17
+    python analysis/count_variability/hour_sparse/probe_hour.py
+    python analysis/count_variability/hour_sparse/probe_hour.py --date 2026-09-29 --centre 18:17
 """
 import argparse
 import csv

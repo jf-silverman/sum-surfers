@@ -8,7 +8,7 @@ production surf_clips/ tree (data/not_needed_in_repo/hourly_variability/) so
 it can't be confused with or interfere with the regular pipeline's data.
 
 Usage:
-    python analysis/hourly_variability_8to9am/pull_hourly_variability_clips.py [--date YYYY-MM-DD] [--start-hour 8]
+    python analysis/count_variability/hour_dense/pull_hourly_variability_clips.py [--date YYYY-MM-DD] [--start-hour 8]
 """
 import argparse
 import sys
