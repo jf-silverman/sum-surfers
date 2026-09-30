@@ -20,10 +20,10 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT" || exit 1
 
 FILES=(
-  "data/charts/latest.png"
-  "data/charts/latest_week.png"
-  "data/charts/latest_detection.gif"
-  "data/charts/latest_forecast_vs_actual.png"
+  "data/charts/published/latest.png"
+  "data/charts/published/latest_week.png"
+  "data/charts/published/latest_detection.gif"
+  "data/charts/published/latest_forecast_vs_actual.png"
 )
 
 entries=""

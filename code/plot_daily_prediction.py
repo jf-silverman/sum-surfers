@@ -68,7 +68,17 @@ from crowd_rating import (  # noqa: E402
 import pytz  # noqa: E402
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CHARTS_DIR = _PROJECT_ROOT / "data" / "charts"
+# data/charts/ is split by lifetime, not by chart type (2026-09-30):
+#   published/  the handful of latest_* files the README and the assets branch
+#               point at. Nothing here may be deleted.
+#   daily/      every dated artefact. All of it is regenerable and pruned.
+# The split exists because the difference used to live only in a filename
+# prefix, and prune_charts.py was written against a list of prefixes -- which
+# is exactly how it came to miss two whole families.
+CHARTS_DIR = _PROJECT_ROOT / "data" / "charts" / "published"
+DAILY_DIR = _PROJECT_ROOT / "data" / "charts" / "daily"
+for _d in (CHARTS_DIR, DAILY_DIR):
+    _d.mkdir(parents=True, exist_ok=True)
 
 # Real, verified detector stats — pulled directly from the actual YOLOv8s training
 # log for the production model (data/model_out/20251013/train/runs/detect/train13/
@@ -514,7 +524,7 @@ def main():
     fig.subplots_adjust(bottom=0.10 + 0.03 * (info_text.count("\n") - 1))
 
     CHARTS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = CHARTS_DIR / f"surfer_count_{target_date.isoformat()}.png"
+    out_path = DAILY_DIR / f"surfer_count_{target_date.isoformat()}.png"
     fig.savefig(out_path, dpi=150, facecolor=fig.get_facecolor())
     print(f"Saved to {out_path}")
 
@@ -1059,7 +1069,7 @@ def generate_week_chart(made_date, day_records, n_train_rows):
     CHARTS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = CHARTS_DIR / WEEK_CHART_NAME
     fig.savefig(out_path, dpi=150, facecolor=fig.get_facecolor())
-    fig.savefig(CHARTS_DIR / f"week_{made_date.isoformat()}.png", dpi=150,
+    fig.savefig(DAILY_DIR / f"week_{made_date.isoformat()}.png", dpi=150,
                 facecolor=fig.get_facecolor())
     plt.close(fig)
     print(f"Saved week chart ({len(day_records)} days) to {out_path}")
@@ -1215,7 +1225,7 @@ def generate_detection_gif(detection_date):
     n_hours = len(frames) // 2
     (CHARTS_DIR / "latest_detection.json").write_text(
         json.dumps({"date": day.isoformat(), "n_frames": n_hours}) + "\n")
-    dated_path = CHARTS_DIR / f"detection_{day.isoformat()}.gif"
+    dated_path = DAILY_DIR / f"detection_{day.isoformat()}.gif"
     dated_path.write_bytes(latest_path.read_bytes())
     size_mb = latest_path.stat().st_size / 1e6
     print(f"Saved detection animation ({n_hours} hours, {len(frames)} frames, "

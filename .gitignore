@@ -5,7 +5,10 @@ archive/data/not_needed_in_repo
 # Data outputs the docs already describe as untracked-by-convention, but that
 # weren't actually covered here — a future `git add -A`/`git add .` would
 # otherwise sweep these (large binaries/CSVs, no secrets) into the repo.
-# data/charts/latest*.png stay tracked on purpose (README daily-chart embed).
+# data/charts/ is split by lifetime: published/ holds the latest_* files the
+# README and assets branch point at, daily/ holds dated artefacts. BOTH are
+# ignored -- published/ goes to the orphan assets branch instead of main
+# (code/publish_assets.sh), and daily/ is disposable and pruned.
 # Listed per-file (not as whole-folder ignores) in analysis/ and
 # data/reviews/ subfolders that also hold real, trackable .py scripts —
 # see docs/PROJECT_FILES.md for the data/ and analysis/ layout.
@@ -27,10 +30,8 @@ analysis/count_variability/hour_dense/hourly_full_counts_2026-08-28.png
 analysis/training_data_expansion/labeling_candidates.csv
 data/cvat_out_coco/reimport_existing_57/
 data/cvat_out_coco/reimport_existing_57.zip
-data/charts/surfer_count_*.png
-data/charts/week_*.png
-data/charts/detection_*.png
-data/charts/detection_*.gif
+data/charts/daily/
+data/charts/published/
 data/.last_local_success
 archive/data/tide_backfill.csv
 
@@ -202,7 +203,6 @@ data/cvat_out_coco/posture_export_57_coco.zip
 data/cvat_out_coco/labeling_batch_*
 
 # Sidecar recording which day the published animation covers (local state)
-data/charts/latest_detection.json
 
 # Old-vs-new detector comparisons (recounted history, local only — not for publication)
 data/compare_detector_*/
@@ -235,15 +235,6 @@ data/hero_candidates/
 # past version in main's history was adding ~9 MB/day to the clone size. They
 # stay reproducible from the data, which is why discarding their history is
 # acceptable.
-data/charts/latest.png
-data/charts/latest_week.png
-data/charts/latest_detection.gif
-data/charts/latest_forecast_vs_actual.png
-data/charts/latest_detection.json
-# Per-day forecast-vs-actual report charts (emailed, not published)
-data/charts/forecast_vs_actual_*.png
-# Per-day extreme detector frames (emailed, not published)
-data/charts/frame_*.png
 
 # Cached forecast models (refit weekly; rebuildable) and the forecast response cache
 data/model_cache/
