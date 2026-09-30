@@ -248,3 +248,10 @@ data/charts/frame_*.png
 # Cached forecast models (refit weekly; rebuildable) and the forecast response cache
 data/model_cache/
 data/predictor_vars/.forecast_response_cache.json
+
+# Raw media pulled by analysis/wave_set_variability/probe_hour.py (24 MB of
+# clips and frames). Re-downloadable from Surfline inside the five-day window;
+# the measurements taken from them are kept in hour_probe.csv, which is what
+# the analysis actually rests on.
+analysis/wave_set_variability/clips/
+analysis/wave_set_variability/frames/
