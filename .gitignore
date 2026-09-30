@@ -246,3 +246,6 @@ data/predictor_vars/.forecast_response_cache.json
 # the analysis actually rests on.
 analysis/count_variability/hour_sparse/clips/
 analysis/count_variability/hour_sparse/frames/
+
+# Boxed renders of the probe frames (regenerable from frames/ + the model)
+analysis/count_variability/hour_sparse/frames_boxed/
