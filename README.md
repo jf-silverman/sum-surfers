@@ -24,10 +24,10 @@ This project collects images from a shoreline video camera and tries to answer t
      The headings and image links are assembled in update_readme() itself.
      ==================================================================== -->
 <!-- DAILY_CHART_START -->
-#### A Full Day of Surfer Detections: Monday, September 28, 2026
+#### A Full Day of Surfer Detections: Tuesday, September 29, 2026
 
 Each green box below contains a surfer, according to the object detection model.  Look carefully and you may find additional surfers that the model missed or other objects which are misclassified as surfers - like the wind sock at the bottom center of the photo.  Birds, reflections, people on the beach and sun glare fool it too: [what isn't a surfer](docs/non_surfer_objects.md) catalogs each one, how to tell it apart, and what the pipeline does about it.  **Each hour is shown twice: first the bare frame, so you can hunt for the surfers yourself as small dark specks, then the same frame with the model's boxes drawn.**  Try it before the boxes appear - it shows how hard these are to see, which is the whole problem the model is solving.  Each frame shows the camera's full width, the same strip the pipeline counts, so the number printed is the whole count for that hour.
-![Detections through Monday, September 28, 2026](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_detection.gif?v=20260930)
+![Detections through Tuesday, September 29, 2026](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_detection.gif?v=20260930)
 
 #### The Surfer Crowd Forecast for: Thursday, October 01, 2026
 
@@ -329,8 +329,11 @@ Variables only matter once you want more than that. Copy `.env.example` to
   nightly report and storage warnings)
 - `CLIPS_DIR_LIMIT_GB` (local clip storage warning threshold, default 2.0)
 - `DETECT_MODE` / `DETECT_RECENT_DAYS` / `DETECT_START_DATE` (detection scope)
-- `SURFLINE_HISTORICAL_TOKEN` (only for `backfill_historical_predictors.py`,
-  never read by the scheduled pipeline — see that script's docstring)
+- `SURFLINE_HISTORICAL_TOKEN` (optional override for
+  `backfill_historical_predictors.py`, never read by the scheduled pipeline.
+  There is no separate historical credential — that script falls back to
+  `SURFLINE_ACCESS_TOKEN`, which is the same token, so this only exists to
+  point one manual backfill at a different session)
 
 **For the clip-download path only** (`get_clips.py`, and therefore
 `local_pipeline.sh`):
