@@ -24,7 +24,11 @@ not meant to be automated:
     traffic against an authenticated session.
 
 Usage:
-    # token via env var (recommended — set it just for this shell session):
+    # Nothing to set if SURFLINE_ACCESS_TOKEN is already in .env -- it is the
+    # same token; Surfline does not issue a separate historical one.
+    python code/backfill_historical_predictors.py --start 2025-10-15 --end 2025-10-20
+
+    # or override for one shell session:
     export SURFLINE_HISTORICAL_TOKEN=<paste from DevTools>
     python code/backfill_historical_predictors.py --start 2025-10-15 --end 2025-10-20
 
@@ -122,12 +126,21 @@ def write_rows(out_csv, rows):
 
 
 def resolve_token(cli_token):
+    """--token, then SURFLINE_HISTORICAL_TOKEN, then SURFLINE_ACCESS_TOKEN, then prompt.
+
+    The last fallback was added 2026-09-30: there is no separate historical
+    credential. Surfline issues ONE access token, and it is the same value the
+    clip downloader uses -- Joel had been pasting the identical string into both
+    variables. SURFLINE_HISTORICAL_TOKEN is kept ahead of it so an existing
+    setup that sets only that one keeps working, but nothing needs to set both.
+    """
     if cli_token:
         return cli_token
-    env_token = os.environ.get("SURFLINE_HISTORICAL_TOKEN", "").strip()
-    if env_token:
-        return env_token
-    print("No token provided via --token or SURFLINE_HISTORICAL_TOKEN.")
+    for name in ("SURFLINE_HISTORICAL_TOKEN", "SURFLINE_ACCESS_TOKEN"):
+        env_token = os.environ.get(name, "").strip()
+        if env_token:
+            return env_token
+    print("No token provided via --token, SURFLINE_HISTORICAL_TOKEN or SURFLINE_ACCESS_TOKEN.")
     print("Grab one from Chrome DevTools: Network tab -> any services.surfline.com")
     print("request -> Headers -> Request Headers -> x-auth-accesstoken.")
     return getpass.getpass("Paste x-auth-accesstoken (input hidden): ").strip()
