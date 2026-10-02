@@ -1,0 +1,30 @@
+{
+  "generated_utc": "2026-10-02T04:07:35Z",
+  "n_scored_hours": 568,
+  "target_coverage": 0.8,
+  "method": "multiplier on the distance from the point prediction to each band edge, fitted linearly across lead times and forced monotone",
+  "fit": {
+    "slope_per_day": 0.0314,
+    "intercept": 0.9914,
+    "p_value": 0.1915,
+    "r": 0.5595
+  },
+  "raw_required_k": {
+    "1": 1.0,
+    "2": 1.01,
+    "3": 1.07,
+    "4": 1.29,
+    "5": 1.18,
+    "6": 1.02,
+    "7": 1.25
+  },
+  "factors": {
+    "1": 1.023,
+    "2": 1.054,
+    "3": 1.086,
+    "4": 1.117,
+    "5": 1.149,
+    "6": 1.18,
+    "7": 1.211
+  }
+}

@@ -321,9 +321,19 @@ def main():
         # alarm, not the routine case.
         missing = [c for c in numeric_cols if pd.isna(feat_row.iloc[0].get(c, np.nan))]
         level, level_value = rating_from_quantiles(quantiles)
+        # Every numeric predictor the model was actually given, carried through
+        # so save_week_forecast_record can write them per lead time. Until
+        # 2026-10-01 the week file recorded only tide_ft and weather_simple,
+        # which meant there was no way to measure how much the INPUTS degrade
+        # with lead -- and therefore no way to ever train a lead-aware model.
+        # Storing them costs a few columns and starts the clock on that.
+        predictor_values = {c: (None if pd.isna(feat_row.iloc[0].get(c, np.nan))
+                                else round(float(feat_row.iloc[0][c]), 4))
+                            for c in numeric_cols}
         return dict(hour=hk, point=point, quantiles=quantiles,
                     weather_simple=weather_simple, is_night=is_night,
                     tide_ft=tide_ft, in_training_range=in_training_range,
+                    predictor_values=predictor_values,
                     missing_predictors=missing,
                     crowd_level=level, crowd_level_value=level_value,
                     crowd_level_low=crowd_level(quantiles[FAN_LEVELS[0]]),
@@ -804,6 +814,38 @@ def save_forecast_record(target_date, records):
     return out
 
 
+LEAD_CALIBRATION_PATH = _PROJECT_ROOT / "data" / "forecasts" / "lead_band_calibration.json"
+
+
+def load_lead_band_factors():
+    """{lead: multiplier} for widening the 80% band further out, or {} if absent.
+
+    Produced by code/calibrate_lead_bands.py from the scored record. Absent file
+    means no correction rather than an error: a fresh clone has nothing to
+    calibrate from, and an uncalibrated band is the old behaviour, not a crash.
+    """
+    try:
+        blob = json.loads(LEAD_CALIBRATION_PATH.read_text())
+        return {int(k): float(v) for k, v in blob.get("factors", {}).items()}
+    except (OSError, ValueError, KeyError) as e:
+        print(f"  NOTE: no lead-band calibration applied ({type(e).__name__}); "
+              f"run code/calibrate_lead_bands.py to create it.")
+        return {}
+
+
+def widen_for_lead(point, lower, upper, lead_days, factors):
+    """Scales each band edge away from the point prediction by the lead's factor.
+
+    Scaling the DISTANCE from the point rather than the width keeps the band
+    anchored on the prediction, so an asymmetric interval stays asymmetric in
+    the same direction. Never narrows: a factor below 1 is ignored.
+    """
+    k = factors.get(int(lead_days), 1.0)
+    if k <= 1.0:
+        return lower, upper
+    return max(point - k * (point - lower), 0.0), point + k * (upper - point)
+
+
 def save_week_forecast_record(made_date, day_records):
     """Writes the whole 7-day outlook to `data/forecasts/week_<made>.csv`.
 
@@ -819,16 +861,29 @@ def save_week_forecast_record(made_date, day_records):
     """
     FORECASTS_DIR.mkdir(parents=True, exist_ok=True)
     out = FORECASTS_DIR / f"week_{made_date.isoformat()}.csv"
+    factors = load_lead_band_factors()
     rows = []
+    widened = 0
     for day, records in day_records:
+        lead = (day - made_date).days
         for r in records:
             row = forecast_row(day, r)
-            row["lead_days"] = (day - made_date).days
+            row["lead_days"] = lead
+            lo, hi = widen_for_lead(row["predicted"], row["lower_q10"],
+                                    row["upper_q90"], lead, factors)
+            if (lo, hi) != (row["lower_q10"], row["upper_q90"]):
+                widened += 1
+            row["lower_q10"], row["upper_q90"] = round(lo, 2), round(hi, 2)
+            row["band_factor"] = factors.get(lead, 1.0)
+            # The predictors the model was actually handed for this hour, at
+            # this lead. See predict_for_hour for why.
+            row.update({f"pred_{k}": v for k, v in (r.get("predictor_values") or {}).items()})
             rows.append(row)
     if not rows:
         return None
     pd.DataFrame(rows).to_csv(out, index=False)
-    print(f"Saved week forecast record ({len(rows)} hours, {len(day_records)} days) to {out}")
+    print(f"Saved week forecast record ({len(rows)} hours, {len(day_records)} days) to {out}"
+          + (f"; {widened} hour(s) had their band widened for lead time" if widened else ""))
     return out
 
 
