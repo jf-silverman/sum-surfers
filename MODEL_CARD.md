@@ -107,7 +107,7 @@ on the most recent, so no day appears on both sides:
 |---|---|
 | MAE | **7.60 surfers** |
 | RMSE | 10.43 |
-| mean bias | −1.84 |
+| mean bias | −1.84 (predicted below actual) |
 | 80% interval coverage | **71.6%** |
 
 Measured on 352 held-out hours (2026-08-29 → 2026-09-21) against 1,242 training
@@ -125,12 +125,40 @@ whole day costs ~1.2 MAE, and holding out the most *recent* days rather than
 random ones costs ~0.8 more. The published figure is now the one a real
 day-ahead forecast faces.
 
-**Live tracking**, which is a different and easier sample: on 83 scored
-forecast-hours the MAE is 4.26 with 73% band coverage. Too few hours and too few
-days to be the headline; see
-[`data/forecasts/forecast_log.csv`](data/forecasts/forecast_log.csv).
+**Live tracking** (updated 2026-10-01): 568 scored forecast-hours across
+2026-09-23 → 2026-10-01. Day-ahead MAE **4.50**, 83% band coverage; across all
+lead times MAE 5.0 and coverage 76%.
+
+**The direction of the bias is not stable, and that matters more than its size.**
+The backtest above shows the model predicting 1.84 surfers BELOW actual. The live
+record since shows it predicting **1.87 surfers ABOVE** actual — nearly the same
+magnitude, opposite sign, 68% of hours over-forecast. The model is not biased in
+a fixed direction; it is **lagging the level**. Mean counts fell from 15.9
+surfers/hour in the backtest window to 11.5 in the live window, and a model
+trained mostly on busier months keeps forecasting the old level. Measured
+independently across 16 rolling origins, forecast bias tracks the train/test
+level gap at **r = −0.811**.
+
+Day-ahead alone the over-prediction is small and uniform: mean −0.82, median
+−1.07, 60% of hours over-forecast (t = −2.03, p = 0.044), and it over-forecasts
+in every predicted quartile (−0.69 / −1.26 / −1.02 / −0.31) rather than
+squashing busy hours toward the middle. It grows with lead time, reaching about
+−7 at seven days out, which is the same staleness amplified by more regression
+toward the training mean.
+
+**Read any bias figure here as a snapshot of one period, not a property of the
+model.** See [`data/forecasts/forecast_log.csv`](data/forecasts/forecast_log.csv)
+for the current record.
 
 ### Known limitations
+- **The intervals do not widen with lead time, so coverage collapses further
+  out.** Band width tracks the predicted level at r = +0.900 rather than input
+  uncertainty, and at longer lead the forecast regresses toward the middle, so
+  the band narrows exactly where the inputs are least reliable. Measured
+  coverage ran 85% at one day out to 57% at seven. Partly corrected since
+  2026-10-01 by `code/calibrate_lead_bands.py`, which widens each lead's band by
+  a factor fitted on the scored record; the correction is gentle (1.02 to 1.21)
+  and its slope is not yet significant.
 - **Prediction intervals are overconfident at every level** — measured coverage
   15/26/36/71.9% against nominal 20/40/60/80%. The 80% band misses 9.4% low and
   18.8% high against a 10% target on each side; the high edge is where it loses.
