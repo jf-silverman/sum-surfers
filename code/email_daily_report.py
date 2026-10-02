@@ -209,11 +209,23 @@ def extreme_frames(target_date, model=None, forecast_rows=None):
             gap = abs(f["point"] - row["surfer_count"])
             if gap > best_gap:
                 best_gap, best_row, best_f = gap, row, f
-        already = {r["filename"] for _l, r, _e in picks}
-        if best_row is not None and best_row["filename"] not in already and best_gap > 0:
+        if best_row is not None and best_gap > 0:
             direction = "over" if best_f["point"] > best_row["surfer_count"] else "under"
-            picks.append((f"Biggest forecast miss", best_row,
-                          f"  |  forecast {best_f['point']:.1f}, {direction} by {best_gap:.1f}"))
+            note = f"  |  forecast {best_f['point']:.1f}, {direction} by {best_gap:.1f}"
+            dup = next((i for i, (_l, r, _e) in enumerate(picks)
+                        if r["filename"] == best_row["filename"]), None)
+            if dup is None:
+                picks.append(("Biggest forecast miss", best_row, note))
+            else:
+                # The worst-missed hour is sometimes also the busiest, emptiest
+                # or quietest one. Dropping the entry in that case -- which is
+                # what this did until 2026-10-01 -- loses the single most useful
+                # fact in the report with no mention of it, and the reader just
+                # sees one fewer attachment. Fold the miss into the frame that is
+                # already there instead, so it is still reported and the image is
+                # not attached twice.
+                label, row, _old = picks[dup]
+                picks[dup] = (f"{label} (also the biggest forecast miss)", row, note)
 
     if model is None:
         model = pdp.ds.load_model()
@@ -233,10 +245,21 @@ def extreme_frames(target_date, model=None, forecast_rows=None):
         hh, mm = map(int, str(row["time_local"]).split(":")[:2])
         stamp = datetime(target_date.year, target_date.month, target_date.day,
                          hh, mm).strftime("%-I:%M %p")
-        cv2.putText(canvas, f"{label}  |  {stamp}  |  {visible} in this frame "
-                    f"(hour counted {row['surfer_count']:.0f}){extra}",
-                    (10, h + 31), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (235, 235, 235), 2,
-                    cv2.LINE_AA)
+        caption = (f"{label}  |  {stamp}  |  {visible} in this frame "
+                   f"(hour counted {row['surfer_count']:.0f}){extra}")
+        # Shrink to fit rather than run off the edge. The caption grew variable
+        # in length once a frame could carry two roles plus the forecast miss,
+        # and at a fixed 0.9 the longest version was silently clipped -- losing
+        # exactly the part worth reading.
+        scale, thick = 0.9, 2
+        while scale > 0.45:
+            (tw, _th), _ = cv2.getTextSize(caption, cv2.FONT_HERSHEY_SIMPLEX, scale, thick)
+            if tw <= w - 20:
+                break
+            scale -= 0.05
+            thick = 2 if scale > 0.6 else 1
+        cv2.putText(canvas, caption, (10, h + 31), cv2.FONT_HERSHEY_SIMPLEX,
+                    scale, (235, 235, 235), thick, cv2.LINE_AA)
         slug = label.lower().split()[0]
         out_path = OUT_DIR / f"frame_{target_date.isoformat()}_{slug}.png"
         cv2.imwrite(str(out_path), canvas)
