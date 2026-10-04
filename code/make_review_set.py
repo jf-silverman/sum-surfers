@@ -120,7 +120,7 @@ def main():
             filename=r.filename, date=args.date, time_local=r.time_local, image=name,
             boxes_drawn=len(boxes), forecast=("" if pred is None else round(pred, 1)),
             # --- to fill in ---
-            true_positives="", missed="", missed_poses="",
+            true_positives="", missed="", missed_poses="", uncertain="",
             false_positives="", false_positive_box_numbers="",
             false_positive_causes="", notes=""))
 
@@ -138,6 +138,11 @@ def main():
     print("  false_positive_box_numbers e.g. 3;7   (the numbers drawn on the image)")
     print("  false_positive_causes      e.g. bird;reflection;beach walker;foam;duplicate")
     print(f"  missed_poses               {POSES}  e.g. prone;prone;sitting")
+    print("  uncertain                  of the above, how many calls you could not")
+    print("                             confidently make -- a surfer you think is under")
+    print("                             whitewater, a shape you cannot resolve. Scored")
+    print("                             twice, once counting these as errors and once")
+    print("                             excluding them; the gap is the ambiguity budget.")
     print("\n  true_positives + false_positives should equal boxes_drawn.")
     return 0
 
