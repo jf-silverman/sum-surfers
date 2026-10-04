@@ -111,7 +111,16 @@ on the most recent, so no day appears on both sides:
 | 80% interval coverage | **71.6%** |
 
 Measured on 352 held-out hours (2026-08-29 → 2026-09-21) against 1,242 training
-rows. *(The calibration section below reports 71.9% for the same interval on the
+rows.
+
+**Against naive baselines** (`code/eval_baselines.py`, same forward split, 378
+test rows as the record has since grown): the model's MAE of 6.79 beats the
+strongest naive reference — persistence, yesterday's count at the same hour, at
+**8.09** — by **16%**. Climatology by hour × weekend scores 10.82, a trailing
+7-day level 11.28, seasonal naive 17.26. The **target noise floor is 0.68
+surfers**, the spread between one extracted frame and the 3-frame mean of its
+clip across 1,750 clips; no forecast can beat that. Read the headline MAE between
+those two numbers, not on its own. *(The calibration section below reports 71.9% for the same interval on the
 same rows. Both are right: the released bundle enforces monotonicity between the
 shipped q0.10/q0.90 pair alone, while the calibration chart fits a nine-level
 quantile ladder and enforces it across all of them, which nudges the upper bound
@@ -152,9 +161,12 @@ for the current record.
 
 ### Known limitations
 - **The intervals do not widen with lead time, so coverage collapses further
-  out.** Band width tracks the predicted level at r = +0.900 rather than input
-  uncertainty, and at longer lead the forecast regresses toward the middle, so
-  the band narrows exactly where the inputs are least reliable. Measured
+  out.** Band width tracks the predicted level at r = +0.900 — which is correct
+  for count data, where a Poisson-like mean-variance relationship forces
+  sd ≈ √μ, and is not the defect. The defect is that width is conditioned on
+  level but **not on lead**, so it carries no horizon information: at longer lead
+  the forecast regresses toward the middle and the band narrows with it, exactly
+  where the inputs are least reliable. Measured
   coverage ran 85% at one day out to 57% at seven. Partly corrected since
   2026-10-01 by `code/calibrate_lead_bands.py`, which widens each lead's band by
   a factor fitted on the scored record; the correction is gentle (1.02 to 1.21)
