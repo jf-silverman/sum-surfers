@@ -113,12 +113,16 @@ def main():
         if render(crop, boxes, out_dir / name, header):
             print(f"  {name}")
         rows.append(dict(
-            date=args.date, time_local=r.time_local, image=name, filename=r.filename,
+            # Column order follows how Joel rearranged it while reviewing
+            # 2026-09-23: filename first, and the missed-surfer columns kept
+            # together before the false-positive ones, so a reviewer fills in
+            # one failure mode at a time rather than jumping between them.
+            filename=r.filename, date=args.date, time_local=r.time_local, image=name,
             boxes_drawn=len(boxes), forecast=("" if pred is None else round(pred, 1)),
             # --- to fill in ---
-            true_positives="", false_positives="", missed="",
-            false_positive_box_numbers="", false_positive_causes="",
-            missed_poses="", notes=""))
+            true_positives="", missed="", missed_poses="",
+            false_positives="", false_positive_box_numbers="",
+            false_positive_causes="", notes=""))
 
     csv_path = out_dir / "review.csv"
     with open(csv_path, "w", newline="") as f:
