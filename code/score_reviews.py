@@ -1,7 +1,7 @@
 """
 score_reviews.py
 ----------------
-Scores the hand-filled review sets in data/reviews/full_day_*/review.csv and
+Scores the hand-filled review sheet at data/reviews/review_all.csv and
 reports detector precision, recall and F1 -- as INTERVALS, not point estimates.
 
 Why intervals. Each reviewed row carries two doubt columns, split by direction
@@ -46,6 +46,7 @@ import pandas as pd
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 REVIEWS = _PROJECT_ROOT / "data" / "reviews"
+REVIEW_CSV = REVIEWS / "review_all.csv"
 
 FILL_COLS = ["true_positives", "missed", "false_positives"]
 
@@ -82,32 +83,38 @@ def as_int(cell):
 
 def load_rows(date_filter=None):
     """Reviewed rows only -- a row counts as reviewed once true_positives is filled."""
+    if not REVIEW_CSV.exists():
+        sys.exit(f"{REVIEW_CSV} not found.")
     rows, skipped, problems = [], 0, []
-    for d in sorted(REVIEWS.glob("full_day_*")):
-        f = d / "review.csv"
-        if not f.exists():
-            continue
-        day = d.name.replace("full_day_", "")
+    df = pd.read_csv(REVIEW_CSV, dtype=str, keep_default_na=False)
+    for _, r in df.iterrows():
+        day = r["date"]
         if date_filter and day != date_filter:
             continue
-        df = pd.read_csv(f, dtype=str, keep_default_na=False)
-        for _, r in df.iterrows():
-            if not str(r.get("true_positives", "")).strip():
-                skipped += 1
-                continue
-            tp, fp = as_int(r["true_positives"]), as_int(r["false_positives"])
-            drawn = as_int(r["boxes_drawn"])
-            if tp + fp != drawn:
-                problems.append(f"  {day} {r['time_local']}: "
-                                f"true_positives({tp}) + false_positives({fp}) "
-                                f"= {tp + fp}, but boxes_drawn = {drawn}")
-            rows.append(dict(
-                date=day, time_local=r["time_local"], drawn=drawn, tp=tp, fp=fp,
-                fn=as_int(r["missed"]),
-                u_box=n_listed(r.get("uncertain_box_numbers", "")),
-                u_missed=as_int(r.get("uncertain_missed", "")),
-                causes=r.get("false_positive_causes", ""),
-                poses=r.get("missed_poses", "")))
+        if not str(r.get("true_positives", "")).strip():
+            skipped += 1
+            continue
+        tp, fp = as_int(r["true_positives"]), as_int(r["false_positives"])
+        drawn = as_int(r["boxes_drawn"])
+        if tp + fp != drawn:
+            problems.append(f"  {day} {r['time_local']}: "
+                            f"true_positives({tp}) + false_positives({fp}) "
+                            f"= {tp + fp}, but boxes_drawn = {drawn}")
+        fn = as_int(r["missed"])
+        # A box holding two surfers costs one miss per extra surfer. Counting
+        # the listed boxes assumes exactly two each, which is what every note so
+        # far describes; a box with three would need its own notation.
+        merged = n_listed(r.get("multi_surfer_box", ""))
+        if merged > fn:
+            problems.append(f"  {day} {r['time_local']}: multi_surfer_box lists {merged} "
+                            f"box(es) but missed = {fn}")
+        rows.append(dict(
+            date=day, time_local=r["time_local"], drawn=drawn, tp=tp, fp=fp,
+            fn=fn, merged=min(merged, fn),
+            u_box=n_listed(r.get("uncertain_box_numbers", "")),
+            u_missed=as_int(r.get("uncertain_missed", "")),
+            causes=r.get("false_positive_causes", ""),
+            poses=r.get("missed_poses", "")))
     return pd.DataFrame(rows), skipped, problems
 
 
@@ -127,7 +134,7 @@ def score(df):
         return t / (t + f) if (t + f) else float("nan")
 
     out = dict(
-        n_frames=len(df), tp=tp, fp=fp, fn=fn, drawn=drawn,
+        n_frames=len(df), tp=tp, fp=fp, fn=fn, drawn=drawn, merged=int(df.merged.sum()),
         u_box=u_box, u_missed=u_missed,
         precision=pr(tp, fp),
         precision_best=pr(tp_best, drawn - tp_best),
@@ -211,6 +218,10 @@ def report(s, title):
     print(f"  frames reviewed      {s['n_frames']}")
     print(f"  boxes drawn          {s['drawn']}        true surfers  {s['true_total']}")
     print(f"  TP {s['tp']}   FP {s['fp']}   FN {s['fn']}")
+    if s["fn"]:
+        merged, nobox = s["merged"], s["fn"] - s["merged"]
+        print(f"    of the {s['fn']} missed: {merged} inside a box the detector merged, "
+              f"{nobox} with no box at all")
     if s["u_box"] or s["u_missed"]:
         print(f"  flagged uncertain    {s['u_box']} box(es), {s['u_missed']} possible miss(es)")
     print()
@@ -236,8 +247,8 @@ def main():
 
     df, skipped, problems = load_rows(args.date)
     if df.empty:
-        sys.exit("No reviewed rows found. Fill in true_positives in a "
-                 "data/reviews/full_day_*/review.csv first.")
+        sys.exit("No reviewed rows found. Fill in true_positives in "
+                 f"{REVIEW_CSV} first.")
 
     if problems:
         print("ARITHMETIC PROBLEMS (true_positives + false_positives should equal boxes_drawn):")

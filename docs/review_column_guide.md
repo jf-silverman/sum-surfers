@@ -1,6 +1,7 @@
 # Review CSV — Column Guide
 
-Reference for filling in `data/reviews/full_day_<date>/review.csv`, scored by
+Reference for filling in `data/reviews/review_all.csv` -- one sheet for every
+day (2026-10-05; it was a CSV per folder before). Scored by
 `code/score_reviews.py`. Column order follows the arrangement Joel settled on
 while reviewing 2026-09-23: one failure mode at a time, misses before false
 positives, with each kind of doubt sitting next to the calls it qualifies.
@@ -34,6 +35,7 @@ The scorer prints an ARITHMETIC PROBLEMS block naming any row that breaks this.
 | `true_positives` | integer | boxes genuinely on a surfer |
 | `missed` | integer | real surfers with **no** box at all |
 | `missed_poses` | `;`-separated, optional leading count | pose of each missed surfer |
+| `multi_surfer_box` | `;`-separated numbers | boxes holding **more than one** surfer |
 | `uncertain_missed` | integer | of `missed`, how many you cannot confirm |
 | `false_positives` | integer | boxes on anything that is not a surfer |
 | `false_positive_box_numbers` | `;`-separated numbers | which drawn boxes those were |
@@ -42,6 +44,28 @@ The scorer prints an ARITHMETIC PROBLEMS block naming any row that breaks this.
 | `notes` | free text | anything else worth remembering |
 
 Pose vocabulary: `sitting | prone | standing | SUP | wipeout | unknown`.
+
+## `multi_surfer_box` — merged boxes
+
+A box drawn around two surfers is a different failure from a surfer the
+detector never saw at all, and the two have different fixes: one is the
+box-merging logic (NMS and containment suppression), the other is recall. On
+2026-09-26 this was **8 of 31 misses**, so it is worth separating.
+
+Each extra surfer inside a box still costs a miss, so count it in `missed` as
+well, and list the box number here:
+
+```
+missed=2  missed_poses=2 prone  multi_surfer_box=2;18
+```
+
+That reads: boxes 2 and 18 each contain two surfers, so two real surfers have
+no box of their own. The box itself stays a **true positive** — it is on a real
+surfer — so `true_positives` does not change.
+
+The scorer assumes exactly two surfers per listed box, which is what every note
+so far describes, and warns if `multi_surfer_box` lists more boxes than
+`missed` allows.
 
 ## The two uncertainty columns
 
@@ -96,6 +120,14 @@ false_positive_box_numbers=2;3
 false_positive_causes=heads of people on shore (bottom center)
 ```
 
+**A merged box.** 36 boxes, all on real surfers, but box 26 holds three people:
+
+```
+boxes_drawn=27  true_positives=27  missed=2  missed_poses=1 prone; 1 sitting
+multi_surfer_box=26
+notes=The 2 false negatives sit inside box 26 (there are 3 surfers total)
+```
+
 **Several missed, with poses.** Two surfers missed, both lying down:
 
 ```
@@ -128,6 +160,9 @@ python code/score_reviews.py --by-day
 
 Rows with `true_positives` blank are treated as not yet reviewed and skipped,
 so a part-finished day scores fine.
+
+`make_review_set.py` only ever ADDS rows to the sheet. Re-running it for a day
+you have already reviewed is a no-op on your answers.
 
 There is no accuracy figure. Object detection has no true negative — the number
 of image regions correctly left un-boxed is unbounded — so precision, recall

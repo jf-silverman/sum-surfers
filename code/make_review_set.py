@@ -29,7 +29,6 @@ Usage:
 """
 
 import argparse
-import csv
 import sys
 from pathlib import Path
 
@@ -42,6 +41,12 @@ sys.path.insert(0, str(_PROJECT_ROOT / "code"))
 import detect_surfers as ds  # noqa: E402
 
 PREDS = _PROJECT_ROOT / "data" / "predictions" / "predictions.csv"
+REVIEW_CSV = _PROJECT_ROOT / "data" / "reviews" / "review_all.csv"
+CSV_COLUMNS = ["filename", "date", "time_local", "image", "boxes_drawn",
+               "forecast", "true_positives", "missed", "missed_poses",
+               "multi_surfer_box", "uncertain_missed", "false_positives",
+               "false_positive_box_numbers", "false_positive_causes",
+               "uncertain_box_numbers", "notes"]
 FORECASTS = _PROJECT_ROOT / "data" / "forecasts"
 UPSCALE = 2.0                       # the ROI strip is 180px tall; boxes need room to label
 BOX_BGR = (90, 227, 157)
@@ -165,43 +170,53 @@ def main():
             # which. uncertain_missed sits with the missed columns and
             # uncertain_box_numbers with the false-positive ones, so each
             # failure mode is still filled in one pass.
-            true_positives="", missed="", missed_poses="", uncertain_missed="",
+            true_positives="", missed="", missed_poses="", multi_surfer_box="",
+            uncertain_missed="",
             false_positives="", false_positive_box_numbers="",
             false_positive_causes="", uncertain_box_numbers="", notes=""))
 
-    csv_path = out_dir / "review.csv"
-    # A plain "w" here once stood between a re-render and a day of hand-review:
-    # the fill-in columns are written blank, so regenerating images would have
-    # erased the answers. Refuse rather than overwrite.
+    # One sheet for every day (2026-10-05), rather than a review.csv per folder:
+    # Joel fills these in a spreadsheet and one file is less to juggle. Rows are
+    # only ever ADDED here -- a row whose filename is already present is left
+    # exactly as it is, so re-running for a day that is partly reviewed cannot
+    # erase an answer. That replaces the old refuse-to-overwrite guard, which
+    # was needed only because the whole file used to be rewritten.
     if args.images_only:
-        print(f"\n--images-only: left {csv_path} untouched.")
+        print(f"\n--images-only: {REVIEW_CSV.name} untouched.")
         print(f"{len(rows)} image(s) re-rendered -> {out_dir}")
         return 0
-    if csv_path.exists():
-        existing = pd.read_csv(csv_path)
-        fill_cols = [c for c in ("true_positives", "missed", "missed_poses", "uncertain",
-                                 "false_positives", "false_positive_box_numbers",
-                                 "false_positive_causes", "uncertain_box_numbers",
-                                 "uncertain_missed", "notes") if c in existing.columns]
-        if fill_cols and int(existing[fill_cols].notna().any(axis=1).sum()):
-            n = int(existing[fill_cols].notna().any(axis=1).sum())
-            print(f"\nREFUSING to overwrite {csv_path}: {n} row(s) already have review "
-                  f"data in them.\nRe-run with --images-only to redraw the images and keep "
-                  f"the CSV as it is.")
-            return 1
-    with open(csv_path, "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-        w.writeheader()
-        w.writerows(rows)
+
+    REVIEW_CSV.parent.mkdir(parents=True, exist_ok=True)
+    if REVIEW_CSV.exists():
+        sheet = pd.read_csv(REVIEW_CSV, dtype=str, keep_default_na=False)
+        known = set(sheet["filename"])
+        fresh = [r for r in rows if r["filename"] not in known]
+        kept = len(rows) - len(fresh)
+        sheet = pd.concat([sheet, pd.DataFrame(fresh)], ignore_index=True) if fresh else sheet
+        # Columns the sheet has gained since: keep every one, blank for new rows.
+        for col in CSV_COLUMNS:
+            if col not in sheet.columns:
+                sheet[col] = ""
+        sheet = sheet[CSV_COLUMNS].fillna("")
+    else:
+        sheet, fresh, kept = pd.DataFrame(rows, columns=CSV_COLUMNS), rows, 0
+
+    sheet = sheet.sort_values(["date", "time_local"]).reset_index(drop=True)
+    sheet.to_csv(REVIEW_CSV, index=False)
+    print(f"\n{REVIEW_CSV}: {len(fresh)} row(s) added, {kept} already present and left alone.")
+    print(f"  {len(sheet)} rows total across {sheet['date'].nunique()} day(s).")
 
     print(f"\n{len(rows)} hour(s) -> {out_dir}")
-    print(f"Fill in {csv_path}:")
+    print(f"Fill in {REVIEW_CSV}:")
     print("  true_positives             boxes that are genuinely on a surfer")
     print("  false_positives            boxes on anything else (incl. a 2nd box on one surfer)")
     print("  missed                     real surfers with no box at all")
     print("  false_positive_box_numbers e.g. 3;7   (the numbers drawn on the image)")
     print("  false_positive_causes      e.g. bird;reflection;beach walker;foam;duplicate")
     print(f"  missed_poses               {POSES}  e.g. prone;prone;sitting")
+    print("  multi_surfer_box           boxes holding more than one surfer, e.g. 2;18 --")
+    print("                             a merged box, not a blind spot. Each one costs a")
+    print("                             miss, so count it in `missed` too.")
     print("  uncertain_box_numbers      drawn boxes you would not defend either way,")
     print("                             e.g. 2;7 -- same numbering as the FP column.")
     print("                             These bound PRECISION.")
