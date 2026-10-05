@@ -1,15 +1,15 @@
-filename,date,time_local,image,boxes_drawn,forecast,true_positives,missed,missed_poses,uncertain,false_positives,false_positive_box_numbers,false_positive_causes,notes
-crop2026-09-23_07-20-00.jpg,2026-09-23,07:20,0720_boxes_11.png,11,10.6,11,1,prone,,0,,,
-crop2026-09-23_08-14-00.jpg,2026-09-23,08:14,0814_boxes_11.png,11,6.5,11,0,,,0,,,
-crop2026-09-23_09-08-00.jpg,2026-09-23,09:08,0908_boxes_11.png,11,3.8,10,1,,,1,1,lens flare spot; very distinct oversat w/ bright red & blue edges,
-crop2026-09-23_10-02-00.jpg,2026-09-23,10:02,1002_boxes_02.png,2,4.8,2,0,,,0,,,
-crop2026-09-23_10-56-00.jpg,2026-09-23,10:56,1056_boxes_02.png,2,4.8,2,0,,,0,,,
-crop2026-09-23_11-50-00.jpg,2026-09-23,11:50,1150_boxes_10.png,10,7.6,8,0,,,2,"2,3",heads of people on shore (bottom center),
-crop2026-09-23_12-44-00.jpg,2026-09-23,12:44,1244_boxes_21.png,21,18.9,21,0,,,0,,,
-crop2026-09-23_13-38-00.jpg,2026-09-23,13:38,1338_boxes_36.png,36,21.4,36,2,2 prone,,0,,,
-crop2026-09-23_14-32-00.jpg,2026-09-23,14:32,1432_boxes_33.png,33,24.7,33,1,prone,,0,,,
-crop2026-09-23_15-26-00.jpg,2026-09-23,15:26,1526_boxes_27.png,27,24.4,26,2,1 prone; 1 sitting,,1,3,wind sock,The 2 false negatives sit inside box 26 (there are 3 surfers total)
-crop2026-09-23_16-20-00.jpg,2026-09-23,16:20,1620_boxes_23.png,23,24.5,23,1,prone,,0,,,
-crop2026-09-23_17-14-00.jpg,2026-09-23,17:14,1714_boxes_12.png,12,18.2,12,0,,,0,,,
-crop2026-09-23_18-08-00.jpg,2026-09-23,18:08,1808_boxes_08.png,8,17.5,8,0,,,0,,,
-crop2026-09-23_19-02-00.jpg,2026-09-23,19:02,1902_boxes_03.png,3,0.7,3,1,prone,,0,,,low light & somewhat hazy; not certain 2 is a surfer.
+filename,date,time_local,image,boxes_drawn,forecast,true_positives,missed,missed_poses,uncertain_missed,false_positives,false_positive_box_numbers,false_positive_causes,uncertain_box_numbers,notes
+crop2026-09-23_07-20-00.jpg,2026-09-23,07:20,0720_boxes_11.png,11,10.6,11,1,prone,,0,,,,
+crop2026-09-23_08-14-00.jpg,2026-09-23,08:14,0814_boxes_11.png,11,6.5,11,0,,,0,,,,
+crop2026-09-23_09-08-00.jpg,2026-09-23,09:08,0908_boxes_11.png,11,3.8,10,1,,,1,1,lens flare spot; very distinct oversat w/ bright red & blue edges,,
+crop2026-09-23_10-02-00.jpg,2026-09-23,10:02,1002_boxes_02.png,2,4.8,2,0,,,0,,,,
+crop2026-09-23_10-56-00.jpg,2026-09-23,10:56,1056_boxes_02.png,2,4.8,2,0,,,0,,,,
+crop2026-09-23_11-50-00.jpg,2026-09-23,11:50,1150_boxes_10.png,10,7.6,8,0,,,2,"2,3",heads of people on shore (bottom center),,
+crop2026-09-23_12-44-00.jpg,2026-09-23,12:44,1244_boxes_21.png,21,18.9,21,0,,,0,,,,
+crop2026-09-23_13-38-00.jpg,2026-09-23,13:38,1338_boxes_36.png,36,21.4,36,2,2 prone,,0,,,,
+crop2026-09-23_14-32-00.jpg,2026-09-23,14:32,1432_boxes_33.png,33,24.7,33,1,prone,,0,,,,
+crop2026-09-23_15-26-00.jpg,2026-09-23,15:26,1526_boxes_27.png,27,24.4,26,2,1 prone; 1 sitting,,1,3,wind sock,,The 2 false negatives sit inside box 26 (there are 3 surfers total)
+crop2026-09-23_16-20-00.jpg,2026-09-23,16:20,1620_boxes_23.png,23,24.5,23,1,prone,,0,,,,
+crop2026-09-23_17-14-00.jpg,2026-09-23,17:14,1714_boxes_12.png,12,18.2,12,0,,,0,,,,
+crop2026-09-23_18-08-00.jpg,2026-09-23,18:08,1808_boxes_08.png,8,17.5,8,0,,,0,,,,
+crop2026-09-23_19-02-00.jpg,2026-09-23,19:02,1902_boxes_03.png,3,0.7,3,1,prone,,0,,,,low light & somewhat hazy; not certain 2 is a surfer.

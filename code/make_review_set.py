@@ -158,9 +158,16 @@ def main():
             filename=r.filename, date=args.date, time_local=r.time_local, image=name,
             boxes_drawn=len(boxes), forecast=("" if pred is None else round(pred, 1)),
             # --- to fill in ---
-            true_positives="", missed="", missed_poses="", uncertain="",
+            # Doubt is split in two (2026-10-05) because the halves move
+            # precision and recall in OPPOSITE directions: an unsure box might
+            # be a false positive, an unsure miss might be a phantom. A single
+            # "uncertain" count could not be scored, because it did not say
+            # which. uncertain_missed sits with the missed columns and
+            # uncertain_box_numbers with the false-positive ones, so each
+            # failure mode is still filled in one pass.
+            true_positives="", missed="", missed_poses="", uncertain_missed="",
             false_positives="", false_positive_box_numbers="",
-            false_positive_causes="", notes=""))
+            false_positive_causes="", uncertain_box_numbers="", notes=""))
 
     csv_path = out_dir / "review.csv"
     # A plain "w" here once stood between a re-render and a day of hand-review:
@@ -174,7 +181,8 @@ def main():
         existing = pd.read_csv(csv_path)
         fill_cols = [c for c in ("true_positives", "missed", "missed_poses", "uncertain",
                                  "false_positives", "false_positive_box_numbers",
-                                 "false_positive_causes", "notes") if c in existing.columns]
+                                 "false_positive_causes", "uncertain_box_numbers",
+                                 "uncertain_missed", "notes") if c in existing.columns]
         if fill_cols and int(existing[fill_cols].notna().any(axis=1).sum()):
             n = int(existing[fill_cols].notna().any(axis=1).sum())
             print(f"\nREFUSING to overwrite {csv_path}: {n} row(s) already have review "
@@ -194,11 +202,15 @@ def main():
     print("  false_positive_box_numbers e.g. 3;7   (the numbers drawn on the image)")
     print("  false_positive_causes      e.g. bird;reflection;beach walker;foam;duplicate")
     print(f"  missed_poses               {POSES}  e.g. prone;prone;sitting")
-    print("  uncertain                  of the above, how many calls you could not")
-    print("                             confidently make -- a surfer you think is under")
-    print("                             whitewater, a shape you cannot resolve. Scored")
-    print("                             twice, once counting these as errors and once")
-    print("                             excluding them; the gap is the ambiguity budget.")
+    print("  uncertain_box_numbers      drawn boxes you would not defend either way,")
+    print("                             e.g. 2;7 -- same numbering as the FP column.")
+    print("                             These bound PRECISION.")
+    print("  uncertain_missed           count of maybe-surfers with no box: a shape under")
+    print("                             whitewater you cannot resolve. These bound RECALL.")
+    print("                             Both are a SUBSET of the counts above, not extra")
+    print("                             categories -- still make your best call. Scoring")
+    print("                             runs best-case and worst-case; the gap is the")
+    print("                             ambiguity budget.")
     print("\n  true_positives + false_positives should equal boxes_drawn.")
     return 0
 
