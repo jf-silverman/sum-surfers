@@ -1,0 +1,134 @@
+# Review CSV — Column Guide
+
+Reference for filling in `data/reviews/full_day_<date>/review.csv`, scored by
+`code/score_reviews.py`. Column order follows the arrangement Joel settled on
+while reviewing 2026-09-23: one failure mode at a time, misses before false
+positives, with each kind of doubt sitting next to the calls it qualifies.
+
+## The one rule that must hold
+
+```
+true_positives + false_positives = boxes_drawn
+```
+
+Every drawn box is either on a surfer or not. `missed` is separate — those
+surfers have no box, so they are not part of `boxes_drawn`.
+
+The scorer prints an ARITHMETIC PROBLEMS block naming any row that breaks this.
+
+## Prefilled — do not edit
+
+| column | meaning |
+|---|---|
+| `filename` | the source crop in `data/j_shore_cam/surf_crops/` |
+| `date` | review day |
+| `time_local` | clip time, local |
+| `image` | the rendered PNG to look at, in the same folder |
+| `boxes_drawn` | how many boxes the detector drew (also in the filename) |
+| `forecast` | what the model predicted for that hour, for context only |
+
+## To fill in
+
+| column | format | meaning |
+|---|---|---|
+| `true_positives` | integer | boxes genuinely on a surfer |
+| `missed` | integer | real surfers with **no** box at all |
+| `missed_poses` | `;`-separated, optional leading count | pose of each missed surfer |
+| `uncertain_missed` | integer | of `missed`, how many you cannot confirm |
+| `false_positives` | integer | boxes on anything that is not a surfer |
+| `false_positive_box_numbers` | `;`-separated numbers | which drawn boxes those were |
+| `false_positive_causes` | free text, `;`-separated | what each actually was |
+| `uncertain_box_numbers` | `;`-separated numbers | drawn boxes you would not defend |
+| `notes` | free text | anything else worth remembering |
+
+Pose vocabulary: `sitting | prone | standing | SUP | wipeout | unknown`.
+
+## The two uncertainty columns
+
+They are split by **direction**, because they bound different metrics and would
+cancel if merged:
+
+- `uncertain_box_numbers` → a drawn box that might not be a surfer → bounds
+  **precision**.
+- `uncertain_missed` → a surfer you think is there but cannot see → bounds
+  **recall**.
+
+Both are a **subset** of the counts beside them, never extra. Still make your
+best call in `true_positives` / `false_positives` / `missed`; these only mark
+which of those calls are soft.
+
+**When to flag one.** If you had to brighten the image to decide, if you would
+plausibly answer differently on a second pass, or if you are calling it from
+position and context rather than actually seeing a person.
+
+**When not to.** Effort is not doubt. A call that took a long hard look but
+that you are now sure of is not uncertain.
+
+The scorer reports best case (soft boxes are all real, soft misses are all
+imagined) against worst case (the reverse). The gap is the ambiguity budget —
+how much of the headline number is judgement rather than measurement.
+
+## Worked examples, all real rows from 2026-09-23
+
+**Clean frame.** 11 boxes, all correct, nothing missed:
+
+```
+boxes_drawn=11  true_positives=11  missed=0  false_positives=0
+```
+
+**One bad box.** 11 drawn, box 1 is a lens flare, and one real surfer has no box:
+
+```
+boxes_drawn=11  true_positives=10  missed=1  false_positives=1
+false_positive_box_numbers=1
+false_positive_causes=lens flare spot; very distinct oversat w/ bright red & blue edges
+```
+
+11 = 10 + 1. The `;` here continues one description; it does not mean two
+causes. Causes are tallied per frame, not per box, precisely because of this.
+
+**Two false positives sharing one cause.** Boxes 2 and 3 are both heads on the
+beach:
+
+```
+boxes_drawn=10  true_positives=8  missed=0  false_positives=2
+false_positive_box_numbers=2;3
+false_positive_causes=heads of people on shore (bottom center)
+```
+
+**Several missed, with poses.** Two surfers missed, both lying down:
+
+```
+boxes_drawn=36  true_positives=36  missed=2  missed_poses=2 prone
+```
+
+A leading number multiplies, so `2 prone` is two prone surfers. Bare `prone`
+means one. Mixed is written out: `1 prone; 1 sitting`. The scorer checks these
+add up to `missed` and names any row that does not.
+
+**Hard frame, with doubt.** Dim and hazy. Three boxes drawn; box 2 might be
+chop; a fourth shape might be a prone surfer but will not resolve:
+
+```
+boxes_drawn=3  true_positives=3  missed=1  missed_poses=prone
+uncertain_box_numbers=2  uncertain_missed=1
+notes=low light & somewhat hazy; not certain 2 is a surfer.
+```
+
+Note the best call is still made — box 2 is counted a true positive and the
+miss is counted — and *then* both are flagged soft.
+
+## Scoring
+
+```bash
+python code/score_reviews.py              # everything reviewed so far
+python code/score_reviews.py --date 2026-09-23
+python code/score_reviews.py --by-day
+```
+
+Rows with `true_positives` blank are treated as not yet reviewed and skipped,
+so a part-finished day scores fine.
+
+There is no accuracy figure. Object detection has no true negative — the number
+of image regions correctly left un-boxed is unbounded — so precision, recall
+and count error are the whole picture.
