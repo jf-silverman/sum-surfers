@@ -150,6 +150,19 @@ notes=low light & somewhat hazy; not certain 2 is a surfer.
 Note the best call is still made — box 2 is counted a true positive and the
 miss is counted — and *then* both are flagged soft.
 
+## Unusable frames
+
+Put **`na`** in `true_positives` for a frame you looked at and could not count —
+sensor noise, condensation, flare over the part that matters. Say why in
+`notes`. It is excluded from every figure and listed separately in the scorer's
+output.
+
+`na` is not the same as leaving the row blank. Blank means not yet reviewed;
+`na` is a verdict. The difference matters, because a frame the automated quality
+gate passed but a human cannot count is a finding about the gate — see D04 in
+`known_bugs.md`, where two such frames had already contributed counts of 1 and
+11 to `predictions.csv`.
+
 ## Scoring
 
 ```bash

@@ -87,12 +87,21 @@ def load_rows(date_filter=None):
         sys.exit(f"{REVIEW_CSV} not found.")
     rows, skipped, problems = [], 0, []
     df = pd.read_csv(REVIEW_CSV, dtype=str, keep_default_na=False)
+    unusable = []
     for _, r in df.iterrows():
         day = r["date"]
         if date_filter and day != date_filter:
             continue
-        if not str(r.get("true_positives", "")).strip():
+        cell = str(r.get("true_positives", "")).strip()
+        if not cell:
             skipped += 1
+            continue
+        # "na" = looked at and judged uncountable (noise, condensation, flare).
+        # Kept apart from blank: blank means not yet reviewed, na is a verdict,
+        # and a frame the quality gate passed but a human cannot count is a
+        # finding about the gate rather than a gap in the review.
+        if cell.lower() in ("na", "n/a"):
+            unusable.append((day, r["time_local"], str(r.get("notes", "")).strip()))
             continue
         tp, fp = as_int(r["true_positives"]), as_int(r["false_positives"])
         drawn = as_int(r["boxes_drawn"])
@@ -115,7 +124,7 @@ def load_rows(date_filter=None):
             u_missed=as_int(r.get("uncertain_missed", "")),
             causes=r.get("false_positive_causes", ""),
             poses=r.get("missed_poses", "")))
-    return pd.DataFrame(rows), skipped, problems
+    return pd.DataFrame(rows), skipped, problems, unusable
 
 
 def score(df):
@@ -245,7 +254,7 @@ def main():
     p.add_argument("--by-day", action="store_true", help="Also break the totals down per day")
     args = p.parse_args()
 
-    df, skipped, problems = load_rows(args.date)
+    df, skipped, problems, unusable = load_rows(args.date)
     if df.empty:
         sys.exit("No reviewed rows found. Fill in true_positives in "
                  f"{REVIEW_CSV} first.")
@@ -279,6 +288,12 @@ def main():
         for date, t, fn, got in unexplained:
             print(f"    {date} {t}: missed={fn} but {got} pose(s) listed")
 
+    if unusable:
+        print(f"\nUnusable frames ({len(unusable)}), marked na and excluded from every figure")
+        print("-" * 62)
+        for day, t, note in unusable:
+            print(f"  {day} {t}  {note}")
+        print("  These passed the automated quality gate but a human could not count them.")
     print(f"\n{skipped} row(s) not yet reviewed, skipped.")
     print("\nNo true-negative exists for a detector, so there is no accuracy figure:")
     print("the count of image regions correctly left un-boxed is unbounded.")
