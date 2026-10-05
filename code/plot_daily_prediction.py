@@ -2,10 +2,9 @@
 plot_daily_prediction.py
 --------------------------
 Generates the daily surfer-count prediction chart (point estimate = median
-GBT model, a continuous 10-90% prediction-interval fan built from 9 real
-fitted quantile models rendered as a smooth gradient, an 80% range side
-table, tide overlay, weather-coded markers, night-hour shading,
-model/detector info footer, per-hour 1-5 crowd level) to
+GBT model, a shaded 80% prediction interval from the fitted q0.10/q0.90
+models, an 80% range side table, tide overlay, weather-coded markers,
+night-hour shading, model/detector info footer, per-hour 1-5 crowd level) to
 data/charts/surfer_count_YYYY-MM-DD.png, a 7-day crowd outlook
 (data/charts/latest_week.png — a day x hour grid of crowd levels, see
 generate_week_chart for why it is a separate chart rather than a wider
@@ -103,14 +102,15 @@ DETECTOR_RECALL = 0.81342  # = sensitivity
 # first-light time, only the coarse is_night flag, so it happily extrapolated).
 TRAINED_HOUR_MIN, TRAINED_HOUR_MAX = 5, 20
 
-# Prediction-interval quantile levels the fan chart is built from -- 9 real
-# fitted GBT quantile models (0.50 = median = point estimate), rendered as a
-# continuous gradient by interpolating between them (see main()). Chosen as
-# a 10%-90% span (an 80% central prediction interval) per Joel's request,
-# in place of the old fixed 33%/66% bands.
-# Just the three levels the chart actually draws: the 80% interval's two
-# edges and the median. It used to fit nine and render a 40-band gradient;
-# Joel found that too busy (2026-09-16), and nine fits cost nine models a run.
+# Prediction-interval quantile levels the chart is built from: just the three
+# it actually draws -- the 80% interval's two edges and the median
+# (0.50 = median = point estimate). The 10%-90% span (an 80% central
+# prediction interval) replaced the old fixed 33%/66% bands per Joel's
+# request. It used to fit nine levels and render a 40-band interpolated
+# gradient; Joel found that too busy (2026-09-16), and nine fits cost nine
+# models a run. The nine-level ladder still lives in
+# analysis/surf_count_model_calibration/plot_calibration.py, which needs the
+# full ladder to measure coverage at every level.
 FAN_LEVELS = [0.10, 0.50, 0.90]
 
 # How many days past today the week chart covers. The daily chart still
@@ -254,10 +254,9 @@ def main():
                                         random_state=42, scoring="neg_mean_absolute_error")
         top_predictors = pd.Series(perm.importances_mean, index=Xi_test.columns).sort_values(ascending=False).head(5)
 
-    # Fan-chart quantiles: 9 real fitted models at 10%-90% (step 10), rendered
-    # as a continuous-looking gradient by interpolating between them at plot
-    # time (see the fill loop below) rather than fitting dozens of models.
-    # FAN_LEVELS[4] (0.50) is the median / point estimate.
+    # Quantile models, one per level in FAN_LEVELS: the 80% interval's two
+    # edges drawn as a single shaded band (see the fill loop below), plus
+    # 0.50, the median / point estimate.
     # allow_degenerate=True: with ~12% of hours at zero surfers the true 10th
     # percentile is 0.00, so that level collapses to a flat zero by rights, not
     # by mis-fitting (see fit_surfer_count_model.ConstantQuantileModel). Before

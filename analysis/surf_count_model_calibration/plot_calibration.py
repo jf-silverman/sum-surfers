@@ -13,8 +13,9 @@ random_state=42), standardize(), fit_quantile_model_robust()) so the numbers
 here are directly consistent with -- not a separately-computed, possibly
 different -- the coverage figures already documented elsewhere.
 
-Quantile levels are limited to 0.10-0.90 in steps of 0.10 (matching
-FAN_LEVELS in code/plot_daily_prediction.py) rather than pushing to more
+Quantile levels are limited to 0.10-0.90 in steps of 0.10 (a superset of
+code/plot_daily_prediction.py's FAN_LEVELS, which draws only 0.10/0.50/0.90
+since 2026-09-16) rather than pushing to more
 extreme levels (e.g. 0.05/0.95): fit_quantile_intervals()'s own docstring
 already found those aren't reliably learnable given how zero-inflated
 this dataset is (~11% of rows at surfer_count==0). From those 9 fitted
@@ -45,7 +46,9 @@ AXES_BG = "#111111"
 GRID = "#333333"
 TEXT = "white"
 
-# Same 9 levels as code/plot_daily_prediction.py's FAN_LEVELS -- all
+# Nine levels, so coverage can be measured at every one. This is a superset
+# of code/plot_daily_prediction.py's FAN_LEVELS, which was cut to the three
+# the chart draws (0.10/0.50/0.90) on 2026-09-16 -- all
 # already-proven learnable on this dataset (see module docstring).
 LEVELS = [0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90]
 # Symmetric central intervals derivable from those 9 levels.
