@@ -33,6 +33,7 @@ from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PREDS_CSV = _PROJECT_ROOT / "data" / "predictions" / "predictions.csv"
+EXCLUSIONS_CSV = _PROJECT_ROOT / "data" / "reviews" / "excluded_frames.csv"
 PREDICTORS_CSV = _PROJECT_ROOT / "data" / "predictor_vars" / "surfline_predictors.csv"
 OPENMETEO_CSV = _PROJECT_ROOT / "data" / "predictor_vars" / "openmeteo_weather.csv"
 DEFAULT_OUT_CSV = _PROJECT_ROOT / "data" / "training_features.csv"
@@ -217,6 +218,33 @@ def add_tide_daylight_features(rows):
     return rows
 
 
+def load_exclusions():
+    """Frames a human has judged unusable, keyed by filename -> reason.
+
+    A partly obscured frame is the reason this exists. It still produces boxes,
+    and they are real -- 2026-10-02 07:29 returned 11 surfers all sitting in the
+    clear right half -- but the frame undercounts the hour by an UNKNOWN amount
+    because nobody can count the half behind the condensation. Downstream there
+    is no way to mark a count as a floor: the forecast model reads
+    surfer_count as truth, so a row like that teaches it the wrong crowd level.
+    An absent row is strictly better than a silently wrong one.
+
+    Curated by hand on purpose. Three attempts at an automatic detector have
+    each flagged countable frames (see D05 in docs/known_bugs.md), so until
+    there are enough labels to fit one, the list is the gate. The images stay on
+    disk either way -- they are the R&D set for building that detector.
+    """
+    if not EXCLUSIONS_CSV.exists():
+        return {}
+    out = {}
+    with open(EXCLUSIONS_CSV, newline="") as f:
+        for row in csv.DictReader(f):
+            fn = (row.get("filename") or "").strip()
+            if fn and not fn.startswith("#"):
+                out[fn] = (row.get("reason") or "").strip()
+    return out
+
+
 def main():
     args = parse_args()
     out_csv = Path(args.out)
@@ -225,7 +253,17 @@ def main():
     predictors_by_filename = {r["filename"]: r for r in load_rows(PREDICTORS_CSV)}
     openmeteo_by_filename = {r["filename"]: r for r in load_rows(OPENMETEO_CSV)} if OPENMETEO_CSV.exists() else {}
 
+    excluded = load_exclusions()
     quality_ok = [r for r in preds if r["quality_ok"] == "True"]
+    if excluded:
+        before = len(quality_ok)
+        quality_ok = [r for r in quality_ok if r["filename"] not in excluded]
+        dropped = before - len(quality_ok)
+        if dropped:
+            print(f"excluded {dropped} hand-rejected frame(s) via {EXCLUSIONS_CSV.name}")
+            for fn in sorted(excluded):
+                if any(r["filename"] == fn for r in preds):
+                    print(f"    {fn}  ({excluded[fn]})")
     matched = [(r, predictors_by_filename[r["filename"]]) for r in quality_ok if r["filename"] in predictors_by_filename]
     unmatched = [r for r in quality_ok if r["filename"] not in predictors_by_filename]
 

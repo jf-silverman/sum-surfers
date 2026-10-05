@@ -6,8 +6,17 @@ Open `obscuration_review.csv` and fill two columns per frame:
 
 - **`countable`** — `yes` / `partial` / `no`. Could you count the surfers?
   - `yes` — the whole frame is countable
-  - `partial` — part is obscured but the rest gives a real count (a floor)
+  - `partial` — part is obscured; the visible part counts but the frame
+    undercounts the hour by an unknown amount
   - `no` — not countable at all
+
+**`partial` and `no` are both excluded from the dataset** (Joel, 2026-10-05). A
+partial count is a wrong count with an unknown error, and nothing downstream
+marks it as a floor, so it would teach the forecast model the wrong crowd
+level. Add anything you mark `partial` or `no` to
+`data/reviews/excluded_frames.csv` and it stops reaching the model. The two
+columns are still kept separate because they are different failure modes and
+will need different detectors.
 - **`unusable_x_range`** — only when `partial`. Roughly which horizontal span is
   unusable, in eighths left to right, e.g. `1-3` for the left ~40%. This is the
   field that makes a *regional* rule possible instead of a frame-level one.
