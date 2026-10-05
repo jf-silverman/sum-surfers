@@ -20,6 +20,11 @@ data/j_shore_cam/surf_crops/
 data/reviews/fog_quality/
 data/reviews/model_spotcheck_50/
 data/reviews/count_60sec_var/
+# full_day_*/ review sets: the rendered box images are regenerable from
+# code/make_review_set.py and churn ~82MB every time the drawing changes
+# (boxes were made translucent 2026-10-05), so only the hand-filled
+# review.csv -- the actual research output, and tiny -- stays tracked.
+data/reviews/full_day_*/*.png
 analysis/count_variability/seconds/frame_variability_analysis.csv
 analysis/count_variability/seconds/frame_variability_analysis_summary.png
 analysis/count_variability/seconds/hourly_60sec_counts_2026-08-27.png
