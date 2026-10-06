@@ -120,6 +120,8 @@ def load_rows(date_filter=None):
         rows.append(dict(
             date=day, time_local=r["time_local"], drawn=drawn, tp=tp, fp=fp,
             fn=fn, merged=min(merged, fn),
+            standing=str(r.get("standing_box_numbers", "")).strip(),
+            n_standing=n_listed(r.get("standing_box_numbers", "")),
             u_box=n_listed(r.get("uncertain_box_numbers", "")),
             u_missed=as_int(r.get("uncertain_missed", "")),
             causes=r.get("false_positive_causes", ""),
@@ -288,6 +290,16 @@ def main():
         for date, t, fn, got in unexplained:
             print(f"    {date} {t}: missed={fn} but {got} pose(s) listed")
 
+    standing = df[df.n_standing > 0] if "n_standing" in df.columns else df.iloc[0:0]
+    if len(standing):
+        total = int(standing.n_standing.sum())
+        print(f"\nStanding surfers located: {total} box(es) across {len(standing)} frame(s)")
+        print("-" * 62)
+        for _, r in standing.sort_values(["date", "time_local"]).iterrows():
+            print(f"  {r['date']} {r['time_local']}  box {r['standing']}")
+        print("  Shortlist for a standing/riding CVAT class: the frames are already on")
+        print("  disk and the boxes are already drawn. Training set holds 31 standing")
+        print("  boxes against 617 sitting and 512 prone, which is what blocks it.")
     if unusable:
         print(f"\nUnusable frames ({len(unusable)}), marked na and excluded from every figure")
         print("-" * 62)
