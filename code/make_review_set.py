@@ -203,6 +203,12 @@ def main():
     REVIEW_CSV.parent.mkdir(parents=True, exist_ok=True)
     if REVIEW_CSV.exists():
         sheet = pd.read_csv(REVIEW_CSV, dtype=str, keep_default_na=False)
+        # Rows 2-3 are the column description and worked example, flagged by a
+        # leading "#" in the date. Hold them aside so they are neither matched
+        # against real filenames nor dragged into the sort, then put them back
+        # on top.
+        is_guide = sheet["date"].astype(str).str.startswith("#")
+        guide, sheet = sheet[is_guide].copy(), sheet[~is_guide].copy()
         known = set(sheet["filename"])
         fresh = [r for r in rows if r["filename"] not in known]
         kept = len(rows) - len(fresh)
@@ -214,11 +220,15 @@ def main():
         sheet = sheet[CSV_COLUMNS].fillna("")
     else:
         sheet, fresh, kept = pd.DataFrame(rows, columns=CSV_COLUMNS), rows, 0
+        guide = pd.DataFrame(columns=CSV_COLUMNS)
 
     sheet = sheet.sort_values(["date", "time_local"]).reset_index(drop=True)
+    if len(guide):
+        sheet = pd.concat([guide[CSV_COLUMNS], sheet], ignore_index=True)
     sheet.to_csv(REVIEW_CSV, index=False)
     print(f"\n{REVIEW_CSV}: {len(fresh)} row(s) added, {kept} already present and left alone.")
-    print(f"  {len(sheet)} rows total across {sheet['date'].nunique()} day(s).")
+    data_rows = sheet[~sheet["date"].astype(str).str.startswith("#")]
+    print(f"  {len(data_rows)} rows total across {data_rows['date'].nunique()} day(s).")
 
     print(f"\n{len(rows)} hour(s) -> {out_dir}")
     print(f"Fill in {REVIEW_CSV}:")

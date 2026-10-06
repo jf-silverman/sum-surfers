@@ -34,6 +34,18 @@ filename, image
 Every script reads columns by NAME, never by position, so reordering them again
 is safe. Adding or dropping one is not — see "If your editor drops a column".
 
+## Rows 2 and 3 are a cheat sheet
+
+Row 2 describes each column and row 3 is a worked example, so the reference is
+beside the work instead of in this file. Both are marked with a leading `#` in
+the `date` cell and **every script ignores them** — `score_reviews.py` skips
+them, and `make_review_set.py` holds them aside before sorting and puts them
+back on top, so they never get matched against a real filename or sorted into
+the data.
+
+Leave them in place. If they are deleted the scripts carry on fine; they are a
+convenience, not structure. Scroll past them to row 4 to start work.
+
 ## Prefilled — do not edit
 
 | column | meaning |

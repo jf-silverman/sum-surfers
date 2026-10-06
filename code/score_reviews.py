@@ -89,7 +89,12 @@ def load_rows(date_filter=None):
     df = pd.read_csv(REVIEW_CSV, dtype=str, keep_default_na=False)
     unusable = []
     for _, r in df.iterrows():
-        day = r["date"]
+        day = str(r["date"]).strip()
+        # Rows 2 and 3 of the sheet are a column description and a worked
+        # example, for whoever is filling it in. They are marked with a leading
+        # "#" in the date and are not data.
+        if day.startswith("#"):
+            continue
         if date_filter and day != date_filter:
             continue
         cell = str(r.get("true_positives", "")).strip()
