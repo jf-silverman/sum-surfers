@@ -46,7 +46,8 @@ CSV_COLUMNS = ["filename", "date", "time_local", "image", "boxes_drawn",
                "forecast", "true_positives", "missed", "missed_poses",
                "multi_surfer_box", "uncertain_missed", "false_positives",
                "false_positive_box_numbers", "false_positive_causes",
-               "uncertain_box_numbers", "standing_box_numbers", "notes"]
+               "uncertain_box_numbers", "standing_box_numbers", "sup_box_numbers",
+               "notes"]
 FORECASTS = _PROJECT_ROOT / "data" / "forecasts"
 UPSCALE = 2.0                       # the ROI strip is 180px tall; boxes need room to label
 BOX_BGR = (90, 227, 157)
@@ -174,12 +175,16 @@ def main():
             uncertain_missed="",
             false_positives="", false_positive_box_numbers="",
             false_positive_causes="", uncertain_box_numbers="",
-            # Standing surfers are the rare class: the training set has 31
-            # standing boxes against 617 sitting and 512 prone, which is why
-            # the multi-class detector is blocked. Recording WHICH box in WHICH
-            # frame turns every review pass into a labeling shortlist -- the
-            # frames are already on disk and the box is already drawn.
-            standing_box_numbers="", notes=""))
+            # The two rare classes, kept apart on Joel's definition (2026-10-05):
+            # standing means RIDING A WAVE, SUP means a stand-up paddleboarder.
+            # They look nothing alike to a detector -- a rider has spray and a
+            # wave face behind them, a SUP is upright on flat water with a
+            # paddle -- so merging them would blur the very class being built.
+            # The training set has 31 standing boxes and 4 SUP against 617
+            # sitting and 512 prone, which is what blocks the multi-class
+            # detector. Recording WHICH box in WHICH frame makes every review
+            # pass a labeling shortlist: frames on disk, boxes already drawn.
+            standing_box_numbers="", sup_box_numbers="", notes=""))
 
     # One sheet for every day (2026-10-05), rather than a review.csv per folder:
     # Joel fills these in a spreadsheet and one file is less to juggle. Rows are
@@ -220,9 +225,12 @@ def main():
     print("  false_positive_box_numbers e.g. 3;7   (the numbers drawn on the image)")
     print("  false_positive_causes      e.g. bird;reflection;beach walker;foam;duplicate")
     print(f"  missed_poses               {POSES}  e.g. prone;prone;sitting")
-    print("  standing_box_numbers       boxes whose surfer is STANDING (up and riding),")
-    print("                             e.g. 9;22. Rare class -- these become the CVAT")
-    print("                             shortlist for a standing/riding detector class.")
+    print("  standing_box_numbers       boxes whose surfer is STANDING = RIDING A WAVE,")
+    print("                             e.g. 9;22. Not a SUP -- that has its own column.")
+    print("  sup_box_numbers            boxes holding a stand-up paddleboarder. Upright on")
+    print("                             flat water with a paddle; a different shape from a")
+    print("                             wave rider, and the rarest class of all (4 boxes")
+    print("                             labeled). Both are CVAT shortlists.")
     print("  multi_surfer_box           boxes holding more than one surfer, e.g. 2;18 --")
     print("                             a merged box, not a blind spot. Each one costs a")
     print("                             miss, so count it in `missed` too.")

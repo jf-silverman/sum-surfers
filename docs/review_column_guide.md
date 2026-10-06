@@ -41,7 +41,8 @@ The scorer prints an ARITHMETIC PROBLEMS block naming any row that breaks this.
 | `false_positive_box_numbers` | `;`-separated numbers | which drawn boxes those were |
 | `false_positive_causes` | free text, `;`-separated | what each actually was |
 | `uncertain_box_numbers` | `;`-separated numbers | drawn boxes you would not defend |
-| `standing_box_numbers` | `;`-separated numbers | boxes whose surfer is **standing** |
+| `standing_box_numbers` | `;`-separated numbers | boxes whose surfer is **riding a wave** |
+| `sup_box_numbers` | `;`-separated numbers | boxes holding a **stand-up paddleboarder** |
 | `notes` | free text | anything else worth remembering |
 
 Pose vocabulary: `sitting | prone | standing | SUP | wipeout | unknown`.
@@ -151,15 +152,24 @@ notes=low light & somewhat hazy; not certain 2 is a surfer.
 Note the best call is still made — box 2 is counted a true positive and the
 miss is counted — and *then* both are flagged soft.
 
-## `standing_box_numbers` — the rare class
+## `standing_box_numbers` and `sup_box_numbers` — the two rare classes
 
-Record which boxes hold a surfer who is **up and riding**, e.g. `9;22`. These
-are true positives like any other, so no other column changes.
+**`standing` means riding a wave. Nothing else.** (Joel's definition,
+2026-10-05.) A stand-up paddleboarder goes in `sup_box_numbers` instead, never
+in `standing`, even though they are also on their feet.
 
-Why it is worth the extra second: standing is the rare pose. The labeled
-training set holds **31** standing boxes against 617 sitting and 512 prone, and
-that imbalance is the single thing blocking a multi-class (standing / sitting /
-prone) detector. Recording which box in which frame turns every review pass
+They are kept apart because they look nothing alike to a detector. A wave rider
+is dynamic — spray, a wave face behind them, a leaning posture. A SUP rider is
+upright and static on flat water holding a paddle. Merging them would blur the
+very class the labeling effort is meant to build.
+
+Record box numbers, e.g. `9;22`. Both are true positives like any other, so no
+other column changes.
+
+Why it is worth the extra second: these are the rare poses. The labeled
+training set holds **31** standing boxes and **4** SUP, against 617 sitting and
+512 prone, and that imbalance is the single thing blocking a multi-class
+detector. Recording which box in which frame turns every review pass
 into a CVAT shortlist for free — the frames are already on disk and the boxes
 are already drawn, so it costs a box number instead of a hunt.
 
