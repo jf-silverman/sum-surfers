@@ -17,16 +17,41 @@ surfers have no box, so they are not part of `boxes_drawn`.
 
 The scorer prints an ARITHMETIC PROBLEMS block naming any row that breaks this.
 
+## Column order
+
+Work columns come first and the two identifiers sit at the far right
+(2026-10-06), so the fill-in columns are not pushed off screen by fields
+nothing is ever typed into:
+
+```
+date, time_local, boxes_drawn, forecast,
+true_positives, missed, missed_poses, multi_surfer_box, uncertain_missed,
+false_positives, false_positive_box_numbers, false_positive_causes,
+uncertain_box_numbers, standing_box_numbers, sup_box_numbers, notes,
+filename, image
+```
+
+Every script reads columns by NAME, never by position, so reordering them again
+is safe. Adding or dropping one is not — see "If your editor drops a column".
+
 ## Prefilled — do not edit
 
 | column | meaning |
 |---|---|
-| `filename` | the source crop in `data/j_shore_cam/surf_crops/` |
 | `date` | review day |
 | `time_local` | clip time, local |
-| `image` | the rendered PNG to look at, in the same folder |
-| `boxes_drawn` | how many boxes the detector drew (also in the filename) |
+| `boxes_drawn` | how many boxes the detector drew (also in the image filename) |
 | `forecast` | what the model predicted for that hour, for context only |
+| `filename` | the source crop in `data/j_shore_cam/surf_crops/` |
+| `image` | the rendered PNG to look at, in `full_day_<date>/` |
+
+### If your editor drops a column
+
+It has happened once: a grid editor held a copy from before two columns were
+added and wrote it back, dropping them. Nothing typed was lost, because the
+columns are re-attached by matching on `filename`. If the sheet comes back with
+fewer than 18 columns, say so and it can be restored from git the same way --
+do not re-type anything.
 
 ## To fill in
 

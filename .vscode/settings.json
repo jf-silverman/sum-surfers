@@ -1,0 +1,16 @@
+{
+  // Edit CSV (janisdd.vscode-edit-csv): treat row 1 as a header by default, so
+  // data/reviews/review_all.csv opens with the column names pinned instead of
+  // sitting in the grid as an editable first row. A CSV cannot record this
+  // itself -- the header is just the first line of text -- so it has to live in
+  // editor config.
+  "csv-edit.readOption_hasHeader": "true",
+  "csv-edit.writeOption_hasHeader": "true",
+
+  // Keep the file on disk as the source of truth while the grid is open. The
+  // 2026-10-05 save that silently dropped two columns happened because a stale
+  // in-editor copy was written back over newer content.
+  "csv-edit.shouldWatchCsvSourceFile": true,
+
+  "files.trimTrailingWhitespace": false
+}

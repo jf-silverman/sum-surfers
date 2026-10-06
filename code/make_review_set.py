@@ -42,12 +42,15 @@ import detect_surfers as ds  # noqa: E402
 
 PREDS = _PROJECT_ROOT / "data" / "predictions" / "predictions.csv"
 REVIEW_CSV = _PROJECT_ROOT / "data" / "reviews" / "review_all.csv"
-CSV_COLUMNS = ["filename", "date", "time_local", "image", "boxes_drawn",
-               "forecast", "true_positives", "missed", "missed_poses",
-               "multi_surfer_box", "uncertain_missed", "false_positives",
-               "false_positive_box_numbers", "false_positive_causes",
-               "uncertain_box_numbers", "standing_box_numbers", "sup_box_numbers",
-               "notes"]
+CSV_COLUMNS = ["date", "time_local", "boxes_drawn", "forecast",
+               "true_positives", "missed", "missed_poses", "multi_surfer_box",
+               "uncertain_missed", "false_positives", "false_positive_box_numbers",
+               "false_positive_causes", "uncertain_box_numbers",
+               "standing_box_numbers", "sup_box_numbers", "notes",
+               # Identifiers last: nothing is typed into them, so they would
+               # otherwise push the fill-in columns off the right of the screen.
+               # Every script keys on `filename`, by NAME not position.
+               "filename", "image"]
 FORECASTS = _PROJECT_ROOT / "data" / "forecasts"
 UPSCALE = 2.0                       # the ROI strip is 180px tall; boxes need room to label
 BOX_BGR = (90, 227, 157)
