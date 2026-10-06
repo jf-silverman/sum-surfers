@@ -48,6 +48,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 REVIEWS = _PROJECT_ROOT / "data" / "reviews"
 REVIEW_CSV = REVIEWS / "review_all.csv"
 
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
 FILL_COLS = ["true_positives", "missed", "false_positives"]
 
 
@@ -90,10 +92,12 @@ def load_rows(date_filter=None):
     unusable = []
     for _, r in df.iterrows():
         day = str(r["date"]).strip()
-        # Rows 2 and 3 of the sheet are a column description and a worked
-        # example, for whoever is filling it in. They are marked with a leading
-        # "#" in the date and are not data.
-        if day.startswith("#"):
+        # Rows 2 and 3 are a column description and a worked example, for
+        # whoever is filling the sheet in. A data row is identified by its date
+        # LOOKING like a date -- deliberately not by a marker character. The
+        # first attempt used a leading "#", which CSV editors treat as a comment
+        # prefix and collapsed the whole row into one cell (2026-10-06).
+        if not DATE_RE.match(day):
             continue
         if date_filter and day != date_filter:
             continue

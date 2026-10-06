@@ -203,11 +203,13 @@ def main():
     REVIEW_CSV.parent.mkdir(parents=True, exist_ok=True)
     if REVIEW_CSV.exists():
         sheet = pd.read_csv(REVIEW_CSV, dtype=str, keep_default_na=False)
-        # Rows 2-3 are the column description and worked example, flagged by a
-        # leading "#" in the date. Hold them aside so they are neither matched
-        # against real filenames nor dragged into the sort, then put them back
-        # on top.
-        is_guide = sheet["date"].astype(str).str.startswith("#")
+        # Rows 2-3 are the column description and worked example. A data row is
+        # identified by its date LOOKING like a date, deliberately not by a
+        # marker character: a leading "#" was tried first and CSV editors treat
+        # it as a comment prefix, collapsing the row into one cell (2026-10-06).
+        # Hold them aside so they are neither matched against real filenames nor
+        # dragged into the sort, then put them back on top.
+        is_guide = ~sheet["date"].astype(str).str.match(r"^\d{4}-\d{2}-\d{2}$")
         guide, sheet = sheet[is_guide].copy(), sheet[~is_guide].copy()
         known = set(sheet["filename"])
         fresh = [r for r in rows if r["filename"] not in known]
@@ -227,7 +229,7 @@ def main():
         sheet = pd.concat([guide[CSV_COLUMNS], sheet], ignore_index=True)
     sheet.to_csv(REVIEW_CSV, index=False)
     print(f"\n{REVIEW_CSV}: {len(fresh)} row(s) added, {kept} already present and left alone.")
-    data_rows = sheet[~sheet["date"].astype(str).str.startswith("#")]
+    data_rows = sheet[sheet["date"].astype(str).str.match(r"^\d{4}-\d{2}-\d{2}$")]
     print(f"  {len(data_rows)} rows total across {data_rows['date'].nunique()} day(s).")
 
     print(f"\n{len(rows)} hour(s) -> {out_dir}")
