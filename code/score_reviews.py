@@ -119,13 +119,14 @@ def load_rows(date_filter=None):
                             f"true_positives({tp}) + false_positives({fp}) "
                             f"= {tp + fp}, but boxes_drawn = {drawn}")
         fn = as_int(r["missed"])
-        # A box holding two surfers costs one miss per extra surfer. Counting
-        # the listed boxes assumes exactly two each, which is what every note so
-        # far describes; a box with three would need its own notation.
-        merged = n_listed(r.get("multi_surfer_box", ""))
+        # Each extra surfer inside a box costs one miss, so the parsed total
+        # must not exceed `missed`.
+        _, merged, bad_multi = parse_multi_surfer(r.get("multi_surfer_box", ""))
+        for b_ in bad_multi:
+            problems.append(f"  {day} {r['time_local']}: multi_surfer_box -- {b_}")
         if merged > fn:
-            problems.append(f"  {day} {r['time_local']}: multi_surfer_box lists {merged} "
-                            f"box(es) but missed = {fn}")
+            problems.append(f"  {day} {r['time_local']}: multi_surfer_box implies {merged} "
+                            f"extra surfer(s) but missed = {fn}")
         rows.append(dict(
             date=day, time_local=r["time_local"], drawn=drawn, tp=tp, fp=fp,
             fn=fn, merged=min(merged, fn),
@@ -181,6 +182,51 @@ def score(df):
 
 def fmt(x, nd=3):
     return "n/a" if x is None or (isinstance(x, float) and math.isnan(x)) else f"{x:.{nd}f}"
+
+
+_MULTI_ENTRY = re.compile(r"^(\d+)(?:\(\s*(\d+)\s*\))?$")
+
+
+def parse_multi_surfer(cell):
+    """Parse the multi_surfer_box cell -> (entries, extra_surfers, bad).
+
+    Syntax (Joel, 2026-10-06): box numbers separated by ";", with the surfer
+    count in parentheses when it is more than the usual two.
+
+        "2"            box 2 holds 2 surfers      -> 1 extra
+        "2;3"          boxes 2 and 3 hold 2 each  -> 2 extra
+        "2(3); 3"      box 2 holds 3, box 3 holds 2 -> 3 extra
+        "2(3); 3(2)"   the same, written explicitly
+
+    "Extra" means surfers with no box of their own, which is what has to appear
+    in `missed`. A box always accounts for one surfer itself, so a box of N
+    contributes N-1.
+
+    The older form listed a box once per extra surfer ("1;1" for a box of 3).
+    That still parses to the same total, so old rows need no migration, but a
+    repeated box number is reported so it can be rewritten the clear way.
+    """
+    entries, extra, bad = [], 0, []
+    for item in str(cell).replace(",", ";").split(";"):
+        item = item.strip()
+        if not item:
+            continue
+        m = _MULTI_ENTRY.match(item.replace(" ", ""))
+        if not m:
+            bad.append(item)
+            continue
+        box = int(m.group(1))
+        n = int(m.group(2)) if m.group(2) else 2
+        if n < 2:
+            bad.append(f"{item} (a multi-surfer box needs 2 or more)")
+            continue
+        entries.append((box, n))
+        extra += n - 1
+    dupes = [b for b, _ in entries if [x for x, _ in entries].count(b) > 1]
+    if dupes:
+        bad.append(f"box {sorted(set(dupes))[0]} listed more than once -- "
+                   f"write it as {sorted(set(dupes))[0]}(N) instead")
+    return entries, extra, bad
 
 
 _LEADING_COUNT = re.compile(r"^\s*(\d+)\s+(.*)$")

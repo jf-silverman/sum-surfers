@@ -95,22 +95,48 @@ Pose vocabulary: `sitting | prone | standing | SUP | wipeout | unknown`.
 A box drawn around two surfers is a different failure from a surfer the
 detector never saw at all, and the two have different fixes: one is the
 box-merging logic (NMS and containment suppression), the other is recall. On
-2026-09-26 this was **8 of 31 misses**, so it is worth separating.
+2026-09-26 this was 8 of 31 misses, so it is worth separating.
 
-Each extra surfer inside a box still costs a miss, so count it in `missed` as
-well, and list the box number here:
+### Syntax
+
+Box numbers separated by `;`. **Two surfers is assumed**, so a bare box number
+needs nothing else. When a box holds more than two, put the count in
+parentheses:
+
+| what you saw | write |
+|---|---|
+| box 2 holds 2 surfers | `2` |
+| boxes 2 and 3 each hold 2 | `2;3` |
+| box 2 holds 3, box 3 holds 2 | `2(3); 3` |
+| the same, written explicitly | `2(3); 3(2)` |
+| box 4 holds 4, box 11 holds 2 | `4(4); 11` |
+
+Both forms of the third row parse identically, so be as explicit as you like.
+
+### How it relates to `missed`
+
+A box always accounts for one surfer by itself, so a box of N means **N-1**
+surfers have no box of their own — and those count in `missed` like any other
+miss, with their poses in `missed_poses`:
 
 ```
-missed=2  missed_poses=2 prone  multi_surfer_box=2;18
+boxes_drawn = 27
+true_positives = 27            <- all 27 boxes are on real surfers
+missed = 3                     <- 3 surfers have no box of their own
+missed_poses = 2 prone; 1 sitting
+multi_surfer_box = 4(3); 11    <- box 4 holds 3 people, box 11 holds 2
 ```
 
-That reads: boxes 2 and 18 each contain two surfers, so two real surfers have
-no box of their own. The box itself stays a **true positive** — it is on a real
-surfer — so `true_positives` does not change.
+27 boxes covering 30 people. The scorer adds up the extras and names the row if
+they exceed `missed`, so a miscount is caught rather than silently absorbed.
 
-The scorer assumes exactly two surfers per listed box, which is what every note
-so far describes, and warns if `multi_surfer_box` lists more boxes than
-`missed` allows.
+**The boxes themselves stay true positives.** They are on real surfers, so
+`true_positives` does not change and
+`true_positives + false_positives = boxes_drawn` still holds.
+
+An older form listed a box once per extra surfer (`1;1` for a box of three).
+That still parses to the same total, so nothing needs rewriting, but the
+scorer will suggest `1(3)` instead.
 
 ## The two uncertainty columns
 
