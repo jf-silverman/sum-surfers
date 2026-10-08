@@ -112,7 +112,11 @@ def load_rows(date_filter=None):
         if cell.lower() in ("na", "n/a"):
             unusable.append((day, r["time_local"], str(r.get("notes", "")).strip()))
             continue
-        tp, fp = as_int(r["true_positives"]), as_int(r["false_positives"])
+        tp = as_int(r["true_positives"])
+        # false_positives is DERIVED (2026-10-08). It used to be a stored count,
+        # and across all 55 rows that had one it always equalled the number of
+        # listed box numbers -- a duplicate that could only ever drift.
+        fp = n_listed(r.get("false_positive_box_numbers", ""))
         drawn = as_int(r["boxes_drawn"])
         if tp + fp != drawn:
             problems.append(f"  {day} {r['time_local']}: "
@@ -134,6 +138,7 @@ def load_rows(date_filter=None):
             n_standing=n_listed(r.get("standing_box_numbers", "")),
             sup=str(r.get("sup_box_numbers", "")).strip(),
             n_sup=n_listed(r.get("sup_box_numbers", "")),
+            dup_box=n_listed(r.get("multi_box_surfer", "")),
             u_box=n_listed(r.get("uncertain_box_numbers", "")),
             u_missed=as_int(r.get("uncertain_missed", "")),
             causes=r.get("false_positive_causes", ""),
@@ -158,6 +163,7 @@ def score(df):
 
     out = dict(
         n_frames=len(df), tp=tp, fp=fp, fn=fn, drawn=drawn, merged=int(df.merged.sum()),
+        dup_box=int(df.dup_box.sum()),
         u_box=u_box, u_missed=u_missed,
         precision=pr(tp, fp),
         precision_best=pr(tp_best, drawn - tp_best),
@@ -290,6 +296,10 @@ def report(s, title):
         merged, nobox = s["merged"], s["fn"] - s["merged"]
         print(f"    of the {s['fn']} missed: {merged} inside a box the detector merged, "
               f"{nobox} with no box at all")
+    if s["fp"]:
+        dup, other = s["dup_box"], s["fp"] - s["dup_box"]
+        print(f"    of the {s['fp']} false positives: {dup} extra box(es) on a surfer "
+              f"already counted, {other} on something that is not a surfer")
     if s["u_box"] or s["u_missed"]:
         print(f"  flagged uncertain    {s['u_box']} box(es), {s['u_missed']} possible miss(es)")
     print()
@@ -349,6 +359,16 @@ def main():
 
     # The two rare classes, reported separately because they are separate
     # classes: standing means riding a wave, SUP is a paddleboarder.
+    # The two box-merging failures are one mechanism seen from both sides.
+    mg, dup = int(df.merged.sum()), int(df.dup_box.sum())
+    if mg or dup:
+        print("\nBox merging, both directions (the same NMS / containment mechanism)")
+        print("-" * 62)
+        print(f"  {mg:3d} surfer(s) lost inside a box drawn around several  "
+              f"-- suppression too aggressive")
+        print(f"  {dup:3d} extra box(es) on one surfer                      "
+              f"-- suppression not aggressive enough")
+
     for col, n_col, label, labeled in (("standing", "n_standing", "STANDING (riding a wave)", 31),
                                        ("sup", "n_sup", "SUP (stand-up paddleboard)", 4)):
         if n_col not in df.columns:

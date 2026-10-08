@@ -44,8 +44,8 @@ PREDS = _PROJECT_ROOT / "data" / "predictions" / "predictions.csv"
 REVIEW_CSV = _PROJECT_ROOT / "data" / "reviews" / "review_all.csv"
 CSV_COLUMNS = ["date", "time_local", "boxes_drawn", "forecast",
                "true_positives", "missed", "missed_poses", "multi_surfer_box",
-               "uncertain_missed", "false_positives", "false_positive_box_numbers",
-               "false_positive_causes", "uncertain_box_numbers",
+               "uncertain_missed", "false_positive_box_numbers",
+               "false_positive_causes", "multi_box_surfer", "uncertain_box_numbers",
                "standing_box_numbers", "sup_box_numbers", "notes",
                # Identifiers last: nothing is typed into them, so they would
                # otherwise push the fill-in columns off the right of the screen.
@@ -176,8 +176,12 @@ def main():
             # failure mode is still filled in one pass.
             true_positives="", missed="", missed_poses="", multi_surfer_box="",
             uncertain_missed="",
-            false_positives="", false_positive_box_numbers="",
-            false_positive_causes="", uncertain_box_numbers="",
+            false_positive_box_numbers="", false_positive_causes="",
+            # The mirror of multi_surfer_box: several boxes on ONE surfer.
+            # A SUBSET of false_positive_box_numbers, not a separate count --
+            # a duplicate box is a false positive. Together the two columns
+            # measure the same NMS/containment mechanism from both sides.
+            multi_box_surfer="", uncertain_box_numbers="",
             # The two rare classes, kept apart on Joel's definition (2026-10-05):
             # standing means RIDING A WAVE, SUP means a stand-up paddleboarder.
             # They look nothing alike to a detector -- a rider has spray and a
@@ -235,7 +239,11 @@ def main():
     print(f"\n{len(rows)} hour(s) -> {out_dir}")
     print(f"Fill in {REVIEW_CSV}:")
     print("  true_positives             boxes that are genuinely on a surfer")
-    print("  false_positives            boxes on anything else (incl. a 2nd box on one surfer)")
+    print("  false_positive_box_numbers every box NOT on its own distinct surfer, e.g. 3;7")
+    print("                             The COUNT is derived from this -- there is no")
+    print("                             separate false_positives column.")
+    print("  multi_box_surfer           of those, the extra box(es) on a surfer already")
+    print("                             counted, e.g. 7. A subset, not an addition.")
     print("  missed                     real surfers with no box at all")
     print("  false_positive_box_numbers e.g. 3;7   (the numbers drawn on the image)")
     print("  false_positive_causes      e.g. bird;reflection;beach walker;foam;duplicate")
@@ -259,7 +267,7 @@ def main():
     print("                             categories -- still make your best call. Scoring")
     print("                             runs best-case and worst-case; the gap is the")
     print("                             ambiguity budget.")
-    print("\n  true_positives + false_positives should equal boxes_drawn.")
+    print("\n  true_positives + (count of false_positive_box_numbers) = boxes_drawn.")
     return 0
 
 

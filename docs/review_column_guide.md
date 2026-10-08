@@ -9,8 +9,13 @@ positives, with each kind of doubt sitting next to the calls it qualifies.
 ## The one rule that must hold
 
 ```
-true_positives + false_positives = boxes_drawn
+true_positives + (count of false_positive_box_numbers) = boxes_drawn
 ```
+
+There is no `false_positives` column — the count is **derived** from the box
+numbers you list. It used to be stored, and across all 55 rows that had one it
+always equalled the number of listed boxes, so it was a duplicate that could
+only drift out of sync (removed 2026-10-08).
 
 Every drawn box is either on a surfer or not. `missed` is separate — those
 surfers have no box, so they are not part of `boxes_drawn`.
@@ -80,8 +85,8 @@ do not re-type anything.
 | `missed_poses` | `;`-separated, optional leading count | pose of each missed surfer |
 | `multi_surfer_box` | `;`-separated numbers | boxes holding **more than one** surfer |
 | `uncertain_missed` | integer | of `missed`, how many you cannot confirm |
-| `false_positives` | integer | boxes on anything that is not a surfer |
-| `false_positive_box_numbers` | `;`-separated numbers | which drawn boxes those were |
+| `false_positive_box_numbers` | `;`-separated numbers | every box **not** on its own distinct surfer |
+| `multi_box_surfer` | `;`-separated numbers | of those, the **extra** box on a surfer already counted |
 | `false_positive_causes` | free text, `;`-separated | what each actually was |
 | `uncertain_box_numbers` | `;`-separated numbers | drawn boxes you would not defend |
 | `standing_box_numbers` | `;`-separated numbers | boxes whose surfer is **riding a wave** |
@@ -89,6 +94,35 @@ do not re-type anything.
 | `notes` | free text | anything else worth remembering |
 
 Pose vocabulary: `sitting | prone | standing | SUP | wipeout | unknown`.
+
+## `multi_box_surfer` — the mirror image
+
+Several boxes on ONE surfer, where `multi_surfer_box` is one box on several
+surfers. Record the **extra** box number, the one that is redundant:
+
+```
+false_positive_box_numbers = 6; 7; 18      <- all three are false positives
+false_positive_causes      = bird; wind sock; duplicate on box 17
+multi_box_surfer           = 18            <- of those, 18 is a duplicate
+```
+
+It is a **subset** of `false_positive_box_numbers`, never an addition — a
+duplicate box IS a false positive, so it is already counted there. Tagging it
+here only says *which kind* of false positive it is: an extra box on a real
+surfer rather than a box on something that is not a surfer at all.
+
+Why it earns a column: together the two make one mechanism measurable from
+both sides. `suppress_contained()` in `detect_surfers.py` exists to delete
+duplicate boxes, and the review data now counts both what it catches and what
+it over-deletes:
+
+| column | meaning | what it argues |
+|---|---|---|
+| `multi_surfer_box` | one box, several surfers | suppression too aggressive |
+| `multi_box_surfer` | several boxes, one surfer | suppression not aggressive enough |
+
+That is exactly the trade-off the containment threshold controls, so these two
+counts decide whether it should move.
 
 ## `multi_surfer_box` — merged boxes
 
