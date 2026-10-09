@@ -29,6 +29,9 @@ daily = (
 )
 daily["Day type"] = daily["is_weekend"].map({True: "Weekend", False: "Weekday"})
 daily["year_month"] = daily["date"].dt.to_period("M")
+# Stamp the filename with the last day of DATA, so a re-run can never
+# present fresh numbers under a stale date (it did: 2026-10-09).
+STAMP = daily["date"].max().strftime("%Y-%m-%d")
 daily["month"] = daily["date"].dt.strftime("%b %Y")
 month_order = [p.strftime("%b %Y") for p in sorted(daily["year_month"].unique())]
 
@@ -57,8 +60,8 @@ for text in legend1.get_texts():
     text.set_color("white")
 
 fig1.tight_layout()
-fig1.savefig(f"{OUT_DIR}/weekday_weekend_by_month_2026-08-28.png", dpi=150, facecolor="black", bbox_inches="tight")
-print("saved", f"{OUT_DIR}/weekday_weekend_by_month_2026-08-28.png")
+fig1.savefig(f"{OUT_DIR}/weekday_weekend_by_month_{STAMP}.png", dpi=150, facecolor="black", bbox_inches="tight")
+print("saved", f"{OUT_DIR}/weekday_weekend_by_month_{STAMP}.png")
 
 # --- Chart 2: KDE distribution ---
 fig2, ax2 = plt.subplots(figsize=(14, 5.5), facecolor="black")
@@ -82,8 +85,8 @@ if legend2 is not None:
         text.set_color("white")
 
 fig2.tight_layout()
-fig2.savefig(f"{OUT_DIR}/weekday_weekend_kde_2026-08-28.png", dpi=150, facecolor="black", bbox_inches="tight")
-print("saved", f"{OUT_DIR}/weekday_weekend_kde_2026-08-28.png")
+fig2.savefig(f"{OUT_DIR}/weekday_weekend_kde_{STAMP}.png", dpi=150, facecolor="black", bbox_inches="tight")
+print("saved", f"{OUT_DIR}/weekday_weekend_kde_{STAMP}.png")
 
 # --- Real numbers for the README prose (not baked into the images anymore) ---
 print("\n=== Overall stats (for README prose) ===")

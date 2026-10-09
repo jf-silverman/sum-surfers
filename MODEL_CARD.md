@@ -5,7 +5,7 @@ frame, and a **forecast model** that predicts how many will be out in a given
 hour. Every number below was measured, not estimated; where a figure has a
 known caveat it is stated next to the figure rather than in a footnote.
 
-Last updated 2026-09-26.
+Last updated 2026-10-09.
 
 ---
 
@@ -58,11 +58,46 @@ mAP@0.5:0.95 being far below mAP@0.5 is expected: it averages over much
 stricter box-overlap requirements than this task needs. A box on the right
 surfer counts that surfer whether or not it hugs the outline.
 
-**Against human counts**, which matters more than validation boxes: across 43
-hand-counted frames the detector is off by **1.26 surfers on average** (mean
-error +0.37). On the nine frames with 25 or more real surfers, mean error is
-**−0.22** — no systematic undercount at the crowded end, which was not true of
-the previous model.
+**Against human counts**, which matters more than validation boxes. Updated
+2026-10-09 on a far larger review: **220 frames hand-counted box by box across
+16 days spanning a full year, 3,880 real surfers.**
+
+| metric | value |
+|---|---|
+| precision | **98.7%** |
+| recall | **91.9%** |
+| count error | **1.47 surfers** per frame (bias −1.23) |
+
+These are higher than the validation figures above because they ask a different
+question — is this box on a surfer — rather than requiring a close overlap with
+a labelled box.
+
+**The undercount is real but modest, and varies by period.** Fitted across all
+220 frames, `detector = 0.938 × truth − 0.10` (r = 0.986), a 6.2% proportional
+undercount. By period, though:
+
+| period | n | peak frame | slope | 95% CI |
+|---|---:|---:|---:|---|
+| summer 2026 | 31 | 73 | 0.996 | 0.945–1.047 |
+| autumn/winter 2025–26 | 51 | 54 | 0.961 | 0.922–1.000 |
+| Sept–Oct 2026 | 138 | 54 | 0.866 | 0.834–0.897 |
+
+Two of the three include 1.0 — including the summer days, which hold the most
+crowded frames in the corpus. **An earlier estimate of 13.5%, fitted on the
+Sept–Oct window alone, was an artifact of that window**; correcting counts by
+it would have inflated every count by roughly 8%. No correction is applied.
+
+**Where the misses go.** Of 316 missed surfers, **286 had no box at all** and 30
+were inside a box drawn around several people. Of 46 false positives, 35 were on
+something that is not a surfer and 11 were a duplicate box. By pose: 223 prone,
+40 sitting, 42 unknown, 10 standing — lying flat is what defeats it.
+
+**Most of the missed surfers were seen and discarded.** Re-running inference at
+a 0.02 confidence floor shows that dropping `CONF_THRESH` from 0.195 to 0.10
+adds 197 boxes and closes the count gap almost exactly (3,900 against 3,880),
+and those boxes appear where the misses were (frames with more no-box misses
+gain more boxes, rho = +0.425, p = 4.7e-11). Whether they are surfers is under
+review; the threshold has not been changed.
 
 ### Known failure modes
 - **Birds**, and in one measured case a **bird's reflection**, counted as

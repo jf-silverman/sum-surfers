@@ -65,6 +65,15 @@ model's own validation set. **220 frames across 16 days spanning a full year,
 
 ![Detector count against a hand count, one point per reviewed frame](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/detector_accuracy.png?v=20261008)
 
+> **Why the daily chart's caption shows lower numbers.** That caption reports
+> **88.5% precision / 81.3% recall**, measured by the training framework on its
+> own held-out validation tiles, where a box only counts if it overlaps the
+> labelled box closely enough. The figures above are from a human looking at
+> production frames and asking whether each box is on a surfer. The second is
+> the question this project actually cares about, and it is the more forgiving
+> of the two — a box can be on the right surfer without hugging its outline.
+> Neither is wrong; they measure different things, and both are kept.
+
 *Each dot is one frame. The dashed line is perfect agreement; the orange line
 is what the detector actually does. It is close to the truth on a quiet
 lineup and slightly low on a crowded one — about 6% low overall — because
@@ -219,27 +228,29 @@ GBT permutation-importance breakdown). A closer look at the weekend effect:
 ### Weekday vs. Weekend
 
 1. The weekend-to-weekday ratio varies noticeably by month — from about
-   1.16-1.18x in March, May, and July 2026 up to nearly 2x in November
-   2025 (also elevated, ~1.5x, in October/December 2025 and August
-   2026). Some months show a much more pronounced weekend effect than
-   others. We'll have to see if the trend holds once we have data from
-   every month — several calendar months are still completely
-   unrepresented in the dataset so far.
-2. Weekends are also more variable day-to-day than weekdays: standard
-   deviation 6.7 vs 5.6 surfers.
+   1.08-1.16x in March, May, and July 2026 up to **2.4x in November
+   2025**, with October and December 2025 also elevated at 1.6-1.7x. Some
+   months show a much more pronounced weekend effect than others. We'll
+   have to see if the trend holds once we have data from every month —
+   several calendar months are still completely unrepresented.
+2. **October 2026 runs the other way, at 0.81x** — the first month where
+   weekends are quieter than weekdays. It is also the thinnest month in the
+   record, so treat it as one month of data rather than a reversal.
+3. Weekends are also more variable day-to-day than weekdays: standard
+   deviation 8.1 vs 6.6 surfers.
 
-![Mean surfer count by month, weekday vs weekend](analysis/weekday_weekend_patterns/weekday_weekend_by_month_2026-08-28.png)
+![Mean surfer count by month, weekday vs weekend](analysis/weekday_weekend_patterns/weekday_weekend_by_month_2026-10-08.png)
 
 ### Daily Mean Count Kernel Density Estimate (KDE)
 
-1. Each curve is normalized to its own group (n=61 weekdays, n=31
+1. Each curve is normalized to its own group (n=93 weekdays, n=45
    weekends) — the taller weekday peak isn't a sample-size artifact.
-2. Weekday counts cluster closer to their mean (std 5.6 vs 6.7), giving
+2. Weekday counts cluster closer to their mean (std 6.6 vs 8.1), giving
    it a taller, narrower peak.
-3. Weekends span a wider range (min 3.8 to max 33.8 vs weekday's 1.5 to
-   28.0).
+3. Weekends span a wider range (0.0 to 37.1 against the weekday's 0.2 to
+   29.6).
 
-![Distribution of daily mean surfer counts, weekday vs weekend KDE](analysis/weekday_weekend_patterns/weekday_weekend_kde_2026-08-28.png)
+![Distribution of daily mean surfer counts, weekday vs weekend KDE](analysis/weekday_weekend_patterns/weekday_weekend_kde_2026-10-08.png)
 
 ## Schedule
 
@@ -263,8 +274,8 @@ watch the stream, count the surfers, collect the matching conditions, build the
 feature table, fit the model, draw the charts. Nobody can reconstruct a history
 for a spot they were not already watching — the camera only reaches back five
 days, today included — so a record like this one is not downloaded, it is
-accumulated. For scale, this repo's stands at roughly 1,650 counted hours across
-125 days as of 2026-09-26, gathered since October 2025.
+accumulated. For scale, this repo's stands at roughly 1,835 counted hours across
+138 days as of 2026-10-08, gathered since October 2025.
 
 ### Collect live data
 
