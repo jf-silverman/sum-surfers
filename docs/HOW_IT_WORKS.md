@@ -219,6 +219,57 @@ box only appears if the model's confidence for it was 0.195 or higher, and
 each box's label is that confidence score. The image's own caption repeats
 the threshold so it's readable without cross-referencing this doc.
 
+## Small-object detection: what the detector does about it
+
+A surfer here is **6 to 11 pixels tall**, and the smallest decile covers about
+61 px² — a few dozen water-coloured pixels. That is the central difficulty, and
+several standard techniques bear on it. What this project uses, and what it
+does not:
+
+**Tiling (in use).** The 1280×180 strip is cut into 4 overlapping tiles of
+376×180 and each is run separately, so the model sees a surfer at a far larger
+fraction of the frame. This is the single biggest reason detection works at
+all. It is the same idea as the published **SAHI** (Slicing Aided Hyper
+Inference) method; this project implements its own slicing and cross-tile
+de-duplication rather than using that library. Benchmarking against it remains
+open.
+
+**Feature pyramids (inherited).** YOLOv8 carries an FPN/PANet neck and three
+detection heads at strides 8, 16 and 32, so features are combined across
+scales. Nothing here configures that; it comes with the architecture. The
+stride-8 head is the one doing essentially all the work at this object size —
+the stride-32 head covers objects far larger than any surfer in frame.
+
+**Input resolution (in use).** Tiles are run at `imgsz 640`, so a 376×180 tile
+is upscaled. That gives the stride-8 head roughly 47×22 cells across a tile,
+which is what makes an 8-pixel object addressable at all.
+
+**Photometric augmentation (in use).** Training applies `hsv_h 0.015`,
+`hsv_s 0.7`, `hsv_v 0.4`, horizontal flips, ±10° rotation and mosaic. The
+value jitter at 0.4 is why global brightness or contrast normalisation at
+inference is not expected to help — the model is already largely invariant to
+a global tone curve.
+
+**Geometric scale augmentation (barely).** `scale` is 0.1, a ±10% zoom range.
+This is deliberate rather than neglected: measured across 742 boxes, apparent
+size tracks image row at rho = +0.60, but the near-to-far ratio is only
+**2.1× in area**. The ROI is a narrow horizontal slice of the perspective
+field, so the scale range the model must cover is small by the standards of
+street-scene detection, where 20–50× is routine.
+
+**Perspective normalisation (not used, and not worth it).** Warping to a ground
+plane so objects are size-constant is a standard fixed-camera technique. At a
+2.1× range it would buy very little and cost interpolation blur.
+
+**Not used, and candidates:** a P2 detection head at stride 4 (the standard
+YOLO modification for objects below ~16 px), small-object copy-paste
+augmentation (`copy_paste` is currently 0.0), and size-weighted loss. These are
+logged in the private ideas notes rather than attempted.
+
+The honest limit: at 61 px² the information is close to what the sensor and the
+camera's H.264 encoder preserved. No architecture recovers detail that was
+never captured.
+
 ## Detector accuracy: the deployed checkpoint
 
 The production detector is the September 2026 retrain, which added labeled fog,
