@@ -8,7 +8,7 @@ This project collects images from a shoreline video camera and tries to answer t
 - **_How many surfers were out there each hour of each day in the past?_**
 - **_How many will there be at each hour of the day in the upcoming days?_**
 
-**_Why does this matter? As a surfer, I know that as as the crowd size grows, so does the competition for each wave.  It becomes difficult to not "drop in" on someone who is already on the wave or have to avoid surfers who drop in on you.  Forecasting surfer crowd size can help surfers know avoid peak crowding - or at least be ready for it._**
+**_Why does this matter? As the crowd size grows, so does the competition for each wave.  It becomes difficult to avoid "dropping in" on others and having others "drop-in" on you.  Forecasting surfer crowd size can help surfers avoid peak crowding - or at least be ready for it._**
 
 <!-- ====================================================================
      AUTO-GENERATED BLOCK - DO NOT EDIT BETWEEN THE MARKERS BELOW.
