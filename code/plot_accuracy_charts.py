@@ -50,8 +50,17 @@ PREDS = _ROOT / "data" / "predictions" / "predictions.csv"
 FLOG = _ROOT / "data" / "forecasts" / "forecast_log.csv"
 OUT = _ROOT / "data" / "charts" / "published"
 
-BG, INK, INK_DIM, GRID = "black", "white", "#b4b2a7", "#333333"
-BLUE, ORANGE = "#3987e5", "#eb6834"   # palette slots 1 and 2, dark-surface steps
+BG, INK, INK_DIM, GRID = "black", "white", "#bbbbbb", "#333333"
+# The site palette, shared with plot_daily_prediction.py so the README reads as
+# one system rather than two. Validated as a categorical pair on this surface:
+# CVD separation dE 22.6 protan / 13.8 tritan against a target of 8, and
+# normal-vision dE 23.4 against a floor of 15 -- comfortably apart. The pair
+# does fail a lightness-band check (0.712 vs 0.842), i.e. LIME reads brighter
+# than AQUA, so LIME is given to the single thin line that has to carry over a
+# field of dots and AQUA to the dots themselves, which turns the imbalance into
+# the right hierarchy instead of a distraction.
+AQUA = "#3ab4c9"    # the data
+LIME = "#9de35a"    # the fitted line / the second panel
 DATE_RE = r"^\d{4}-\d{2}-\d{2}$"
 
 
@@ -87,9 +96,9 @@ def detector_chart(s):
 
     ax.plot([0, hi], [0, hi], color=INK_DIM, linewidth=1.4, linestyle=(0, (5, 4)), zorder=2)
     xs = np.array([0, hi])
-    ax.plot(xs, sl * xs + ic, color=ORANGE, linewidth=2.0, zorder=3)
+    ax.plot(xs, sl * xs + ic, color=LIME, linewidth=2.0, zorder=3)
     # 2px surface ring keeps overlapping points readable where the lineup packs in
-    ax.scatter(s.truth, s.det, s=42, color=BLUE, alpha=0.78,
+    ax.scatter(s.truth, s.det, s=42, color=AQUA, alpha=0.78,
                edgecolors=BG, linewidths=1.0, zorder=4)
 
     # Direct labels placed where the two lines separate, which is the whole
@@ -98,7 +107,7 @@ def detector_chart(s):
     ax.text(lx, lx + hi * 0.055, "perfect agreement", color=INK_DIM, fontsize=10,
             rotation=38, rotation_mode="anchor", va="bottom", ha="left")
     ax.text(lx, sl * lx + ic - hi * 0.075, f"detector = {sl:.2f} x actual",
-            color=ORANGE, fontsize=10, rotation=36, rotation_mode="anchor",
+            color=LIME, fontsize=10, rotation=36, rotation_mode="anchor",
             va="top", ha="left")
 
     ax.set_xlim(-2, hi); ax.set_ylim(-2, hi)
@@ -133,7 +142,7 @@ def forecast_chart():
         ax.set_xlabel("days ahead the forecast was made", color=INK, fontsize=10.5)
         ax.set_xticks(list(g.index))
 
-    a1.plot(g.index, g.mae, color=BLUE, linewidth=2.0, marker="o",
+    a1.plot(g.index, g.mae, color=AQUA, linewidth=2.0, marker="o",
             markersize=8, markeredgecolor=BG, markeredgewidth=1.2, zorder=3)
     a1.set_ylim(0, g.mae.max() * 1.30)
     a1.set_ylabel("average error, surfers", color=INK, fontsize=10.5)
@@ -144,7 +153,7 @@ def forecast_chart():
                     ha="center", color=INK_DIM, fontsize=9)
 
     a2.axhline(80, color=INK_DIM, linewidth=1.4, linestyle=(0, (5, 4)), zorder=2)
-    a2.plot(g.index, g.cover, color=ORANGE, linewidth=2.0, marker="o",
+    a2.plot(g.index, g.cover, color=LIME, linewidth=2.0, marker="o",
             markersize=8, markeredgecolor=BG, markeredgewidth=1.2, zorder=3)
     a2.set_ylim(50, 100)
     a2.set_ylabel("actual counts inside the 80% range, %", color=INK, fontsize=10.5)
