@@ -25,6 +25,11 @@ data/reviews/count_60sec_var/
 # (boxes were made translucent 2026-10-05), so only the hand-filled
 # review.csv -- the actual research output, and tiny -- stays tracked.
 data/reviews/full_day_*/*.png
+# Same reasoning for any other review batch's rendered images: regenerable
+# from code, and only the hand-filled CSV is the research output.
+data/reviews/conf_band_review/*.png
+data/reviews/usability_balanced_56/**/*.jpg
+data/reviews/obscuration_batch_60/*.jpg
 analysis/count_variability/seconds/frame_variability_analysis.csv
 analysis/count_variability/seconds/frame_variability_analysis_summary.png
 analysis/count_variability/seconds/hourly_60sec_counts_2026-08-27.png
