@@ -45,14 +45,60 @@ The same model, run out to a week. Every hour gets a crowd level from 1 (near-em
      never touched by the nightly run.
      ==================================================================== -->
 
-## How Accurate Is This Forecast Right Now?
+## How Accurate Is It Right Now?
 
-Surfer counts swing hard across a single day at this spot — from an empty
-lineup to more than 70 in one hour — but average about **15 surfers per
-daylight hour**. Against that, the forecast lands **within ±8 surfers about 80%
-of the time**. Every forecast is written down before the day happens and scored
-against what the detector later counted, so the record cannot be rewritten
-after the fact.
+Two models run in sequence, so there are two accuracy questions: can the
+detector count the surfers in a frame, and can the forecast predict how many
+will be out tomorrow. The detector is the stronger of the two by a wide margin.
+
+### The detector, against a human count
+
+Every figure here comes from counting by hand, box by box, not from the
+model's own validation set. **220 frames across 16 days spanning a full year,
+3,880 real surfers.**
+
+| | |
+|---|---|
+| precision — of the boxes it drew, how many were on a surfer | **98.7%** |
+| recall — of the surfers really there, how many it found | **91.9%** |
+| average count error | **1.5 surfers** per frame |
+
+![Detector count against a hand count, one point per reviewed frame](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/detector_accuracy.png?v=20261008)
+
+*Each dot is one frame. The dashed line is perfect agreement; the orange line
+is what the detector actually does. It is close to the truth on a quiet
+lineup and slightly low on a crowded one — about 6% low overall — because
+surfers lying flat on their boards in a packed lineup are the ones it loses.*
+
+**It misses far more than it invents.** Of 316 missed surfers, **286 had no box
+at all and 30 were inside a box drawn around several people**; of 46 false
+positives, 35 were on something that is not a surfer — a bird, a wind sock, a
+head on the beach — and 11 were a second box on a surfer already counted.
+
+**Lying down is what defeats it.** 223 of the misses were prone and 40
+sitting, against 10 standing. A surfer up and riding is an unmistakable shape;
+one lying flat is a dark smudge a few pixels across.
+
+### The forecast, against what the detector later counted
+
+Surfer counts swing hard across a day — from an empty lineup to more than 70 in
+one hour. Every forecast is written down before the day happens and scored
+afterwards, so the record cannot be rewritten after the fact. **1,155 scored
+forecast-hours.**
+
+| | |
+|---|---|
+| average error, one day ahead | **4.4 surfers** |
+| average error, all lead times | **5.0 surfers** |
+| actual counts falling inside the 80% range | **80.3%** |
+
+![Forecast error and prediction-range coverage against lead time](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/forecast_accuracy.png?v=20261008)
+
+*Error grows the further ahead the forecast is made, which is expected. The
+right-hand panel is the more useful caveat: the 80% prediction range holds up
+a day or two out and stops holding by seven, where it catches 63% of actual
+counts instead of 80%. Treat a seven-day band as narrower than the uncertainty
+really is.*
 
 ![Forecast vs. actual surfer counts for the most recently scored day, with tide](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_forecast_vs_actual.png?v=20261007)
 
@@ -62,12 +108,22 @@ detector counted, the shaded band is the 80% prediction range, and the dashed
 green line is tide on the right-hand axis. This is the same chart that goes out
 in the nightly email.*
 
-Measured on 83 scored forecast-hours as of 2026-09-26, so treat it as an early
-reading. For the fuller picture — per-hour error spread, accuracy by lead time,
-and why the prediction bands are overconfident — see
-[forecast accuracy and calibration](docs/HOW_IT_WORKS.md#forecast-accuracy-and-calibration) and
-[`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md). The raw scored record is
-[`data/forecasts/forecast_log.csv`](data/forecasts/forecast_log.csv).
+### What these numbers do not cover
+
+The forecast record runs from 2026-09-23, so its accuracy is measured in
+autumn only. Skill in other seasons has been estimated by rebuilding forecasts
+for past dates using only data available before each one — see
+[forecast accuracy and calibration](docs/HOW_IT_WORKS.md#forecast-accuracy-and-calibration).
+The detector figures carry their own caveat: hand counting is itself
+imperfect, and 8 boxes and 45 possible misses were flagged as judgement calls
+the reviewer would not defend either way.
+
+For the fuller picture — per-hour error spread, calibration, and why the
+prediction bands are overconfident — see
+[`MODEL_CARD.md`](MODEL_CARD.md) and [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md).
+The raw records are
+[`data/forecasts/forecast_log.csv`](data/forecasts/forecast_log.csv) and
+[`data/reviews/review_all.csv`](data/reviews/review_all.csv).
 
 
 ## How This Project Works

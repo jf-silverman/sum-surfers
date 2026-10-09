@@ -24,6 +24,10 @@ FILES=(
   "data/charts/published/latest_week.png"
   "data/charts/published/latest_detection.gif"
   "data/charts/published/latest_forecast_vs_actual.png"
+  # Accuracy charts: rebuilt by code/plot_accuracy_charts.py, not nightly.
+  # They change only when more frames are hand-scored or more forecasts land.
+  "data/charts/published/detector_accuracy.png"
+  "data/charts/published/forecast_accuracy.png"
 )
 
 entries=""
