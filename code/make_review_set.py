@@ -62,7 +62,12 @@ BOX_BGR = (90, 227, 157)
 # stay readable on a bright frame.
 BOX_ALPHA = 0.35                    # 65% transparent
 LABEL_ALPHA = 0.55
-POSES = "sitting | prone | standing | SUP | wipeout | unknown"
+# prone splits into three orientations (Joel, 2026-10-09). They present very
+# different silhouettes -- end-on is the smallest target -- and prone is 223
+# of 316 misses, so breaking it down is where the detail is worth having.
+# Plain "prone" stays valid when the orientation is not worth calling.
+POSES = ("prone-a (angled) | prone-s (side-on) | prone-e (end-on) | prone | "
+         "sitting | standing | SUP | wipeout | unknown")
 
 
 def _blend(img, draw, alpha):

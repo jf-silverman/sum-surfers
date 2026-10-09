@@ -2,19 +2,36 @@
 
 ## What to do
 
-Open `conf_band_review.csv`. One row per **numbered green box**. Fill in
-`is_surfer` with `yes` or `no`. That is the whole job — there is no counting,
-no poses, no arithmetic.
+Open `conf_band_review.csv`. One row per **numbered coral box**.
+
+**`is_surfer`** — `yes` or `no` when you are sure, otherwise **a percent 0–100**:
+how likely it is a surfer. `70` means you lean yes but would not defend it.
+
+Writing a percent is better than forcing a guess. Scored as a probability, an
+unsure box contributes its fraction rather than being rounded to 0 or 1, which
+gives a calibrated expected count as well as a point estimate.
+
+**`pose`** — only for the ones that ARE surfers, and optional:
+
+```
+prone-a (angled)  prone-s (side-on)  prone-e (end-on)  prone
+sitting  standing  SUP  wipeout  unknown
+```
+
+These boxes nearly went undetected, so their pose is the signal. End-on is the
+smallest silhouette and the obvious suspect; this is how that gets tested
+rather than assumed.
 
 In each image:
 
-- **green, numbered** — the boxes under judgement. These sit between confidence
-  0.10 and 0.195, so the detector saw them but the current threshold throws
-  them away.
+- **coral, numbered, thin** — the boxes under judgement. These sit between
+  confidence 0.10 and 0.195, so the detector saw them but the current threshold
+  throws them away. Drawn translucent so you can see what is underneath, which
+  is the whole question.
 - **grey, faint** — boxes the detector already accepts. Context only; ignore
   them.
 
-Most frames have one or two green boxes. The busiest have five.
+Most frames have one or two coral boxes. The busiest have five.
 
 ## Why this is worth the time
 
@@ -46,9 +63,13 @@ than the whole containment-suppression effort, whose ceiling is +0.008 recall.
 
 ## After
 
-Hand it back. The yes/no counts give the real precision and recall at a 0.10
+Hand it back. The answers give the real precision and recall at a 0.10
 threshold, and `CONF_THRESH` gets chosen on box-level ground truth for the
 first time — the September sweep used count MAE on 76 frames.
+
+The pose column answers a second question for free: of the surfers the detector
+almost missed, which orientations are they? If they are mostly `prone-e`, that
+is a labelling target with a name rather than a vague "prone is hard".
 
 A change to `CONF_THRESH` alters production counts, so it needs Joel's explicit
 go-ahead and a re-check against the clear-day overcount set before adoption.

@@ -53,9 +53,22 @@ OUT = _ROOT / "data" / "reviews" / "conf_band_review"
 
 UPSCALE = 2.0
 FLOOR = 0.02
-BAND_BGR = (90, 227, 157)     # the boxes under judgement
+# Coral (#ff6f61), the project's warning colour, so the boxes under judgement
+# read as "decide this" rather than as ordinary detections -- and so they never
+# read as the green of an accepted box in the full-day sets.
+BAND_BGR = (97, 111, 255)     # the boxes under judgement
 KEPT_BGR = (150, 150, 150)    # already accepted, context only
-BAND_ALPHA, KEPT_ALPHA = 0.85, 0.30
+# 30% transparent: these have to be seen THROUGH, since the whole question is
+# what is underneath. Thinner than the full-day boxes for the same reason.
+BAND_ALPHA, KEPT_ALPHA = 0.70, 0.25
+BAND_THICKNESS = 1
+
+# prone splits into three orientations (Joel, 2026-10-09), because they present
+# very different silhouettes and the end-on case is the smallest target:
+#   prone-a  angled to the camera
+#   prone-s  side-on
+#   prone-e  end-on, pointing toward or away -- fewest pixels
+POSES = "prone-a | prone-s | prone-e | prone | sitting | standing | SUP | wipeout | unknown"
 
 
 def boxes_at_floor(model, img_path):
@@ -98,7 +111,7 @@ def render(crop, kept, band, out_path, header):
     def draw_band(d):
         for i, b in enumerate(ordered, 1):
             p1, p2 = pt(b)
-            cv2.rectangle(d, p1, p2, BAND_BGR, 2)
+            cv2.rectangle(d, p1, p2, BAND_BGR, BAND_THICKNESS)
             ly = p1[1] - 5 if p1[1] > 18 else p2[1] + 15
             cv2.putText(d, str(i), (p1[0], ly), cv2.FONT_HERSHEY_SIMPLEX,
                         0.52, BAND_BGR, 1, cv2.LINE_AA)
@@ -149,7 +162,15 @@ def main():
             for j, b in enumerate(sorted(band, key=lambda x: x[0]), 1):
                 rows.append(dict(image=name, date=r.date, time_local=r.time_local,
                                  box=j, confidence=round(b[4], 3),
-                                 is_surfer="", notes="",
+                                 # yes / no when certain, else a percent 0-100:
+                                 # how likely this is a surfer. Parsed as a
+                                 # probability, so an unsure box contributes its
+                                 # fraction rather than being forced to 0 or 1.
+                                 is_surfer="",
+                                 # Only for boxes that ARE surfers. The whole
+                                 # point of the band is that these nearly went
+                                 # undetected, so their pose is the signal.
+                                 pose="", notes="",
                                  filename=r.filename,
                                  nobox_misses_this_frame=int(r.nobox)))
             n_boxes += len(band)
@@ -158,7 +179,9 @@ def main():
 
     pd.DataFrame(rows).to_csv(OUT / "conf_band_review.csv", index=False)
     print(f"\n{n_boxes} box(es) across {len({r['image'] for r in rows})} frame(s) -> {OUT}")
-    print("Fill in is_surfer: yes / no  (one row per numbered green box)")
+    print("Fill in is_surfer: yes / no, or a percent 0-100 when unsure.")
+    print("Optionally fill pose for the ones that ARE surfers:")
+    print(f"  {POSES}")
     return 0
 
 

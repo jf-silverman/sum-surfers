@@ -93,7 +93,18 @@ do not re-type anything.
 | `sup_box_numbers` | `;`-separated numbers | boxes holding a **stand-up paddleboarder** |
 | `notes` | free text | anything else worth remembering |
 
-Pose vocabulary: `sitting | prone | standing | SUP | wipeout | unknown`.
+Pose vocabulary:
+
+```
+prone-a (angled)  prone-s (side-on)  prone-e (end-on)  prone
+sitting  standing  SUP  wipeout  unknown
+```
+
+**`prone` splits three ways** (2026-10-09). The orientations present very
+different silhouettes — end-on is the smallest target — and prone is 223 of 316
+misses, so this is where the detail is worth having. Plain `prone` stays valid
+when the orientation is not worth calling, and the counts still work the same
+way: `2 prone-e; 1 sitting` is three missed surfers.
 
 ## `multi_box_surfer` — the mirror image
 
