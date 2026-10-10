@@ -38,7 +38,9 @@ FEATURES = ROOT / "data" / "training_features.csv"
 
 BG, INK, INK_DIM, GRID = "black", "white", "#bbbbbb", "#333333"
 AQUA, LIME = "#3ab4c9", "#9de35a"
-EDGES = [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7]
+# Stops at 5 ft: above that the lineup is simply empty (median 0, IQR 0-1
+# across 197 hours), so the bands add width without adding information.
+EDGES = [-2, -1, 0, 1, 2, 3, 4, 5]
 MIN_N = 15
 
 
@@ -73,10 +75,13 @@ def main():
     for box in bp["boxes"]:
         box.set(facecolor=AQUA, alpha=0.40, edgecolor=AQUA, linewidth=1.2)
 
-    peak = int(np.argmax([np.median(g) for g in groups]))
-    bp["boxes"][peak].set(alpha=0.70, linewidth=2.0)
-
-    top = max(np.percentile(g, 99) for g in groups)
+    # Scale to the tallest WHISKER, not the tallest outlier, so the boxes are
+    # legible. Outliers above the cut are clipped and the caption says so.
+    def upper_whisker(g):
+        q1, q3 = np.percentile(g, [25, 75])
+        return max(g[g <= q3 + 1.5 * (q3 - q1)], default=q3)
+    top = max(upper_whisker(g) for g in groups) * 1.04
+    n_clipped = int(sum((g > top).sum() for g in groups))
     for i, (g, n) in enumerate(zip(groups, ns), 1):
         ax.text(i, -top * 0.085, f"n={n}", ha="center", color=INK_DIM, fontsize=8.5)
         ax.text(i, np.median(g) + top * 0.022, f"{np.median(g):.0f}", ha="center",
@@ -87,11 +92,13 @@ def main():
     ax.set_ylabel("surfers counted that hour", color=INK, fontsize=10.5)
     ax.set_ylim(-top * 0.13, top * 1.06)
     ax.set_title("Surfer counts by tide height", color=INK, fontsize=13.5,
-                 fontweight="bold", loc="left", pad=26)
-    ax.text(0, 1.035,
-            f"{len(t):,} counted hours over {t.filename.str[4:14].nunique()} days  ·  "
-            f"box is the middle half, line is the median, whiskers 1.5x IQR  ·  "
-            f"Spearman rho = {rho:.3f}",
+                 fontweight="bold", loc="left", pad=38)
+    sub = (f"{len(t):,} counted hours over {t.filename.str[4:14].nunique()} days  ·  "
+           f"Spearman rho = {rho:.3f}")
+    ax.text(0, 1.062, sub, transform=ax.transAxes, color=INK_DIM, fontsize=9)
+    ax.text(0, 1.022,
+            "box is the middle half, line the median, whiskers 1.5x IQR"
+            + (f"  ·  {n_clipped} outlier(s) above the axis" if n_clipped else ""),
             transform=ax.transAxes, color=INK_DIM, fontsize=9)
 
     fig.tight_layout()
