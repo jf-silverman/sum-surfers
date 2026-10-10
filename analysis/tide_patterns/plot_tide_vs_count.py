@@ -1,22 +1,21 @@
 """
 plot_tide_vs_count.py
 ---------------------
-Hourly surfer count against tide height.
+Distribution of hourly surfer counts in 1-foot tide bands.
 
-The relationship is the strongest single-predictor effect in the dataset:
-Spearman rho = -0.644 over 1,835 counted hours, p = 2.7e-215. Two checks say it
-is not an artifact:
+A box per band rather than a scatter or a line: the question is how the whole
+distribution moves, and a median alone hides that the spread collapses along
+with the level. At 1-2 ft the middle half of hours runs 13 to 33; above 5 ft it
+is 0 to 1.
 
-  Time of day. Tide shifts about 50 minutes a day, so over 138 days it
-  decorrelates from clock time entirely -- tide vs hour rho = +0.015, p = 0.52.
-  The daily rhythm of when people surf cannot be producing this.
+Tide is the strongest single-predictor relationship in the data, Spearman
+rho = -0.644 over 1,835 counted hours. Two confounds are ruled out: tide is
+independent of clock time here (rho = +0.015, p = 0.52, because tide shifts
+about 50 minutes a day and 138 days decorrelates it), and the effect holds
+within every month with enough data (rho -0.47 to -0.77, all p < 1e-4).
 
-  Season. The effect holds WITHIN every month with enough data, rho -0.47 to
-  -0.77, all p < 1e-4. It is not a summer/winter pattern in disguise.
-
-The shape is not monotonic, which a correlation coefficient hides: counts peak
-around 1-2 ft and fall away on BOTH sides. That is why the chart draws a binned
-median through the cloud rather than a straight fit.
+The relationship is NOT monotonic, which is the point of binning rather than
+fitting: counts peak in the 1-2 ft band and fall away on both sides.
 
 Usage:
     python analysis/tide_patterns/plot_tide_vs_count.py
@@ -38,77 +37,70 @@ ROOT = HERE.parent.parent
 FEATURES = ROOT / "data" / "training_features.csv"
 
 BG, INK, INK_DIM, GRID = "black", "white", "#bbbbbb", "#333333"
-AQUA, LIME, CORAL = "#3ab4c9", "#9de35a", "#ff6f61"
+AQUA, LIME = "#3ab4c9", "#9de35a"
+EDGES = [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7]
+MIN_N = 15
 
 
 def main():
     t = pd.read_csv(FEATURES).dropna(subset=["tide_ft", "surfer_count"])
-    lo, hi = t.tide_ft.quantile([0.05, 0.95])
     rho, p = st.spearmanr(t.tide_ft, t.surfer_count)
+    t["bin"] = pd.cut(t.tide_ft, EDGES)
 
-    # Median per 0.5ft bin, drawn only where there is enough data to mean it.
-    bins = np.arange(np.floor(t.tide_ft.min() * 2) / 2, t.tide_ft.max() + 0.5, 0.5)
-    t["bin"] = pd.cut(t.tide_ft, bins)
-    agg = t.groupby("bin", observed=True).agg(
-        n=("surfer_count", "size"), med=("surfer_count", "median"),
-        q1=("surfer_count", lambda s: s.quantile(0.25)),
-        q3=("surfer_count", lambda s: s.quantile(0.75)))
-    agg["mid"] = [iv.mid for iv in agg.index]
-    agg = agg[agg.n >= 15]
+    groups, labels, ns = [], [], []
+    for iv, g in t.groupby("bin", observed=True):
+        if len(g) < MIN_N:
+            continue
+        groups.append(g.surfer_count.values)
+        labels.append(f"{int(iv.left)} to {int(iv.right)}")
+        ns.append(len(g))
 
-    fig, ax = plt.subplots(figsize=(9.2, 6.0), facecolor=BG)
+    fig, ax = plt.subplots(figsize=(9.6, 5.8), facecolor=BG)
     ax.set_facecolor(BG)
-    ax.grid(True, color=GRID, linewidth=0.6, alpha=0.9)
+    ax.grid(True, axis="y", color=GRID, linewidth=0.6, alpha=0.9)
     ax.set_axisbelow(True)
     for sp in ax.spines.values():
         sp.set_color(GRID)
-    ax.tick_params(colors=INK_DIM, labelsize=9)
+    ax.tick_params(colors=INK_DIM, labelsize=9.5)
 
-    # The band most hours actually fall in, so the eye is not drawn to the tails
-    ax.axvspan(lo, hi, color=INK_DIM, alpha=0.07, zorder=0)
-    ax.annotate(f"90% of counted hours fall between {lo:.1f} and {hi:.1f} ft",
-                xy=((lo + hi) / 2, t.surfer_count.max() * 0.97), ha="center",
-                color=INK_DIM, fontsize=9)
+    bp = ax.boxplot(groups, patch_artist=True, widths=0.62, showfliers=True,
+                    medianprops=dict(color=LIME, linewidth=2.2),
+                    whiskerprops=dict(color=INK_DIM, linewidth=1.1),
+                    capprops=dict(color=INK_DIM, linewidth=1.1),
+                    flierprops=dict(marker="o", markersize=2.6,
+                                    markerfacecolor=INK_DIM, markeredgecolor="none",
+                                    alpha=0.45))
+    for box in bp["boxes"]:
+        box.set(facecolor=AQUA, alpha=0.40, edgecolor=AQUA, linewidth=1.2)
 
-    ax.scatter(t.tide_ft, t.surfer_count, s=11, color=AQUA, alpha=0.30,
-               edgecolors="none", zorder=2)
-    ax.fill_between(agg.mid, agg.q1, agg.q3, color=LIME, alpha=0.16, zorder=3)
-    ax.plot(agg.mid, agg.med, color=LIME, linewidth=2.4, zorder=4)
+    peak = int(np.argmax([np.median(g) for g in groups]))
+    bp["boxes"][peak].set(alpha=0.70, linewidth=2.0)
 
-    # Labels sit just above/beside the points they name, with short leaders --
-    # a long leader across a 1,800-point cloud is worse than no label.
-    peak = agg.loc[agg.med.idxmax()]
-    ax.annotate(f"busiest near {peak.mid:.2f} ft (median {peak.med:.0f})",
-                xy=(peak.mid, peak.med), xytext=(0, 14),
-                textcoords="offset points", ha="center",
-                color=LIME, fontsize=9.5,
-                arrowprops=dict(arrowstyle="-", color=LIME, linewidth=0.8,
-                                shrinkA=0, shrinkB=3))
-    tail = agg[agg.med <= 1]
-    if len(tail):
-        x0 = tail.mid.iloc[0]
-        ax.annotate("above ~4.5 ft\nthe lineup empties", xy=(x0, 1),
-                    xytext=(14, 42), textcoords="offset points", ha="left",
-                    color=CORAL, fontsize=9.5,
-                    arrowprops=dict(arrowstyle="-", color=CORAL, linewidth=0.8,
-                                    shrinkA=0, shrinkB=3))
+    top = max(np.percentile(g, 99) for g in groups)
+    for i, (g, n) in enumerate(zip(groups, ns), 1):
+        ax.text(i, -top * 0.085, f"n={n}", ha="center", color=INK_DIM, fontsize=8.5)
+        ax.text(i, np.median(g) + top * 0.022, f"{np.median(g):.0f}", ha="center",
+                color=LIME, fontsize=9.5, fontweight="bold")
 
-    ax.set_xlabel("tide height, feet", color=INK, fontsize=10.5)
+    ax.set_xticklabels(labels, fontsize=9.5)
+    ax.set_xlabel("tide height, feet", color=INK, fontsize=10.5, labelpad=16)
     ax.set_ylabel("surfers counted that hour", color=INK, fontsize=10.5)
-    ax.set_title("Surfer count against tide height", color=INK, fontsize=13.5,
-                 fontweight="bold", loc="left", pad=14)
-    ax.text(0, 1.015,
+    ax.set_ylim(-top * 0.13, top * 1.06)
+    ax.set_title("Surfer counts by tide height", color=INK, fontsize=13.5,
+                 fontweight="bold", loc="left", pad=26)
+    ax.text(0, 1.035,
             f"{len(t):,} counted hours over {t.filename.str[4:14].nunique()} days  ·  "
-            f"Spearman rho = {rho:.3f}  ·  line is the median per 0.5 ft, band is the IQR",
-            transform=ax.transAxes, color=INK_DIM, fontsize=9.5)
-    ax.set_ylim(-2, t.surfer_count.max() * 1.06)
+            f"box is the middle half, line is the median, whiskers 1.5x IQR  ·  "
+            f"Spearman rho = {rho:.3f}",
+            transform=ax.transAxes, color=INK_DIM, fontsize=9)
 
     fig.tight_layout()
     out = HERE / f"tide_vs_count_{t.filename.str[4:14].max()}.png"
     fig.savefig(out, facecolor=BG, dpi=150)
-    print(f"saved {out}")
-    print(f"\nrho={rho:.3f} p={p:.1e}  peak median at {peak.mid:.2f} ft")
-    print(agg[["n", "med", "q1", "q3"]].round(1).to_string())
+    print(f"saved {out}\n")
+    for lab, g, n in zip(labels, groups, ns):
+        q1, med, q3 = np.percentile(g, [25, 50, 75])
+        print(f"  {lab:>9s} ft  n={n:4d}  median {med:5.1f}  IQR {q1:.0f}-{q3:.0f}")
     return 0
 
 
