@@ -27,40 +27,63 @@ score the next TEST_BLOCK days. Paired t-test on per-origin MAE against the
 baseline, because a single split of this size cannot support an MAE claim
 (that is the lesson of eval_forecast_features.py).
 
-Result, 2026-10-13, 1,890 rows / 142 days, 16 rolling origins:
+Result, 2026-10-13, 1,904 rows / 143 days, 16 rolling origins:
 
     arm              MAE   vs all       p   better
-    all            7.112       --      --       --
-    win30          7.928   +1.157   0.129    6/14
-    win60          8.136   +1.083   0.042    5/15
-    win90          7.948   +0.895   0.033    4/15
-    season_only    7.887   +1.116   0.079    4/14
-    season_hi_1.5  7.031   -0.080   0.254   10/16
-    season_hi_2    6.969   -0.143   0.053   11/16
-    season_hi_2.5  7.026   -0.086   0.319   10/16
-    season_hi_3    7.076   -0.036   0.721    8/16
-    season_hi_5    7.122   +0.010   0.939    7/16
+    all            7.106       --      --       --
+    win30          8.469   +1.704   0.049    3/14
+    win60          8.114   +1.067   0.048    5/15
+    win90          7.852   +0.804   0.036    6/15
+    season_only    7.933   +1.168   0.064    4/14
+    season_hi_1.5  7.175   +0.069   0.447    8/16
+    season_hi_2    7.085   -0.022   0.794    6/16
+    season_hi_2.5  7.109   +0.002   0.983    7/16
+    season_hi_3    7.201   +0.095   0.419    7/16
+    season_hi_5    7.260   +0.153   0.277    5/16
+    anti_season_hi_2  7.207  +0.100  0.211    8/16
 
-Verdict on question 1: NO. Every hard window is worse, win60 and win90
-significantly so, and they lose in two origins out of three. The direction is
-the same as the rejected exponential recency weighting but larger, which is
-what a harsher version of the same instruction should produce. The reason is
-visible in the table: a 30-day window at the 2026-07-07 cut scores 14.97
-against 7.23, because 30 days of July is ~200 rows covering one weather regime.
-Throwing away data costs more than staleness does at this sample size. The
-win30/season_only NaNs at the March and May cuts are the same problem in its
-extreme form -- the collection record has gaps, so those windows hold almost
+    placebo null (10 random reweightings): mean +0.039, sd 0.055,
+                                           range -0.087 to +0.088
+
+Verdict on question 1 (short windows): NO, and firmly. Every window is worse,
+all three significantly, and they lose two origins in three. The mechanism is
+legible per origin: a 30-day window at the 2026-07-07 cut scores 14.97 against
+7.23, because 30 days of July is ~200 rows covering one weather regime, and a
+tree cannot predict a condition it has never seen. At ~1,900 rows total,
+discarding data costs far more than staleness does. These effects are +0.8 to
++1.7 MAE -- an order of magnitude above refit noise -- so they are robust.
+The win30 and season_only NaNs at the March and May cuts are the same problem
+in extreme form: the collection record has gaps, so those windows hold almost
 nothing and no model is fitted.
 
-Verdict on question 2: WORTH WATCHING, NOT WORTH SHIPPING. Doubling the weight
-on rows within +/-1 calendar month of the target month is the best in-model
-result this project has measured (previous best: day-level aggregates, -0.09)
-and wins 11 of 16 origins, but -0.143 MAE at p=0.053 is a tenth of the 0.5 MAE
-adoption bar. It peaks at 2x and fades at 1.5x and 2.5x; at this sample size a
-sharp peak flanked by decay is as consistent with noise as with a real optimum.
-Re-run it when autumn 2026 is complete -- the hypothesis predicts the gain
-should GROW as the season-matched band fills, since the +/-1 month band for an
-October target currently draws mostly on October-November 2025.
+Verdict on question 2 (weight fall higher): NO. Nothing here.
+
+This arm was briefly reported as the best in-model result on this project
+(-0.143 MAE, 11/16 origins, p=0.053, measured hours earlier the same day at
+1,890 rows). It was wrong, and HOW it was wrong is the useful part:
+
+  * It failed the placebo. Upweighting a RANDOM subset of the same size gives
+    a null distribution of mean +0.039, sd 0.055. The seasonal arm's -0.022 is
+    inside it, and 1 of 10 random reweightings did as well or better.
+    Reweighting perturbs the fit; a perturbation sometimes helps by accident.
+  * It failed to survive 14 new rows. The nightly pipeline added one day
+    (2026-10-13) between the two runs -- 1,890 to 1,904, a 0.7% increase --
+    and the gain fell from -0.143 to -0.022, from 11/16 origins to 6/16.
+  * Its shape was already the tell. A sharp peak at 2x with decay on both
+    sides is what noise looks like at this sample size.
+
+It also contradicted nothing: the project had ALREADY measured that one extra
+day of data moves predictions 0.78 surfers on refit noise alone. A -0.143
+claim is well below that floor and should never have been ranked.
+
+PROCEDURE, the durable lesson: any forecast arm claiming less than about
++/-0.5 MAE needs the placebo arms run alongside it BEFORE the result is
+reported, and the training row count recorded next to the number so a shifted
+baseline is visible rather than silent. Both are now built into this script.
+
+Season and year also remain perfectly confounded here (October-December exist
+only for 2025, March-September only for 2026), so even a surviving seasonal
+effect would have been partly indistinguishable from a 2025 effect.
 
 Usage:
     python analysis/forecast_training_window/test_training_window.py
@@ -104,6 +127,8 @@ def fit_mae(X_tr, y_tr, X_te, y_te, w=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--origins", type=int, default=16)
+    ap.add_argument("--seeds", type=int, default=10,
+                    help="random-reweighting placebo arms (the null distribution)")
     args = ap.parse_args()
 
     warnings.filterwarnings("ignore")
@@ -123,7 +148,9 @@ def main():
           f"{TEST_BLOCK}-day test blocks\n")
 
     arms = (["all", "win30", "win60", "win90", "season_only"]
-            + [f"season_hi_{k}" for k in (1.5, 2, 2.5, 3, 5)])
+            + [f"season_hi_{k}" for k in (1.5, 2, 2.5, 3, 5)]
+            + ["anti_season_hi_2"]
+            + [f"placebo{s}" for s in range(args.seeds)])
     scores = {a: [] for a in arms}
     rows = []
 
@@ -149,6 +176,21 @@ def main():
                 tr &= (day > cut - pd.Timedelta(days=n)).values
             elif arm == "season_only":
                 tr &= near
+            elif arm == "anti_season_hi_2":
+                # Control: upweight the months FURTHEST from the target month.
+                # If this helps too, the mechanism is not season.
+                far = month_distance(month, m_target) >= 5
+                w = np.where(far[tr], 2.0, 1.0)
+            elif arm.startswith("placebo"):
+                # Control: upweight a RANDOM subset of the same size as the
+                # season band. Gives a null distribution for "reweight
+                # something, anything" -- reweighting perturbs the fit, and a
+                # perturbation sometimes helps by accident.
+                rng = np.random.default_rng(1000 + int(arm[7:]))
+                idx = np.where(tr)[0]
+                w = np.ones(len(idx))
+                w[rng.choice(len(idx), size=min(int(near[tr].sum()), len(idx)),
+                             replace=False)] = 2.0
             elif arm.startswith("season_hi_"):
                 k = float(arm.rsplit("_", 1)[1])
                 w = np.where(near[tr], k, 1.0)
@@ -174,6 +216,20 @@ def main():
         print(f"{arm:14s} {np.nanmean(a):6.3f} {d.mean():+8.3f} {t.pvalue:7.3f} "
               f"{(d < 0).sum():4d}/{ok.sum():<3d}")
     print("\nNegative 'vs all' = better than the production baseline.")
+
+    # The placebo arms are a null distribution, not individual results: compare
+    # any small seasonal gain against their SPREAD, not against zero.
+    pl = np.array([np.nanmean(np.array(scores[f"placebo{s}"], float) - base)
+                   for s in range(args.seeds)])
+    if len(pl):
+        sd = pl.std(ddof=1) if len(pl) > 1 else float("nan")
+        print(f"\nplacebo null ({args.seeds} random reweightings): "
+              f"mean {pl.mean():+.3f}, sd {sd:.3f}, "
+              f"range {pl.min():+.3f} to {pl.max():+.3f}")
+        sh = np.nanmean(np.array(scores["season_hi_2"], float) - base)
+        print(f"season_hi_2 delta {sh:+.3f} -> {int((pl <= sh).sum())}/{args.seeds} "
+              f"random reweightings did as well or better")
+        print("\nAny arm inside that spread has not been shown to do anything.")
 
 
 if __name__ == "__main__":
