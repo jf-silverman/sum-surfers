@@ -28,11 +28,11 @@ from pathlib import Path
 
 import cv2
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "code"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "code"))
 import detect_surfers as ds  # noqa: E402
 from get_cropped_frame import ROI_X, ROI_Y, ROI_W, ROI_H  # noqa: E402
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).resolve().parent
 CLIPS_DIR = _PROJECT_ROOT / "data" / "not_needed_in_repo" / "surf_clips" / "2026-08-27"
 OUT_FRAMES_DIR = _PROJECT_ROOT / "data" / "not_needed_in_repo" / "frame_variability_analysis"

@@ -32,7 +32,7 @@ from pathlib import Path
 import cv2
 import pytz
 
-_ROOT = Path(__file__).resolve().parent.parent.parent
+_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_ROOT / "code"))
 import get_clips as gc          # noqa: E402
 import detect_surfers as ds     # noqa: E402

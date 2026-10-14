@@ -22,7 +22,7 @@ import cv2
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
-_ROOT = HERE.parent.parent.parent
+_ROOT = HERE.parents[2]
 sys.path.insert(0, str(_ROOT / "code"))
 import detect_surfers as ds  # noqa: E402
 

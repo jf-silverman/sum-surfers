@@ -18,9 +18,9 @@ from pathlib import Path
 
 import pytz
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "code"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "code"))
 import get_clips as gc  # noqa: E402
 
 OUT_DIR = _PROJECT_ROOT / "data" / "not_needed_in_repo" / "hourly_variability"
