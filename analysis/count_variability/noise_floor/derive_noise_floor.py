@@ -28,21 +28,68 @@ different data or crowd levels:
 It also reports each against crowd level, because noise does scale with level
 and a project-wide floor has to say at what level it applies.
 
-Result, 2026-10-13, on 2026-08-28 08:00-09:00 (3,614 frames, mean 24.65):
+Result, 2026-10-13. Three dense hours, 36 clips, clip means 1.1 to 30.1:
 
-    frame vs 3-frame mean containing it   0.70   <- reproduces the published 0.68
-    frame vs mean of the other 2 frames   1.05
-    frame vs the clip true 300s mean      2.08
+    hour                  mean   self-inc   LOO   vs clip truth
+    2026-10-12 09:00      5.36     0.61     0.91      1.15
+    2026-10-13 08:00     12.09     1.00     1.51      2.08
+    2026-08-28 08:00     24.65     0.69     1.04      2.07
 
-The published figure reproduces almost exactly on an hour whose mean count is
-24.7, well above the 11.5-15.9 the project usually sees. So 0.68 is NOT a
-low-crowd artifact -- it is what that definition yields, and the like-for-like
-number at this level is about 3x larger.
+Pooled by crowd level (per clip):
 
-Consequence: 0.68 does not bound forecast accuracy and should not be quoted as
-the floor the MAE is read against. Pending more dense hours at other crowd
-levels, the defensible statement is that a single frame carries roughly 2
-surfers of error against its clip's true level at a mean count near 25.
+    clip mean   clips   self-inc   LOO   vs clip truth
+    <8            12      0.61     0.92      1.14
+    8-15          10      1.01     1.51      2.15
+    15-22          6      0.75     1.12      1.69
+    22+            8      0.72     1.09      2.28
+
+FINDING 1 -- the published figure is a definition artifact, and the bias is
+exactly mechanical. Over all 1,903 clips in predictions.csv the self-inclusive
+definition gives 0.690 and the leave-one-out gives 1.035; the ratio is 1.50,
+precisely the 3/2 predicted algebraically when the scored frame sits inside a
+3-frame mean. That 1.5x holds in all three dense hours (0.61->0.91,
+1.00->1.51, 0.69->1.04). The quantity itself does NOT hold: the same
+definition returns 0.61, 1.00 and 0.69 on the three hours, so 0.68 is not even
+a stable estimate of what it does measure.
+
+FINDING 2 -- target noise is mostly ADDITIVE, not proportional to crowd size.
+This is the question the new hours were collected to settle, and the design
+answers it cleanly: 2026-10-13 08:00 and 2026-08-28 08:00 are the SAME clock
+hour on the same camera, so light and geometry are held constant while the
+mean count halves from 24.65 to 12.09. The per-frame error did not move --
+2.07 against 2.08. Proportional noise would have predicted about 1.0.
+
+Fitted across all 36 clips:
+
+    MAD = 0.0427 * mean_count + 1.173     r = 0.607, p = 0.0001
+    slope 95% CI +0.0239 to +0.0614
+
+The intercept carries nearly all of it. There IS a weak proportional term --
+the slope is significantly positive -- but it is small: noise grows only about
+0.85 surfers across a 3x increase in crowd size. And the coefficient of
+variation falls monotonically with level (0.59, 0.28, 0.24, 0.11, 0.11), which
+a proportional model requires to be constant.
+
+CONSEQUENCE for MODEL_CARD. The "target noise floor is 0.68 surfers" should be
+replaced. A single extracted frame carries roughly
+
+    1.2 + 0.043 * count
+
+surfers of error against its hour's true level -- about 1.7 at the project's
+typical mean count of 11.5-15.9, and 2.3 on the most crowded hours. That is
+roughly 2.5x the published figure, so the headroom between the model's MAE and
+the floor it is read against is materially smaller than published.
+
+NOT claimed: that the forecast's level-proportional interval width is wrong in
+shape. The band must cover real day-to-day crowd variation as well as
+measurement error, and that component may well scale with level. This result
+constrains the measurement term only. MODEL_CARD's defence of sd ~ sqrt(mu) is
+about the total, and testing it needs a separate analysis.
+
+Caveat: three hours, all from one camera, two in October 2026 and one in
+August 2026, all passing the quality gate. The additive result rests mainly on
+the matched-clock-hour pair, which is the strongest piece of evidence here but
+is still a single pair.
 
 Usage:
     python analysis/count_variability/noise_floor/derive_noise_floor.py
