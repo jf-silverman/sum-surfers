@@ -5033,3 +5033,104 @@ rules and the `PROJECT_FILES.md` rows were updated. **The three older
 references in this file were deliberately left pointing at the old paths**,
 because they record what those folders were called on the day each entry was
 written; this entry is the forwarding address.
+
+### 2026-10-14 — The target noise floor was a definition artifact; two dense hours settle how it scales
+
+`MODEL_CARD.md` published a **target noise floor of 0.68 surfers** and told the
+reader to judge the headline forecast MAE against it. The figure is withdrawn.
+It was defined as the spread between one extracted frame and the 3-frame mean
+**of its own clip**, which has two defects that compound:
+
+- The frame being scored sits *inside* the mean it is scored against. For three
+  frames that deflates the result by exactly **3/2** — the closed form, and
+  measured at 1.50 across all 1,903 clips carrying `frame_count_1/2/3` in
+  `predictions.csv` (0.690 self-inclusive against 1.035 leave-one-out).
+- The reference frames are **1.5 s away**, and counts decorrelate only over
+  about **60 s** (r = 0.83 at 1 s lag, 0.58 at 10 s, 0.03 at 60 s). So the
+  reference is nearly the same observation, not a stand-in for the clip's level.
+
+It was also not a stable estimate of its own quantity: the same definition
+returns **0.61, 1.00 and 0.69** on the three dense hours now available.
+
+**Two new dense hours were collected to settle how the floor scales**, chosen by
+shape rather than at random. The pivotal design choice: `2026-10-13 08:00-09:00`
+is the **same clock hour on the same camera** as the existing `2026-08-28
+08:00-09:00` study, so light and camera geometry are held constant while the mean
+count halves.
+
+| hour | frames | mean count | 1 frame vs clip truth | production target |
+|---|---:|---:|---:|---:|
+| 2026-10-12 09:00 | 3,636 | 5.36 | 1.15 | 1.00 |
+| 2026-10-13 08:00 | 3,612 | 12.09 | 2.08 | 1.82 |
+| 2026-08-28 08:00 | 3,614 | 24.65 | 2.07 | 1.96 |
+
+**Target noise is close to additive, not proportional to crowd size.** The
+matched pair is the evidence: the mean count fell from 24.65 to 12.09 and the
+per-frame error did not move (2.07 against 2.08), where a proportional model
+predicted about 1.0. Fitted across all 36 clips (clip means 1.1 to 30.1) on the
+production target, `MAE = 0.0454 × mean_count + 0.954` (r = 0.643, p < 0.0001,
+slope 95% CI 0.027–0.064). The intercept carries most of it; the coefficient of
+variation falls monotonically with level (0.59, 0.28, 0.24, 0.11, 0.11) where a
+proportional model requires it constant.
+
+**The floor is measured on what the forecast actually trains on.** Reading the
+docs during the write-up corrected the analysis mid-flight: the target is not one
+frame but `round(frame_count_mean)`, the rounded mean of the three frames cut at
+1.0/2.5/4.0 s (`build_training_features.py`'s `resolve_target_count()`). On that
+estimator the floor is **1.59 pooled, about 1.5 at the project's typical mean
+count of 13** — roughly 2.3× the withdrawn figure, so the model's headroom above
+the floor is materially smaller than published.
+
+**Multi-frame averaging buys 20%, not 42%.** One frame scores 2.00 against a
+clip's true level and the rounded 3-frame mean scores 1.59 — a fifth, where three
+independent samples would give 42%, because the three frames are 1.5 s apart and
+nearly the same observation. Spreading them across the whole clip would cut
+single-frame error from 2.07 to **1.17** on the 2026-08-28 hour. Cheap and real,
+but it needs a re-extraction and re-detection pass over the archive to apply
+retroactively, so it is logged in the ideas doc rather than adopted.
+
+**The mean beats the median, and the gap widens as the frames get more
+independent.** Checked because the median is the standard defence against
+outliers. It loses at every configuration tested, on all 36 clips, against each
+clip's own per-second level: 3 frames at production spacing **1.590 mean against
+1.621 median**; 3 frames spread across the clip **0.876 against 1.067**; 5 frames
+spread **0.636 against 0.830**. Paired p < 1e-6 in all three, and the median wins
+in only 4, 3 and 1 of 36 clips respectively. The reason is that the
+within-clip variation is not outlier-driven: pooled standardised residuals over
+all 10,862 frames have **excess kurtosis +0.089** and skew −0.173, with 0.285% of
+frames beyond |z| > 3 where normal tails predict 0.27%. With no heavy tail there
+is nothing for the median to protect against, while the median of three discards
+two thirds of the information (about 74% efficiency on symmetric data) — which is
+the penalty that shows up. The |z| > 4 rate, 0.018% against 0.006% expected, says
+a thin excess tail does exist; it is far too rare to pay for. Production keeps the
+mean. The place to handle a genuinely ambiguous clip is the `frame_count_stdev`
+disagreement signal, not a robust statistic that silently absorbs it.
+
+**Not claimed:** that the forecast's level-proportional interval width is wrong in
+shape. That band covers real day-to-day crowd variation as well as measurement
+error, and the former may well scale with level. This result constrains the
+measurement term only; `MODEL_CARD`'s defence of sd ≈ √μ is about the total.
+
+**Two bugs found on the way in**, both from the 2026-09-30 folder reorganisation
+and both latent until something tried to use the scripts:
+
+- `analyze_hourly_variability_full.py` wrote to a fixed `hourly_variability_full.csv`
+  with mode `"w"`. Running it for a second date would have **silently erased the
+  2026-08-28 hour**, the only dense hour the project had and the basis of every
+  number above. Outputs are now date-stamped and the existing file carries its
+  date; `plot_hourly_full_strip.py` takes the date as an argument.
+- Six scripts under `analysis/count_variability/` computed the project root as
+  `parent.parent.parent`, correct one level shallower but resolving to
+  `<repo>/analysis` after the move. All six were broken — the clip download died
+  on `ModuleNotFoundError: No module named 'get_clips'` and left twelve empty
+  directories behind. Now `parents[3]`.
+
+The 36 source clips (2.5 GB) were deleted after extraction, with the 10,862
+per-second frames and the three CSVs verified first. Note that
+`data/not_needed_in_repo/hourly_variability/` was never watched by
+`manage_clips.py --check`, which only monitors `surf_clips` against
+`CLIPS_DIR_LIMIT_GB`, so nothing would have warned about it.
+
+Analysis: `analysis/count_variability/noise_floor/derive_noise_floor.py`, which
+globs every dense-hour CSV so new hours need no edit, and reports noise against
+crowd level because a floor has to say at what level it applies.

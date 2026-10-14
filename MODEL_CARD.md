@@ -5,7 +5,7 @@ frame, and a **forecast model** that predicts how many will be out in a given
 hour. Every number below was measured, not estimated; where a figure has a
 known caveat it is stated next to the figure rather than in a footnote.
 
-Last updated 2026-10-09.
+Last updated 2026-10-14.
 
 ---
 
@@ -152,10 +152,30 @@ rows.
 test rows as the record has since grown): the model's MAE of 6.79 beats the
 strongest naive reference — persistence, yesterday's count at the same hour, at
 **8.09** — by **16%**. Climatology by hour × weekend scores 10.82, a trailing
-7-day level 11.28, seasonal naive 17.26. The **target noise floor is 0.68
-surfers**, the spread between one extracted frame and the 3-frame mean of its
-clip across 1,750 clips; no forecast can beat that. Read the headline MAE between
-those two numbers, not on its own. *(The calibration section below reports 71.9% for the same interval on the
+7-day level 11.28, seasonal naive 17.26. The **target noise floor is about 1.5
+surfers** at typical crowd levels — the error in the production target
+(`round(frame_count_mean)`, the rounded mean of the 3 frames cut at 1.0/2.5/4.0 s)
+against its hour's true level, measured on three dense hours sampled at 1 fps
+(10,862 frames, 36 clips, hour means 5.4 / 12.1 / 24.7). No forecast can beat
+that. Read the headline MAE between those two numbers, not on its own.
+
+The floor is close to **additive** rather than proportional to crowd size:
+MAE ≈ 0.95 + 0.045 × count (r = 0.643, p < 0.0001, slope 95% CI 0.027–0.064),
+so about 1.0 on a quiet hour and 2.2 on a crowded one. The matched pair that
+shows this is 2026-10-13 08:00 against 2026-08-28 08:00 — same clock hour, same
+camera, so light and geometry are held constant while the mean count halves from
+24.7 to 12.1. Per-frame error did not move (2.07 against 2.08) where a
+proportional model predicted about 1.0.
+
+*(An earlier figure of **0.68** is withdrawn. It compared each frame to a 3-frame
+mean **containing that frame**, which deflates the result by exactly 3/2 — the
+closed form, confirmed at 1.50 across all 1,903 clips — and used frames 1.5 s
+apart when counts decorrelate only over about 60 s, so the reference was nearly
+the same observation. It also was not stable: the same definition returns 0.61,
+1.00 and 0.69 on the three dense hours. See
+[`analysis/count_variability/noise_floor/`](analysis/count_variability/noise_floor/).)*
+
+*(The calibration section below reports 71.9% for the same interval on the
 same rows. Both are right: the released bundle enforces monotonicity between the
 shipped q0.10/q0.90 pair alone, while the calibration chart fits a nine-level
 quantile ladder and enforces it across all of them, which nudges the upper bound

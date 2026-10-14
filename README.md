@@ -155,7 +155,10 @@ detail and a link to the in-depth write-up.
    cropped to the same fixed [region of interest](docs/HOW_IT_WORKS.md#term-roi)
    — a 1280×180 strip. Three frames rather than one because counts on the same
    stretch of water swing by several surfers within seconds as waves pass and
-   people duck under; averaging cuts that noise.
+   people duck under; averaging cuts that noise — though by less than it looks,
+   **20% rather than the 42% three independent samples would give**, because
+   frames 1.5s apart are nearly the same observation. Measured 2026-10-14 on
+   three hours sampled once per second.
    → [Multi-frame count averaging](docs/HOW_IT_WORKS.md#multi-frame-count-averaging)
 
 3. **Screen out unusable pictures.**

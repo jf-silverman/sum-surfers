@@ -70,6 +70,18 @@ naive forecast built on it scores well.
 the 3-frame mean of its clip, over 1,750 clips. No forecast can beat that; it is
 measurement noise in the target.
 
+> **Withdrawn 2026-10-14.** This figure is a definition artifact. The frame being
+> scored sits *inside* the mean it is scored against, which deflates the result
+> by exactly 3/2 (the closed form; measured at 1.50 across all 1,903 clips), and
+> the reference frames are 1.5s away when counts decorrelate only over ~60s, so
+> they are nearly the same observation. The replacement, measured on three dense
+> hours at 1 fps, is about **1.5 surfers** at typical crowd levels for the actual
+> production target `round(frame_count_mean)` — roughly 1.0 on a quiet hour and
+> 2.2 on a crowded one, close to additive rather than proportional
+> (MAE ≈ 0.95 + 0.045 × count). The conclusion of this section is unchanged in
+> direction but the margin is smaller: the model's MAE is read against a floor of
+> ~1.5, not 0.68. See `analysis/count_variability/noise_floor/`.
+
 **Post-hoc recalibration, tested out-of-sample**
 (`analysis/forecast_recalibration/`). Fitted only on earlier target dates, 625
 rows over 10 dates:

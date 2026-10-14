@@ -76,6 +76,20 @@ results. `predictions.csv` stores the full detail, not just the average:
   to how `lap_var` flags an unreliable *image* rather than an unreliable
   *count*.
 
+**How much the averaging is actually worth** (measured 2026-10-14, three hours
+sampled once per second — 10,862 frames, 36 clips; see
+`analysis/count_variability/noise_floor/`). Against a clip's true per-second
+level, one frame is off by **2.00** surfers and the rounded 3-frame mean by
+**1.59** — a 20% reduction, where three *independent* samples would give 42%.
+The three frames sit 1.5s apart and counts 1–3s apart correlate at r = 0.83 to
+0.77, so they are close to the same observation. Counts only decorrelate over
+about **60 seconds**: r = 0.58 at 10s, 0.03 at 60s.
+
+Spreading the three frames across the whole clip instead would cut the error to
+**1.17** on the 2026-08-28 hour, a 43% reduction rather than 20%. That is a real
+and cheap improvement, but it needs a re-extraction and re-detection pass over
+the archive to apply retroactively, so it is logged rather than adopted.
+
 **Historical backfill**: for existing `predictions.csv` rows where the raw
 clip is still on disk, `code/backfill_multiframe_counts.py` fills in the
 `frame_count_*` columns without touching the original `surfer_count`/
