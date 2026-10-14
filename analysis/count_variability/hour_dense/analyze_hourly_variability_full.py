@@ -32,7 +32,11 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 HERE = Path(__file__).resolve().parent
 BASE_DIR = _PROJECT_ROOT / "data" / "not_needed_in_repo" / "hourly_variability"
 OUT_FRAMES_DIR = _PROJECT_ROOT / "data" / "not_needed_in_repo" / "hourly_variability_frames_full"
-OUT_CSV = HERE / "hourly_variability_full.csv"
+# Date-stamped (2026-10-13): this file is opened with mode "w", so a fixed
+# name meant running a second date silently ERASED the first hour. The only
+# dense hour the project had was nearly lost this way.
+def out_csv(date):
+    return HERE / f"hourly_variability_full_{date}.csv"
 
 CSV_HEADER = ["date", "clip_time", "second", "quality_ok", "quality_reason",
               "brightness", "lap_var", "count"]
@@ -123,12 +127,12 @@ def main():
             })
 
         # Flush progress after every clip so a long run can be checked on partway through.
-        with open(OUT_CSV, "w", newline="") as f:
+        with open(out_csv(args.date), "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=CSV_HEADER)
             writer.writeheader()
             writer.writerows(rows)
 
-    print(f"\nWrote {len(rows)} rows to {OUT_CSV}")
+    print(f"\nWrote {len(rows)} rows to {out_csv(args.date)}")
 
     from collections import defaultdict
     by_clip = defaultdict(list)

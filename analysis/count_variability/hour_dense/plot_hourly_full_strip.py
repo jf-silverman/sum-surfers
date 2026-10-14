@@ -22,7 +22,9 @@ sns.set_theme(style="darkgrid", rc={
 AQUA = "#3ab4c9"
 LIME = "#9de35a"
 
-df = pd.read_csv(HERE / "hourly_variability_full.csv")
+import sys
+_date = sys.argv[1] if len(sys.argv) > 1 else "2026-08-28"
+df = pd.read_csv(HERE / f"hourly_variability_full_{_date}.csv")
 df = df[df["quality_ok"]].copy()
 
 def label_for(clip_time):
