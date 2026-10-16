@@ -5,7 +5,7 @@ frame, and a **forecast model** that predicts how many will be out in a given
 hour. Every number below was measured, not estimated; where a figure has a
 known caveat it is stated next to the figure rather than in a footnote.
 
-Last updated 2026-10-14.
+Last updated 2026-10-15.
 
 ---
 
@@ -129,7 +129,13 @@ ahead, from publicly available surf and weather forecasts.
 
 ### Architecture
 `HistGradientBoostingRegressor` with Poisson loss for the point estimate, plus
-two quantile models (q0.10 / q0.90) for the prediction interval. **34 features**:
+two quantile models (q0.10 / q0.90) for the prediction interval. The target is
+`round(frame_count_mean)` — the rounded mean of the three frames cut at
+1.0/2.5/4.0 s. The Poisson objective is load-bearing: squared
+error costs **+0.43 MAE** on 16 rolling origins (p < 0.05, better on only 3 of
+16). This confirms the September 5-fold comparison (6.238 against 6.461) on a
+forward split, the earlier one having used the random-hour split later found to
+leak. **34 features**:
 surf height, swell height/period/direction, wind speed/gust/direction, tide,
 rating, wave energy, consistency, observed and forecast weather, plus cyclical
 hour/month encodings, `is_weekend` and `is_night`.
@@ -233,7 +239,12 @@ for the current record.
   72-combination hyperparameter grid landed within noise of each other.
   Measured and rejected on rolling origins: previous-day lags, lunar tide
   structure, day-of-week one-hots, raw hour, deeper trees, weekend×hour
-  interactions, within-day rank features, tide bands, tide-window structure.
+  interactions, within-day rank features, tide bands, tide-window structure,
+  and training on the **unrounded** 3-frame mean instead of the rounded one
+  (+0.07 MAE, p = 0.25, and inside a placebo null built by permuting the same
+  rounding deltas — 3 of 8 random seeds did as well or better). Rounding
+  displaces the target by 0.188 surfers on average, against a target whose own
+  measurement noise is about 1.5, so there was nothing there to recover.
   Day-level aggregate predictors are the only idea to have moved MAE the right
   way (−0.09), and that is not significant either.
 - **The apparent under-call at crowded hours is mostly a measurement artifact.**

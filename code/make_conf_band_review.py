@@ -172,7 +172,11 @@ def main():
                                  # undetected, so their pose is the signal.
                                  pose="", notes="",
                                  filename=r.filename,
-                                 nobox_misses_this_frame=int(r.nobox)))
+                                 # Renamed from nobox_misses_this_frame
+                                 # 2026-10-15; every consumer reads by column
+                                 # name, so a rerun must not resurrect the old
+                                 # one beside the filled-in column.
+                                 boxes_missed=int(r.nobox)))
             n_boxes += len(band)
         if i % 40 == 0:
             print(f"  {i}/{len(s)}", flush=True)

@@ -5134,3 +5134,125 @@ per-second frames and the three CSVs verified first. Note that
 Analysis: `analysis/count_variability/noise_floor/derive_noise_floor.py`, which
 globs every dense-hour CSV so new hours need no edit, and reports noise against
 crowd level because a floor has to say at what level it applies.
+
+### 2026-10-15 — The rounded target is fine; the Poisson loss is the thing that matters
+
+Joel asked whether the forecast should train on the **unrounded** 3-frame mean.
+The question follows directly from the noise-floor work: the target is
+`round(frame_count_mean)`, and the rounding was never a measured choice — it is
+there because `detect_surfers.py` publishes an integer and the features table
+copied it (`build_training_features.py`'s `resolve_target_count()`).
+
+Rounding does destroy real information. A 3-frame mean of integers lands on a
+third, so it moves **57.0% of rows** by 0.33, with a mean displacement of
+**0.188 surfers**.
+
+**It does not help.** 1,917 rows / 144 days, 16 rolling origins:
+
+| arm | MAE | vs base | p | better |
+|---|---:|---:|---:|---:|
+| `round_poisson` (production) | 6.927 | — | — | — |
+| `exact_poisson` | 6.992 | +0.066 | 0.253 | 7/16 |
+| `round_squared` | 7.355 | +0.428 | 0.046 | 3/16 |
+| `exact_squared` | 7.379 | +0.453 | 0.032 | 5/16 |
+
+The placebo settles it, and this is the first result where the procedure adopted
+the day before did its job before anything was reported. Permuting the same
+rounding deltas among the training rows — same marginal perturbation, wrong
+rows — gives a null of **mean +0.078, sd 0.061**. The unrounded arm's +0.066
+sits inside that distribution, with **3 of 8 random seeds doing as well or
+better**. Whatever unrounding does to the fit cannot be distinguished from
+perturbing the target by the same amount in the wrong places.
+
+The magnitudes said so in advance: recovering a 0.19 detail of a quantity whose
+own measurement noise is about 1.5 surfers is below the noise, and far below the
+0.78-surfer refit noise. Production keeps `round()`.
+
+**The design point worth keeping.** An arm trained on a different target cannot
+be scored against its own target — "MAE against the unrounded mean" and "MAE
+against the rounded count" are different quantities, and the smoother one is
+mechanically easier to hit. Every arm is scored against the same held-out truth,
+and both choices of truth are reported; they agree within 0.01, so nothing
+hinges on which is primary.
+
+**The control arms found the real result: squared error costs +0.43 MAE**
+against Poisson (p < 0.05 on both truths, better on only 3 of 16 origins). That
+is the only significant effect in the table and an order of magnitude above the
+rounding question.
+
+This is not a new discovery — `analysis/surf_count_model_selection/` already
+measured it in September, Poisson 6.238 against squared_error 6.461 — but that
+comparison ran on the random-hour split later found to leak, and it carried no
+significance test. The gap is wider on a forward split (+0.43 against +0.22) and
+now has one, which upgrades a ranking already known to survive the split fix
+into a measured effect on the split the project actually reports.
+`MODEL_CARD.md` says so. Gamma and Tweedie are untested:
+`HistGradientBoostingRegressor`'s gamma loss needs a strictly positive target
+and about 15% of hours are empty.
+
+Analysis: `analysis/forecast_target_rounding/test_target_rounding.py`.
+
+### 2026-10-15 — The tide feature is astronomy, so a Kelvin wave is invisible to it
+
+Joel reported that a coastally trapped Kelvin wave is raising the local tide by
+1 to 1.5 ft, expects a series of them this fall and winter, and asked whether it
+is changing when people show up.
+
+**The 1–1.5 ft is right.** Measured at NOAA station 9413450 (Monterey; Santa
+Cruz's 9413745 has no MLLW datum and is not a full station), as observed water
+level minus the harmonic prediction. Daily-mean residual rose from 0.51 ft in
+late September to **1.33 ft on 2026-10-10**, peak hourly **1.83 ft**, relaxing to
+0.79 ft by 10-15. Comparing like months to control for the seasonal cycle and
+datum drift, **October 2026 averaged 0.995 ft against October 2025's 0.237 ft —
+a 0.76 ft year-over-year rise.** Monterey is ~25 miles across the bay, which is
+fine for a wave whose cross-shore scale is 12–20 miles and which propagates
+~150 miles/day, and wrong for anything local and fast.
+
+**The finding that matters: the signal cannot reach the model.** `tide_ft` comes
+from Surfline's `tides` forecast endpoint, a harmonic prediction — astronomy, by
+construction free of any non-tidal residual. So a +1 ft rise in actual water
+level is absent from all 34 features.
+
+It also corrupts three features already in use. The `good_tide_*` family
+thresholds *predicted* tide at `GOOD_TIDE_MAX_FT`. Share of daylight hours
+actually below it:
+
+| | by predicted tide (the feature) | by observed level | overstated by |
+|---|---:|---:|---:|
+| Oct 2025 | 39.2% | 32.8% | 6.5 pp |
+| Oct 2026 | 41.7% | **19.4%** | **22.2 pp** |
+
+In the current event the feature claims more than twice the good-tide window
+that exists.
+
+**The arrival-timing question was NOT tested, deliberately.** Only 190 rows over
+14 days sit in the elevated period, and the residual rises almost monotonically
+across the whole record (0.24 → 0.99 ft), so it is near-collinear with time —
+on top of season and year already being perfectly confounded here. An arm using
+the raw residual would mostly learn "recent". Against a 0.78-surfer refit-noise
+floor, a test today would produce a number that could not be defended. The
+identification that will work is the residual's deviation from a trailing
+30-day mean, which strips the trend: hourly sd 0.351 ft, 0.147 ft on daily
+means. Real, small, and in need of months rather than weeks.
+
+So the data collection was built now and the modelling deferred:
+`code/backfill_tide_residual.py` writes hourly observed/predicted/residual plus
+the trailing mean and detrended deviation to
+`data/predictor_vars/tide_residual.csv`, 9,829 rows back to 2025-09-01,
+incremental and idempotent. It is a predictor file and nothing else — no
+features added, no thresholds changed, not in the nightly pipeline.
+
+Two constraints recorded in the script because they are easy to get wrong later:
+the trend column uses a **trailing** window, since a centred one needs future
+observations and would leak into any backtest; and NOAA forecasts no non-tidal
+residual at all, so serving this feature at a 1–7 day lead means persisting the
+last observed value — defensible for a signal that varies over weeks, but an
+assumption that has to be stated rather than buried.
+
+Context: CPC's September discussion kept an El Niño Advisory with >90% odds of a
+very strong event for winter 2026–27 and 75% on a historic one for Oct–Dec, with
+downwelling events logged in Dec 2025, Jan, Mar and Jun 2026. More pulses are
+the base case, which is what makes the collection worth starting now.
+
+Noted in passing, not changed: `GOOD_TIDE_MAX_FT` is 3.5 in
+`build_training_features.py` and 3.0 in `plot_daily_prediction.py`.
