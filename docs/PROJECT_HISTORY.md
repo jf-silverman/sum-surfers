@@ -5320,3 +5320,64 @@ event alone reached 1.83 ft hourly — a 2 ft winter residual would give the
 physical channel a materially stronger test than anything in this record.
 
 Analysis: `analysis/forecast_tide_residual/test_tide_residual.py`.
+
+### 2026-10-15 — Both masking candidates from the review notes turn out not to need a mask
+
+Joel's confidence-band review notes repeatedly flagged two false-positive
+sources for masking: "edge — tree bough; revisit tree bough masking" (14 boxes)
+and "head of person on shore… we may need to mask out this area" (8 boxes).
+`analysis/static_fp_zones/map_static_fp.py` tests a candidate zone against the
+record rather than eyeballing one, using the signature that a fixed object
+detects at the same pixel location across many distinct **days** while a surfer
+detects once at high confidence. Sampling spans all hours, because an earlier
+pass that took only the first frame of each day could not have seen an object
+that is lit at midday and invisible at dawn.
+
+**Tree boughs: already masked, no change.** Joel described the conifer as several
+horizontal boughs at different heights, not connected vertically, the lower ones
+reaching further into the frame — which is what rules out the obvious fix. Over
+160 frames spanning 93 days, exactly one cluster has the static signature:
+x 1276, y 68–80, at 11–18 distinct days each. That is inside the existing
+`TREE_MASK (1268, 58, 1280, 87)`, and all 14 flagged boxes sit in it. The lower
+boughs are plainly visible — one measured reaching to about x 1242 at y 114–128 —
+but they do not fire, presumably because they are larger and sit against the dark
+shoreline instead of being thin silhouettes against water. A rectangle spanning
+y 58 to 158 would blanket the water between boughs, and that water is productive:
+bins at y 76–92, x 1150–1200 carry real detections at confidence 0.69–0.77. One
+watch item, `(1268, 128)` at 2 days and mean confidence 0.234, which clears the
+0.195 production threshold and matches the lower bough.
+
+**Shore heads: no mask possible, and this is the more interesting negative.**
+Unlike the boughs, all 8 survive into production. But the day-count test returns
+nothing — no bin reaches 5 days. The reason is that these are not a fixed
+object. They are *people*, who stand in different places, so a fixed object's
+signature cannot appear however long the sample. The unit has to be the band:
+
+| region | bins | boxes | mean confidence |
+|---|---:|---:|---:|
+| y 164–180, the shore edge | 11 | 18 | 0.359 |
+| y < 164, water at the same x | 9 | 10 | 0.741 |
+
+That points at a confidence-conditional zone, which is the idiom `FLAG_MASK`
+already uses. Against the reviewed boxes, a candidate `(500, 164, 625, 180)`
+holds 7 not-surfers at confidence 0.108–0.181 **and one confirmed surfer at
+(596, 175) at confidence 0.181** — the top of the false-positive range, so no
+confidence cut separates them. That row is also the one Joel annotated "edge
+truncated; could be on shore person's head" at `js_confidence` 0.6, his least
+certain yes. Inspecting the strip settles it: x 480–650, y 150–180 is water, not
+sand, with head-sized dark blobs in it — the inside where people genuinely stand
+and sometimes surf.
+
+So 7-for-1 looks like a good trade until the 1 turns out to sit in water at a
+confidence the 7 reach, on a sample of 8 boxes. No mask. This becomes a known,
+measured, accepted false-positive source rather than an open question, and gets
+revisited when more reviewed rows land in the band.
+
+**Also found, and more consequential than either:** `make_conf_band_review.py`
+built its review set with `survive()`, which applies only `suppress_contained` —
+production also runs `nms_across_tiles` and `filter_false_positive_zones`. So 20
+of the 136 boxes reviewed so far cannot reach `predictions.csv` at all, and 18 of
+those 20 are false positives. On the 116 boxes production would actually emit the
+real rate is **55.2%** (js-weighted 53.3%) against 48.5% on the raw 136, so the
+batch is healthier than the raw count suggests and still clears the 42% F1
+break-even. The generator needs to use the production path.
