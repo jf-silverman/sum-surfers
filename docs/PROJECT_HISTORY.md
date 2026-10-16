@@ -5256,3 +5256,67 @@ the base case, which is what makes the collection worth starting now.
 
 Noted in passing, not changed: `GOOD_TIDE_MAX_FT` is 3.5 in
 `build_training_features.py` and 3.0 in `plot_daily_prediction.py`.
+
+### 2026-10-15 — Correcting the tide to physical reality makes the forecast worse
+
+Follow-up to the Kelvin-wave entry above. `tide_ft` is Surfline's harmonic
+prediction and is currently about a foot below actual water level, and
+permutation importance on a forward split ranks it **1 of 33 at 6.81**, against
+0.92 for the next feature — so the model's most-relied-upon input is
+systematically wrong about the physical quantity. (That figure is inflated:
+tide correlates with hour and date, and permutation breaks those joint
+structures. Read it as heavy reliance, not 6.8 surfers of causal signal.)
+
+Joel predicted it would not matter, with a mechanism: surfers are not tracking
+the Kelvin wave, they read the Surfline tide chart and paddle out when it says
+the tide is low. If that is the whole story the harmonic value is the
+**behaviourally** correct input and correcting it should make things worse.
+
+He was right. 1,927 rows / 145 days, 16 rolling origins:
+
+| arm | MAE | vs base | p | better |
+|---|---:|---:|---:|---:|
+| `base` | 6.753 | — | — | — |
+| `corrected` (tide_ft + residual) | 7.033 | +0.280 | 0.102 | 5/16 |
+| `both` (residual as its own column) | 6.786 | +0.033 | 0.507 | 7/16 |
+| `dev_only` (detrended residual added) | 6.842 | +0.089 | 0.165 | 6/16 |
+
+Nothing helps, nothing is significant, and `both` sits inside the
+add-a-column placebo null (mean +0.017, sd 0.030) — this project's standard
+result for a new feature.
+
+**The controls are the methodological point, and they had to be built in two
+stages.** The first control scrambled the residual and cost +0.631, making the
+real correction look good by comparison — less than half as damaging. That
+reading was wrong: a permuted residual is white noise hour to hour while the
+real one is smooth and slowly varying, so the comparison partly measures
+*smooth beats jagged* rather than *right beats wrong*. The second control fixes
+it by rolling the residual forward by whole days, which preserves the
+autocorrelation exactly and breaks only the alignment with the hours it belongs
+to. Against that, `corrected` wins 7 of 8 seeds by about 1.3 sd, with one
+shifted seed doing better.
+
+So the residual does carry some information about these specific hours, weakly.
+It is still not worth using: beating a *wrong* correction while remaining worse
+than *no* correction means the signal is real but too small to pay for
+disturbing the dominant feature.
+
+**What this does not settle.** The behavioural explanation is consistent with
+every number here, but so is the simpler one — that the physical effect exists
+and sits below the ~1.5-surfer target noise floor. Both predict this exact
+pattern and this test cannot separate them. What it does rule out is that
+correcting `tide_ft` is free; it is a measurable loss.
+
+Also corrected from the previous entry: the `good_tide_*` family was described
+there as a defect worth fixing, because the Kelvin wave makes it overstate the
+good-tide window by 22 percentage points. Permutation importance says those
+three features are worthless — `good_tide_hours` −0.005, `good_tide_frac`
+−0.023, `good_tide_hours_left` +0.085, two of them negative. Fixing a feature
+that carries no weight buys nothing, so that recommendation is withdrawn.
+
+Nothing was adopted. `data/predictor_vars/tide_residual.csv` keeps collecting,
+because it is free and because these rows top out at +1.38 ft while the October
+event alone reached 1.83 ft hourly — a 2 ft winter residual would give the
+physical channel a materially stronger test than anything in this record.
+
+Analysis: `analysis/forecast_tide_residual/test_tide_residual.py`.
