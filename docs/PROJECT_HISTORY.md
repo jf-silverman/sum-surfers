@@ -5498,3 +5498,45 @@ Stated limit: at 15–20 days per weekday the smallest detectable difference is
 about 8.4 surfers, larger than the weekend effect itself. Large day-to-day
 differences are ruled out; small ones are not. Worth revisiting after another
 winter, when ~30 days per weekday brings that to about 6.
+
+### 2026-10-17 — The weekend×hour interaction buys nothing, and 16 origins cannot resolve 0.1 MAE
+
+The per-hour weekend box plot showed the weekend gap is confined to 08:00–17:00
+— dawn patrol and the last session are identical seven days a week, and 18:00
+and 19:00 actually run *quieter* at the weekend (18 vs 16, 11 vs 7). The live
+model carries a plain binary `is_weekend` beside `hour_sin`/`hour_cos`, which
+cannot express that shape as a linear term, so
+`analysis/forecast_weekend_hour/` tested handing the interaction over
+explicitly: `wx_trig` (the unused pair in `build_dow_features`), `wx_raw`,
+`wx_work` (`is_weekend × 1[08:00–17:00]`, the window fixed a priori), and
+`dow_onehot` for comparison.
+
+**The verdict is NO, and the run order is the finding.**
+
+| | 16 origins | 30 origins | 101 origins |
+|---|---:|---:|---:|
+| `wx_work` | −0.084 | +0.101 | +0.029 |
+| placebo seeds as good | 0/8 | 12/12 | 6/6 |
+
+At 16 origins every arm improved and cleared both controls outright, including
+a fake-weekend control that permutes the label across dates. At 30 — the same
+cut list, more of it — every arm was worse. At all 101 they land on nothing and
+no arm beats the add-a-column null.
+
+The per-origin delta has sd 0.27–0.36, so the standard error of the mean is
+±0.09 at 16 origins, ±0.065 at 30 and ±0.030 at 101. Both the −0.084 and the
++0.101 sit inside one standard error of zero. **Sixteen rolling origins
+resolves about 0.25 MAE, not 0.1; resolving 0.1 takes roughly 80.**
+
+This project has used 16 origins as its default — the tide-residual and
+target-rounding tests were both decided there. No published conclusion changes,
+since those concluded NO and noise cannot manufacture a null. The magnitudes
+carry about ±0.09, and 16 origins should not be used again for a claim under
+about 0.25 MAE. The full cut list is free: the 101-origin run took about
+fifteen minutes. The script now prints the per-origin sd and standard error on
+every arm so the resolution limit is visible in the output.
+
+The interaction itself is not in doubt in the counts. The tree ensemble simply
+already has it — trees represent interactions by splitting on one feature
+inside a branch of another, so the product column was a hint the learner did
+not need.

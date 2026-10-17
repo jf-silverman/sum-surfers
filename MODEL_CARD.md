@@ -5,7 +5,7 @@ frame, and a **forecast model** that predicts how many will be out in a given
 hour. Every number below was measured, not estimated; where a figure has a
 known caveat it is stated next to the figure rather than in a footnote.
 
-Last updated 2026-10-15.
+Last updated 2026-10-17.
 
 ---
 
@@ -239,7 +239,11 @@ for the current record.
   72-combination hyperparameter grid landed within noise of each other.
   Measured and rejected on rolling origins: previous-day lags, lunar tide
   structure, day-of-week one-hots, raw hour, deeper trees, weekend×hour
-  interactions, within-day rank features, tide bands, tide-window structure,
+  interactions (re-tested 2026-10-17 on all 101 origins after the box plot
+  showed the weekend gap is confined to 08:00–17:00: +0.010 to +0.029 MAE, no
+  arm beating the add-a-column null — the tree ensemble already represents the
+  interaction by splitting on one feature inside a branch of another),
+  within-day rank features, tide bands, tide-window structure,
   and training on the **unrounded** 3-frame mean instead of the rounded one
   (+0.07 MAE, p = 0.25, and inside a placebo null built by permuting the same
   rounding deltas — 3 of 8 random seeds did as well or better). Rounding
@@ -247,6 +251,15 @@ for the current record.
   measurement noise is about 1.5, so there was nothing there to recover.
   Day-level aggregate predictors are the only idea to have moved MAE the right
   way (−0.09), and that is not significant either.
+- **How finely these tests can resolve anything.** The per-origin MAE delta has
+  a standard deviation of 0.27–0.36, so the standard error of a mean over 16
+  rolling origins is about ±0.09 and over all 101 about ±0.03. Sixteen origins
+  resolves roughly 0.25 MAE, not 0.1. The weekend×hour test demonstrated this
+  directly on 2026-10-17: the same arm read −0.084 at 16 origins and +0.101 at
+  30 before settling at +0.029 over all 101. The rejections above stand — a
+  null that survives a noisy test is still a null — but a magnitude quoted from
+  a 16-origin run carries about ±0.09, and 16 should not be used again for a
+  claim under about 0.25. See `analysis/forecast_weekend_hour/results.md`.
 - **The apparent under-call at crowded hours is mostly a measurement artifact.**
   Binned by actual count the top quintile shows −15.7; binned by *predicted*
   count the same rows show −2.2, and the calibration slope is 1.02 (95% CI
