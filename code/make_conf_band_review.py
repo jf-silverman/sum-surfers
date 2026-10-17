@@ -84,9 +84,18 @@ def boxes_at_floor(model, img_path):
 
 
 def survive(boxes, thresh):
+    """The boxes a given CONF_THRESH would actually emit.
+
+    This has to mirror ds.run_inference_with_boxes() exactly -- NMS across tile
+    seams and the static false-positive zones included. An earlier version
+    applied only suppress_contained, so the band carried boxes that could never
+    reach predictions.csv at any threshold: 22 of the first 136 reviewed rows
+    were unreachable, and 20 of those 22 were false positives. Rerunning will
+    therefore produce a smaller band than the 2026-10-09 set.
+    """
     kept = [b for b in boxes if b[4] >= thresh]
-    kept = ds.suppress_contained(kept)
-    return kept
+    kept = ds.suppress_contained(ds.nms_across_tiles(kept))
+    return ds.filter_false_positive_zones(kept)
 
 
 def _blend(img, draw, alpha):

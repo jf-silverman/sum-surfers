@@ -1,4 +1,14 @@
-# Confidence-band review — 197 boxes, 118 frames
+# Confidence-band review — 187 boxes, 113 frames
+
+> **Pruned 2026-10-17.** The generator built the band with `suppress_contained`
+> alone, while production also runs NMS across tile seams and the static
+> false-positive zones. 32 of the original 197 boxes could never reach
+> `predictions.csv` at any threshold. The 22 already reviewed are kept (they
+> still describe what the detector proposes, and 20 of the 22 were false
+> positives); the 10 unreviewed ones were removed, along with the 5 frames that
+> left with no boxes. `box` numbers were **not** renumbered, so they still match
+> the numerals drawn on the images. `survive()` now mirrors the production path,
+> so a rerun will not reintroduce them.
 
 ## What to do
 
