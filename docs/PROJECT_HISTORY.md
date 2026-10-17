@@ -5375,9 +5375,75 @@ revisited when more reviewed rows land in the band.
 
 **Also found, and more consequential than either:** `make_conf_band_review.py`
 built its review set with `survive()`, which applies only `suppress_contained` —
-production also runs `nms_across_tiles` and `filter_false_positive_zones`. So 20
-of the 136 boxes reviewed so far cannot reach `predictions.csv` at all, and 18 of
-those 20 are false positives. On the 116 boxes production would actually emit the
-real rate is **55.2%** (js-weighted 53.3%) against 48.5% on the raw 136, so the
+production also runs `nms_across_tiles` and `filter_false_positive_zones`. So 22
+of the 136 boxes reviewed so far cannot reach `predictions.csv` at all, and 20 of
+those 22 are false positives. On the 114 boxes production would actually emit the
+real rate is **56.1%** (js-weighted 54.2%) against 48.5% on the raw 136, so the
 batch is healthier than the raw count suggests and still clears the 42% F1
-break-even. The generator needs to use the production path.
+break-even. The generator needs to use the production path. (Counts corrected
+2026-10-17, when every row was re-run through the production path box for box;
+the first pass reported 20 and 18.)
+
+### 2026-10-17 — The bluff heads are clipped by the ROI, which is the thing to key on
+
+Joel proposed a large bottom-centre zone with a raised confidence threshold for
+the on-shore heads, plus a size condition: the people are on the cliff in the
+foreground, so their head and shoulders should be much bigger than a surfer in
+the water at the same image height. `analysis/shore_head_zone/` measures it.
+
+The mechanism checks out and is sharper than a rectangle. The ROI is rows
+420–600 of a 720-row frame; the bluff path — fence, bench, people watching —
+sits at roughly y 590–660, *below* the crop. Only the top of a standing head
+reaches the image, so **a bluff head's box is always clipped by the ROI's
+bottom edge**. That is a tighter and cheaper test than "low in the frame".
+
+All 142 labelled frames were run through the production pipeline and matched to
+ground truth at IoU 0.5: 3,404 boxes, 3,125 true positives, 279 false
+positives. Of the boxes clipped by the bottom edge, the 6 false positives sit
+in x 405–656 and nothing else does; the 26 true positives span x 18–994.
+Inside x 400–680, confidence nearly sorts them — FPs at 0.26/0.30/0.35/0.40/
+0.49/0.55 against TPs from 0.53 up — so an in-zone threshold of 0.50 removes 5
+of 6 FPs for **zero** lost surfers. Without the edge condition the same
+threshold costs a surfer.
+
+The size half is backwards. In the zone, FPs have median width 12.8 and true
+positives 25.7: the false positives are the *smaller* boxes. We see a 10-pixel
+slice of the top of a head, while a surfer at the same height is boxed with
+their board. A size rule keyed on big boxes loses 7–10 surfers to remove 1–5
+FPs. The confidence-band review appears to say the opposite (shore heads
+12.4–19.3 wide, the one real surfer 10.7) because every box in it is between
+0.10 and 0.195, where both classes give small partial boxes — width separates
+only at confidences where the rule is not needed.
+
+Not adopted. 300 random production frames put the firing rate at 0.08 boxes per
+frame (23 of 300 frames, 0.57% of all detections) against a ~1.5-surfer noise
+floor, and the whole case rests on six false positives with a 0.04 gap between
+the highest FP and the lowest true positive. Two things would change it: a
+targeted review of the 24 already-identified firing boxes, which would take the
+evidence from 6 to 30; or lowering `CONF_THRESH`, which would admit the band
+review's 8 shore heads (~0.07 per frame) and double what the zone has to catch.
+
+### 2026-10-17 — Unreachable unreviewed rows pruned from the confidence-band set
+
+Follow-on from the defect above. Every row of `conf_band_review.csv` was re-run
+through the production path: 22 of the 136 reviewed rows and 10 of the 61
+unreviewed ones can never reach `predictions.csv`. The 10 unreviewed rows were
+removed, along with the 5 frames left with no boxes; every reviewed row was
+kept, and `box` numbers were **not** renumbered, since they match the numerals
+drawn on the images. `survive()` in `make_conf_band_review.py` now mirrors
+`run_inference_with_boxes`, so a rerun will not reintroduce them. The set is
+187 boxes over 113 frames, 51 still to fill.
+
+### 2026-10-17 — A tide-filtered pair of count histograms
+
+`plot_count_histograms.py --tide-max` restricts to hours below a given forecast
+tide and writes the pair with a `_tide_lt<N>` suffix; 3.0 ft is checked in. The
+filter is on `tide_ft`, Surfline's harmonic prediction, not the observed level
+that runs about a foot higher this autumn under the Kelvin wave — the
+prediction is what a surfer reads before deciding to go.
+
+Below 3 ft it is a different distribution: 738 of 1,950 counted hours, mean
+**23.1** against 14.7, median **22** against 11, and empty hours collapse from
+**15.0% to 2.6%**. Dark, foggy and night-sensor-noise frames were already out
+of both versions — they fail the quality gate before detection runs and carry
+no count at all.
