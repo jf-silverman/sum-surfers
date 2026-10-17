@@ -17,9 +17,10 @@ WORSE by shrinking the sample -- Wed vs Sun month-mix divergence goes from 32%
 to 41%.
 
 So the script prints a within-month check alongside the chart. Read the chart
-only as far as that check supports it. The honest summary as of 2026-10-09: the
+only as far as that check supports it. The summary as of 2026-10-09: the
 weekend effect is large and survives the check; the Wednesday dip does not and
-should not be believed.
+should not be believed. Confirmed by a day-level test on 2026-10-17 --
+see test_day_of_week.py and day_of_week_results.md.
 
 Usage:
     python analysis/weekday_weekend_patterns/plot_count_by_weekday.py
