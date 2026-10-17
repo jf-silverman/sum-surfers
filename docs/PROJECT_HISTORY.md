@@ -5465,3 +5465,36 @@ box plot is wrong on the full record — 15% of counts are exactly zero and the
 summary would hide the spike — but below 3 ft the spike collapses to 2.6% and
 the quartiles become accurate. Medians run 8 at 06:00, 25–31 from 08:00 to
 12:00, a dip to 19 at 13:00, 24–28 through the afternoon, and 12 by 19:00.
+
+### 2026-10-17 — Weekend splits the hourly box plot; no weekday differs from another
+
+`plot_count_boxplots.py --split weekend` draws weekday against weekend hour by
+hour, both under the tide-below-3-ft filter. The weekend sits above the weekday
+at every hour from 07:00 to 18:00 — +15 at 08:00 and 10:00, +20 at 15:00, +16
+at 17:00 — and by nothing at 06:00 (8 vs 8) or 19:00 (12 vs 12.5). The weekend
+effect is a midday and afternoon phenomenon, not a shift of the whole day.
+
+`test_day_of_week.py` asks whether anything survives beyond that split, and
+nothing does. The unit of analysis is the **day**, not the hour: hours inside
+one day share a tide, a swell and a sky, so testing at the hour level would
+manufacture significance. Counts are adjusted for their hour's median and then
+for their calendar month's, since the month mix differs by weekday. Over 127
+days:
+
+| test | p |
+|---|---:|
+| weekend vs weekday | **0.00003** (rank-biserial +0.46, +6.2 surfers) |
+| Mon–Fri alone | 0.64 (20,000 label shuffles: 0.65) |
+| Sat vs Sun | 0.70 |
+| all ten weekday pairs | Holm p = 1.000 |
+
+The Wednesday dip `plot_count_by_weekday.py` warns about measures −3.1 adjusted
+and does not survive correction, so that warning is now a measurement. Day-of-
+week one-hots were already on the MODEL_CARD's rejected list from rolling-origin
+tests; this says why — the signal is absent in the counts, so the rejection was
+not a power problem in the backtest.
+
+Stated limit: at 15–20 days per weekday the smallest detectable difference is
+about 8.4 surfers, larger than the weekend effect itself. Large day-to-day
+differences are ruled out; small ones are not. Worth revisiting after another
+winter, when ~30 days per weekday brings that to about 6.
