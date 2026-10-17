@@ -28,6 +28,9 @@ data/reviews/full_day_*/*.png
 # Same reasoning for any other review batch's rendered images: regenerable
 # from code, and only the hand-filled CSV is the research output.
 data/reviews/conf_band_review/*.png
+# bluff_head_review: 24 two-panel renders at 2560px wide, ~32MB, regenerable
+# from code/make_bluff_head_review.py. The CSV and the guide stay tracked.
+data/reviews/bluff_head_review/*.png
 data/reviews/usability_balanced_56/**/*.jpg
 data/reviews/obscuration_batch_60/*.jpg
 analysis/count_variability/seconds/frame_variability_analysis.csv

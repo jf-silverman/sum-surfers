@@ -5447,3 +5447,21 @@ Below 3 ft it is a different distribution: 738 of 1,950 counted hours, mean
 **15.0% to 2.6%**. Dark, foggy and night-sensor-noise frames were already out
 of both versions — they fail the quality gate before detection runs and carry
 no count at all.
+
+### 2026-10-17 — The 24 bluff-head firings rendered for review; per-hour box plots
+
+`code/make_bluff_head_review.py` renders every production detection the
+candidate bluff-head rule would drop — 24 boxes over 24 images, drawn from the
+300-frame random sample of the production record rather than the labelled pool,
+so the verdicts answer the question the labelled pool cannot. Each image gets
+two views: the full 1280-wide crop at 2x for comparison against the surfers on
+the same frame, and ROI rows 100–180 at 8x, because these boxes are 10–15px
+wide at the very bottom edge and neither view alone is legible. Verdicts will
+take the evidence from 6 false positives to 30.
+
+`analysis/count_distribution/plot_count_boxplots.py` adds per-hour box plots
+under the same tide filter, with the individual hours drawn over the boxes. A
+box plot is wrong on the full record — 15% of counts are exactly zero and the
+summary would hide the spike — but below 3 ft the spike collapses to 2.6% and
+the quartiles become accurate. Medians run 8 at 06:00, 25–31 from 08:00 to
+12:00, a dip to 19 at 13:00, 24–28 through the afternoon, and 12 by 19:00.
