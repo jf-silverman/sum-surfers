@@ -5699,3 +5699,43 @@ rows counted without this zone, and the nightly run now applies it. That is a
 step change of about −0.08 counts/frame (0.5% of a 14.7 mean) partway through a
 series the forecast trains on. Re-detecting the 6,543 archived crops would make
 the series consistent; leaving it means a small discontinuity dated 2026-10-17.
+
+---
+
+## 2026-10-18 — The bluff zone applied to history, scoped to one model era
+
+Joel chose to re-detect only the rows the current weights already counted. Done:
+**27 of 382 rows changed, every one of them downward, net −28 surfers
+(−0.073/frame)**, fog-era mean count 12.123 → 12.050. Rows before 2026-09-21 are
+untouched, `human_count` is preserved, and the discontinuity now sits on the
+2026-09-21 model boundary instead of creating a second one.
+
+Two things had to be got right first, and neither was obvious.
+
+**`predictions.csv` spans two model eras.** Of the 1,963 countable rows, 1,581
+were counted with the October 2025 weights and only 382 with `20260921_fog`,
+adopted 2026-09-21. A full re-detect was described — and approved — as applying
+the new zone to history. It would in fact have re-counted a year of history with
+weights it was never counted with, moving rows in both directions and
+invalidating every measurement calibrated on the old counts, including the hand
+reviews and the forecast's training series. The zone change was the stated
+reason; re-counting the archive under new weights was the actual effect. Scope
+is now `--since 2026-09-21`.
+
+**A production count is a three-frame mean, not a frame count.** The first
+attempt at the re-detect recounted through `run_inference()` on the primary crop
+alone. Production uses `run_inference_multi()`: `surfer_count` is
+`round(mean(...))` over the primary crop and the two side frames either side of
+it, and that mean carries a per-frame stdev averaging 0.69. All 382 fog-era rows
+satisfy `surfer_count == round(frame_count_mean)`. Recounting one frame
+therefore moved 174 of 382 rows, **71 of them upward**, for a change that can
+only ever subtract — pure frame-sampling noise presented as a zone effect. The
+tell was the direction: a mask cannot add a surfer. `predictions.csv` was
+restored from its backup and the script rewritten to recount through
+`run_inference_multi`, writing `frame_count_1..3`, `frame_count_mean` and
+`frame_count_stdev` along with the count. The corrected pass moves only
+downward.
+
+The lesson generalises past this change: `frame_count_*` are derived columns, not
+hand-entered ones, and any tool that rewrites `surfer_count` without rewriting
+them leaves the file internally inconsistent.

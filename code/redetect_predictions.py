@@ -3,22 +3,39 @@ Recount existing `predictions.csv` rows in place, after a detection change.
 
 Why this and not `DETECT_MODE=all`. That mode only ever ADDS rows -- `main()`
 drops any crop already listed in `predictions.csv` -- so it cannot revise
-history. Clearing the file first would work and would also throw away the
-hand-entered columns the file accumulates (`human_count`, `frame_count_1..3`,
-`frame_count_mean`, `frame_count_stdev`), which exist nowhere else.
+history. Clearing the file first would work and would also throw away
+`human_count`, the hand-entered column, which exists nowhere else.
 
-So this rewrites exactly one column, `surfer_count`, plus `confidence_avg`,
-leaving every other field and the row order untouched. The quality gate is not
-re-evaluated: rows whose `quality_ok` is not True never ran detection and keep
-their empty count, because re-deciding the gate here would silently mix a
-second change into the one being made.
+So this rewrites only what detection derives -- `surfer_count`,
+`confidence_avg`, `frame_count_1..3`, `frame_count_mean`, `frame_count_stdev`
+-- and leaves `human_count`, the quality columns and the row order untouched.
+The quality gate is not re-evaluated: rows whose `quality_ok` is not True never
+ran detection and keep their empty count, because re-deciding the gate here
+would silently mix a second change into the one being made.
+
+It MUST recount through `run_inference_multi`, not `run_inference`. A production
+row's `surfer_count` is `round(mean(...))` over three frames -- the primary crop
+plus the two side frames either side of it -- and that mean carries a per-frame
+stdev averaging 0.69. Recounting the primary frame alone therefore moves rows by
++-1 in both directions purely from frame sampling, which swamps any detection
+change being measured: a first attempt at this did exactly that and moved 174 of
+382 rows, 71 of them UPWARD, for a change that can only ever subtract.
 
 Always writes a timestamped backup beside the file before touching it.
 
+`--since` exists because of model eras. `predictions.csv` spans two sets of
+weights: rows before 2026-09-21 were counted with the October 2025 model, rows
+from 2026-09-21 on with `20260921_fog`. Recounting the whole file would apply
+today's weights to a year of history, which changes counts in BOTH directions
+and silently rewrites the series every calibration and hand review was measured
+against. `--since 2026-09-21` recounts only the rows whose weights already match
+the loaded model, so the only thing that moves is the detection change being
+applied -- and the discontinuity lands on a seam that already exists.
+
 Usage:
-    python code/redetect_predictions.py --dry-run       # count what would change
-    python code/redetect_predictions.py --limit 25      # small real pass
-    python code/redetect_predictions.py
+    python code/redetect_predictions.py --dry-run                   # count what would change
+    python code/redetect_predictions.py --since 2026-09-21 --limit 25
+    python code/redetect_predictions.py --since 2026-09-21
 """
 from __future__ import annotations
 
@@ -42,6 +59,9 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--since", default="",
+                    help="only recount rows with date >= this YYYY-MM-DD "
+                         "(use the model-era boundary; see the module docstring)")
     args = ap.parse_args()
 
     with PREDS.open(newline="") as fh:
@@ -52,13 +72,16 @@ def main():
     todo = [r for r in rows
             if str(r.get("quality_ok", "")).strip() == "True"
             and str(r.get("surfer_count", "")).strip() != ""
-            and (CROPS / r["filename"]).exists()]
+            and (CROPS / r["filename"]).exists()
+            and r["date"] >= args.since]
     skipped_gate = sum(1 for r in rows if str(r.get("quality_ok", "")).strip() != "True")
     missing = sum(1 for r in rows
                   if str(r.get("quality_ok", "")).strip() == "True"
                   and not (CROPS / r["filename"]).exists())
     print(f"  {len(todo)} to recount; {skipped_gate} quality-gated (left alone); "
           f"{missing} with no crop on disk (left alone)")
+    if args.since:
+        print(f"  --since {args.since}: earlier rows left alone (different model era)")
     if args.limit:
         todo = todo[:args.limit]
         print(f"  --limit: {len(todo)} this pass")
@@ -74,16 +97,20 @@ def main():
     index = {r["filename"]: r for r in rows}
     changed, delta, done = 0, 0, 0
     for r in todo:
-        boxes = ds.run_inference_with_boxes(model, CROPS / r["filename"])
-        new = len(boxes)
-        conf = round(sum(b[4] for b in boxes) / new, 4) if new else ""
+        res = ds.run_inference_multi(model, CROPS / r["filename"])
+        new = res["surfer_count"]
         old = int(float(r["surfer_count"]))
         if new != old:
             changed += 1
             delta += new - old
         tgt = index[r["filename"]]
         tgt["surfer_count"] = str(new)
-        tgt["confidence_avg"] = str(conf)
+        tgt["confidence_avg"] = str(res["confidence_avg"])
+        for i in (1, 2, 3):
+            v = res[f"frame_count_{i}"]
+            tgt[f"frame_count_{i}"] = "" if v is None else str(v)
+        tgt["frame_count_mean"] = str(res["frame_count_mean"])
+        tgt["frame_count_stdev"] = str(res["frame_count_stdev"])
         done += 1
         if done % 100 == 0:
             print(f"  {done}/{len(todo)}  changed {changed}  net {delta:+d}", flush=True)
