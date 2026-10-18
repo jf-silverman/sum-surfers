@@ -60,6 +60,37 @@ TREE_MASK = (1268, 58, 1280, 87)      # x1, y1, x2, y2
 FLAG_MASK = (720, 140, 750, 165)
 CONF_THRESH_FLAG_MASK = 0.5
 
+#   - Bluff heads (bottom-middle, adopted 2026-10-17): people standing on the
+#     cliff path above the beach, read as surfers. The geometry is what makes
+#     this separable. The ROI is rows 420-600 of the 720-row camera frame and
+#     the bluff path runs at y 590-660, so a person up there enters the image
+#     only as the top of a head and the box is ALWAYS clipped by the ROI's
+#     bottom edge -- a tighter and cheaper test than "low in the frame".
+#
+#     Hand-checked against every box it fires on in a 300-frame production
+#     sample (24 of them): 19 shore heads, 1 duplicate box on an
+#     already-counted surfer, 4 real surfers. 20/24 correct, a 5:1 trade at
+#     0.080 boxes/frame. See analysis/shore_head_zone/.
+#
+#     It cannot be tuned. Confidence, width, height, top edge and centre-x all
+#     overlap completely between the 4 real surfers and the 19 heads, so a
+#     tighter variant is only fitting itself to which of four boxes it drops.
+#     Adopted as specified or not at all.
+#
+#     Note the net runs AGAINST the count: 0.063 false counts removed against
+#     0.013 real surfers lost, while the detector already undercounts by ~2.14
+#     surfers/frame. It is adopted because shore heads are a systematic bias --
+#     the same bluff positions day after day, concentrated on clear bright days
+#     -- rather than noise that averages out across hours.
+#
+#     Watch item: the x range is fitted to a small sample and the bluff carries
+#     people further right than 680. Two of the four real surfers sit in the
+#     right third of the range, as does the rightmost shore head. Re-derive the
+#     range against new evidence rather than assuming it.
+BLUFF_MASK = (400, 164, 680, 180)
+CONF_THRESH_BLUFF_MASK = 0.5
+BLUFF_EDGE_Y = 179.0                  # box bottom must reach the ROI edge
+
 # Image-quality gate: skips detection entirely on frames too dark (night/
 # dawn/dusk, incl. streetlight-lit fog) or too low-detail (fog, lens
 # condensation, or naturally smooth/low-texture water) to reliably count.
@@ -239,12 +270,19 @@ def _in_zone(box, zone):
 
 
 def filter_false_positive_zones(boxes):
-    """Drop boxes landing in the static tree-bough/flag false-positive zones."""
+    """Drop boxes landing in the static tree-bough/flag/bluff-head zones."""
     kept = []
     for b in boxes:
         if _in_zone(b, TREE_MASK):
             continue
         if _in_zone(b, FLAG_MASK) and b[4] < CONF_THRESH_FLAG_MASK:
+            continue
+        # Bluff heads: zone AND clipped by the ROI's bottom edge AND below
+        # the confidence ceiling. All three are required -- the edge clip is
+        # what distinguishes a head on the cliff from a surfer in the water
+        # at the same image position.
+        if (_in_zone(b, BLUFF_MASK) and b[3] >= BLUFF_EDGE_Y
+                and b[4] < CONF_THRESH_BLUFF_MASK):
             continue
         kept.append(b)
     return kept

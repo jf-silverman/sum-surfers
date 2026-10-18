@@ -184,6 +184,44 @@ def test_flag_zone_drops_only_low_confidence_boxes():
     assert ds.filter_false_positive_zones([high]) == [high]
 
 
+def test_bluff_zone_needs_the_zone_the_edge_and_the_confidence_together():
+    """A person on the cliff path enters the ROI only as the top of a head, so
+    the box is always clipped by the bottom edge. All three conditions are
+    required -- a surfer in the water at the same x sits clear of the edge, and
+    a confident detection there is trusted."""
+    zx1, _zy1, zx2, _zy2 = ds.BLUFF_MASK
+    cx = (zx1 + zx2) / 2
+    conf = ds.CONF_THRESH_BLUFF_MASK - 0.05
+    clipped = [cx - 6, 169.0, cx + 6, 180.0, conf]
+    assert ds.filter_false_positive_zones([clipped]) == []
+
+    clear_of_edge = [cx - 6, 158.0, cx + 6, ds.BLUFF_EDGE_Y - 1, conf]
+    assert ds.filter_false_positive_zones([clear_of_edge]) == [clear_of_edge]
+
+    confident = [cx - 6, 169.0, cx + 6, 180.0, ds.CONF_THRESH_BLUFF_MASK + 0.05]
+    assert ds.filter_false_positive_zones([confident]) == [confident]
+
+    left_of_zone = [zx1 - 40, 169.0, zx1 - 28, 180.0, conf]
+    assert ds.filter_false_positive_zones([left_of_zone]) == [left_of_zone]
+
+
+def test_bluff_zone_drops_every_box_the_hand_review_judged():
+    """The 24 boxes the rule fires on in a 300-frame sample were all reviewed
+    by hand (19 shore heads, 1 duplicate, 4 real surfers). The filter must drop
+    exactly that set -- it is the evidence the rule was adopted on."""
+    csv = Path(__file__).resolve().parents[1] / "data" / "reviews" / \
+        "bluff_head_review" / "bluff_head_review.csv"
+    if not csv.exists():
+        pytest.skip("review set not present")
+    rows = list(csv.open())[1:]
+    boxes = []
+    for line in rows:
+        f = line.rstrip("\n").split(",")
+        boxes.append([float(f[-5]), float(f[-4]), float(f[-3]), float(f[-2]), float(f[4])])
+    assert len(boxes) == 24
+    assert ds.filter_false_positive_zones(boxes) == []
+
+
 def test_box_outside_every_zone_survives():
     box = [5, 5, 15, 15, 0.9]
     assert ds.filter_false_positive_zones([box]) == [box]

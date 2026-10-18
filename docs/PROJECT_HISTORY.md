@@ -5664,3 +5664,38 @@ frame is noted "blurry w/ condensation over 80% and should be gated out of
 detection" despite passing the quality gate; it belongs with the 23 frames in
 the fog-gate review. The x-range watch item stands: two of the four real surfers
 sit in the right third of the 400–680 zone, as does the rightmost shore head.
+
+### 2026-10-17 — Bluff-head zone adopted into production detection
+
+Joel's go-ahead on the 5:1 evidence above. `code/detect_surfers.py` gains a
+third static false-positive zone beside `TREE_MASK` and `FLAG_MASK`:
+
+```python
+BLUFF_MASK = (400, 164, 680, 180)
+CONF_THRESH_BLUFF_MASK = 0.5
+BLUFF_EDGE_Y = 179.0                  # box bottom must reach the ROI edge
+```
+
+All three conditions are required together. The edge clip is what carries the
+rule: the ROI is rows 420–600 of the 720-row camera frame and the bluff path
+runs at y 590–660, so a person up there enters the image only as the top of a
+head and the box is always cut off by the ROI's bottom edge. A surfer in the
+water at the same image position sits clear of it.
+
+Verified against the evidence it was adopted on: the filter drops all 24
+reviewed boxes and exactly those 24 across the 300-frame sample. Two tests
+added to `tests/test_detection_geometry.py` — one checking that zone, edge and
+confidence are each necessary, one asserting the filter still drops the whole
+reviewed set so the rule cannot drift away from its evidence. 17 pass.
+
+**The definition question is settled.** The box noted "surfer standing on beach
+w/ board in-hand" is a real count — Joel: he is standing in knee-deep water
+wading out to surf, and a surfer on the beach is a surfer. The ratio stays 5:1.
+The series counts people who are there to surf, not only people already in the
+lineup.
+
+**Not done, and it needs a decision:** `predictions.csv` holds 2,184 historical
+rows counted without this zone, and the nightly run now applies it. That is a
+step change of about −0.08 counts/frame (0.5% of a 14.7 mean) partway through a
+series the forecast trains on. Re-detecting the 6,543 archived crops would make
+the series consistent; leaving it means a small discontinuity dated 2026-10-17.

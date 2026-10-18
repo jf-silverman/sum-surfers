@@ -103,8 +103,11 @@ and a measured per-hour noise floor of about 1.5 surfers.
 
 ## Where this leaves it
 
-**Reviewed and settled, 2026-10-17.** Option 1 below was done: all 24 firing
-boxes were rendered and judged. Scored by
+**Reviewed, settled and ADOPTED, 2026-10-17.** Option 1 below was done: all 24
+firing boxes were rendered and judged, Joel gave the go-ahead, and the rule now
+ships as `BLUFF_MASK` / `CONF_THRESH_BLUFF_MASK` / `BLUFF_EDGE_Y` in
+`code/detect_surfers.py`, covered by two tests in
+`tests/test_detection_geometry.py`. Scored by
 `python analysis/shore_head_zone/score_bluff_review.py`.
 
 | | n |
@@ -158,11 +161,11 @@ alone. A 0.15 floor admits 3 of them (0.027/frame, a third of what the zone
 catches); a 0.10 floor admits all 9 (0.080/frame, doubling it). The zone should
 go in first either way.
 
-**Open question for Joel, worth one line:** one of the 4 real surfers is noted
-"surfer standing on beach w/ board in-hand". If a person on the beach holding a
-board is not a count — the series measures water crowding — the rule is 6.7:1
-rather than 5:1, and that definition should be written down somewhere, because
-it will keep coming up in this zone.
+**Definition, now settled.** One of the 4 real surfers is noted "surfer standing
+on beach w/ board in-hand", which raised the question of whether a person on the
+beach is a count. Joel: he is standing in knee-deep water, wading out to surf,
+and **a surfer on the beach is a surfer**. The ratio stays 5:1, and the series
+counts people who are there to surf, not only people already in the lineup.
 
 **Watch item, unchanged.** The x range 400–680 is still fitted. Two of the four
 real surfers sit in its right third (centre x 662 and 668), and so does the
