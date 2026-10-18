@@ -15,24 +15,33 @@ box inflates it exactly as a hallucinated one does. Under the guide's looser
 reading ("is a surfer under this box") the band is 61% real; under the rule
 actually applied it is 49%.
 
-`boxes_missed` is frame-level and ambiguous in one way that changes the answer,
-so both readings are carried through:
+`boxes_missed` is NOT a review answer. The generator copied it in as
+`missed - merged` from `data/reviews/review_all.csv` (it was called
+`nobox_misses_this_frame` until 2026-10-15), so it is frame-level truth, not
+something judged in this pass. That earlier hand review was scored against
+`boxes_drawn` -- the boxes production emits at 0.195 -- and the band boxes were
+never shown in it. So a surfer whose only box is a band box counted there as
+having no box at all, and **the 92 recovered surfers are inside
+`boxes_missed`**. Admitting them shrinks the undercount rather than adding to a
+separate pool.
 
-  A  surfers with NO box of any colour -- the 92 recovered surfers are NOT in it
-  B  surfers still missed after the coral boxes -- the 92 ARE in it
-
-A makes the current undercount 2.96/frame, B makes it 2.14/frame. Which one is
-right decides whether 0.10 or 0.15 is the floor; see the RESULT block.
+That makes the current undercount 2.14/frame and fixes the arithmetic below.
+An earlier cut of this script also carried a reading in which the 92 sat
+outside `boxes_missed` (undercount 2.96/frame, and a floor of 0.10 rather than
+0.15). It was never a live option -- the column's provenance rules it out -- and
+is gone.
 
 RESULT (2026-10-17, all 187 reviewed)
     band precision          92/187 = 0.492   (0.610 under the guide's looser rule)
     production at 0.195     0.918 on 142 labelled frames
-    recommended floor       0.150 -- the deepest step significant under BOTH
-                            readings of boxes_missed (A -0.389 p<0.0001;
-                            B -0.212 p=0.023), and in the 0.15-0.18 band where
-                            admitted-box precision peaks at 0.55-0.58
-    0.100 rejected          92 recovered vs 95 spurious; reading B stops
-                            improving below 0.14 while precision decays to 0.49
+    current undercount      2.14 surfers/frame over the 113 frames
+    recommended floor       0.150 -- mean |count error| -0.212/frame, p=0.023,
+                            the deepest step that is significant at all, and in
+                            the 0.15-0.18 band where admitted-box precision
+                            peaks at 0.55-0.58
+    0.100 rejected          92 recovered vs 95 spurious; -0.204/frame, p=0.233.
+                            Everything below 0.15 buys nothing measurable while
+                            admitted-box precision decays to 0.49
     free win first          28 of the 95 spurious boxes are tree bough (18),
                             shore head (9) and wind sock (1) -- static zones that
                             cost no recall to mask, and lift band precision to 0.579
@@ -85,10 +94,12 @@ def load():
 
 
 def truth_extra(d, frames):
-    """Surfers missing from the production count, per frame, under each reading."""
-    miss = d.groupby("image").boxes_missed.max().reindex(frames)
-    recovered = d.groupby("image").y.sum().reindex(frames)
-    return {"A": miss + recovered, "B": miss}
+    """Surfers missing from the production count, per frame.
+
+    Straight from `boxes_missed`: it already counts the surfers the band boxes
+    recover, because the review it came from only ever drew the 0.195 boxes.
+    """
+    return d.groupby("image").boxes_missed.max().reindex(frames)
 
 
 def admitted(d, t, frames):
@@ -131,27 +142,24 @@ def main():
           f"   -> band precision without them {d.y.sum()}/{len(d) - static} "
           f"= {d.y.sum() / (len(d) - static):.3f}")
 
-    extras = truth_extra(d, frames)
-    print("\n--- what each step down admits, and what it does to the count ---")
-    print("     T    admit   rec  spur   prec |  "
-          "A: d|err|  95% CI          p  |  B: d|err|  95% CI          p")
+    extra = truth_extra(d, frames)
+    base = extra.abs()
+    print(f"\n--- what each step down admits, and what it does to the count ---")
+    print(f"  current mean |count error| {base.mean():.2f}/frame "
+          f"({int(extra.sum())} surfers uncounted over {len(frames)} frames)")
+    print("     T    admit   rec  spur   prec    d|err|   95% CI              p"
+          "    frames better/worse")
     for t in SWEEP:
         s, g = admitted(d, t, frames)
-        cells = []
-        for key in ("A", "B"):
-            base = (-extras[key]).abs()
-            new = (-extras[key] + g.y + g.n).abs()
-            dl = (new - base).to_numpy(float)
-            bs = np.array([dl[rng.integers(0, len(dl), len(dl))].mean()
-                           for _ in range(N_BOOT)])
-            p = wilcoxon(dl)[1] if np.any(dl != 0) else 1.0
-            cells.append(f"{dl.mean():+.3f}  {np.percentile(bs, 2.5):+.3f} to "
-                         f"{np.percentile(bs, 97.5):+.3f}  {p:.4f}")
+        new = (-extra + g.y + g.n).abs()
+        dl = (new - base).to_numpy(float)
+        bs = np.array([dl[rng.integers(0, len(dl), len(dl))].mean()
+                       for _ in range(N_BOOT)])
+        p = wilcoxon(dl)[1] if np.any(dl != 0) else 1.0
         print(f"  {t:.3f}   {len(s):4d}  {int(g.y.sum()):4d}  {int(g.n.sum()):4d}  "
-              f"{s.y.mean():.3f} |  {cells[0]} |  {cells[1]}")
-    for key in ("A", "B"):
-        print(f"  reading {key}: current mean |count error| "
-              f"{(-extras[key]).abs().mean():.2f}/frame")
+              f"{s.y.mean():.3f}   {dl.mean():+.3f}   "
+              f"{np.percentile(bs, 2.5):+.3f} to {np.percentile(bs, 97.5):+.3f}  "
+              f"{p:.4f}        {int((dl < 0).sum())}/{int((dl > 0).sum())}")
 
     print("\n--- pose of the 92 recovered surfers ---")
     canon = (d.loc[d.y, "pose"].fillna("(blank)").astype(str).str.strip()

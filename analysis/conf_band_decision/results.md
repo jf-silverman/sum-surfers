@@ -23,46 +23,53 @@ For scale, production at 0.195 runs **91.8%** precision on the 142 COCO-labelled
 frames. Every box the band admits is roughly twice as likely to be wrong as what
 is already in.
 
-## One ambiguity in `boxes_missed` decides how far down to go
+## What `boxes_missed` is
 
-`boxes_missed` is frame-level and can be read two ways, and nothing in the CSV
-settles it:
+It is not a review answer. The generator copied it in as `missed - merged` from
+`data/reviews/review_all.csv`, where it was called `nobox_misses_this_frame`
+until it was shortened on 2026-10-15. That earlier hand review was scored
+against `boxes_drawn` — the boxes production emits at 0.195 — and the band boxes
+were never drawn in it, so a surfer whose only box is a band box counted there as
+having no box at all.
 
-- **A** — surfers with *no box of any colour*, so the 92 recovered surfers are
-  **not** counted in it. Current undercount **2.96/frame**.
-- **B** — surfers still missed *after* the coral boxes, so the 92 **are** in it.
-  Current undercount **2.14/frame**.
+**The 92 recovered surfers are therefore inside `boxes_missed`.** Admitting them
+shrinks the undercount rather than adding to a separate pool. The current
+undercount on these frames is **2.14 surfers/frame** (242 uncounted over 113
+frames), and 92 of those 242 — 38% — are already proposed by the detector below
+threshold.
 
 ## The sweep
 
-Per-frame change in |count error| against the current 0.195, paired bootstrap CI
+Per-frame change in |count error| against the current 0.195. Paired bootstrap CI
 and Wilcoxon over the 113 frames.
 
-| T | admits | recovered | spurious | precision | A: Δ\|err\| | p | B: Δ\|err\| | p |
+| T | admits | recovered | spurious | precision | Δ\|err\| | 95% CI | p | frames better/worse |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 0.190 | 14 | 7 | 7 | 0.500 | −0.035 | 0.285 | −0.035 | 0.285 |
-| 0.180 | 34 | 19 | 15 | 0.559 | −0.124 | 0.029 | −0.071 | 0.202 |
-| 0.170 | 44 | 25 | 19 | 0.568 | −0.177 | 0.007 | −0.124 | 0.056 |
-| 0.160 | 62 | 36 | 26 | 0.581 | −0.283 | 0.0004 | −0.159 | 0.042 |
-| **0.150** | **82** | **45** | **37** | **0.549** | **−0.389** | **<0.0001** | **−0.212** | **0.023** |
-| 0.140 | 108 | 59 | 49 | 0.546 | −0.442 | 0.0001 | −0.212 | 0.087 |
-| 0.120 | 145 | 74 | 71 | 0.510 | −0.451 | 0.001 | −0.204 | 0.159 |
-| 0.100 | 187 | 92 | 95 | 0.492 | −0.558 | 0.0009 | −0.204 | 0.233 |
+| 0.190 | 14 | 7 | 7 | 0.500 | −0.035 | −0.106 to +0.027 | 0.285 | 9/5 |
+| 0.180 | 34 | 19 | 15 | 0.559 | −0.071 | −0.186 to +0.044 | 0.202 | 17/13 |
+| 0.170 | 44 | 25 | 19 | 0.568 | −0.124 | −0.248 to +0.000 | 0.056 | 25/14 |
+| 0.160 | 62 | 36 | 26 | 0.581 | −0.159 | −0.310 to −0.018 | 0.042 | 33/20 |
+| **0.150** | **82** | **45** | **37** | **0.549** | **−0.212** | **−0.389 to −0.035** | **0.023** | **39/27** |
+| 0.140 | 108 | 59 | 49 | 0.546 | −0.212 | −0.434 to +0.009 | 0.087 | 43/35 |
+| 0.130 | 119 | 61 | 58 | 0.513 | −0.150 | −0.381 to +0.080 | 0.283 | 44/40 |
+| 0.120 | 145 | 74 | 71 | 0.510 | −0.204 | −0.469 to +0.062 | 0.159 | 50/48 |
+| 0.100 | 187 | 92 | 95 | 0.492 | −0.204 | −0.522 to +0.097 | 0.233 | 53/56 |
 
-**The count improves even at 49% precision, and that is error cancellation, not
-accuracy.** The detector undercounts by 2 to 3 surfers a frame on this set, so
-injecting boxes that are wrong half the time still closes the gap — the spurious
-ones land in frames that had room to absorb them. Box-level precision falls the
-whole way down. Any claim about these thresholds has to say which of the two is
-being optimised.
+**0.150 is the floor.** It is the largest improvement in the table and the only
+one that clears p < 0.05 with room — and it sits inside the 0.15–0.18 range where
+the precision of what gets admitted peaks at 0.55–0.58.
 
-**0.15 is the recommendation.** It is the deepest step that is significant under
-*both* readings of `boxes_missed`, and it sits in the 0.15–0.18 range where the
-precision of what gets admitted peaks at 0.55–0.58. Below 0.14 reading B stops
-improving entirely (−0.212 → −0.204, p drifts to 0.23) while precision decays to
-0.49: the extra 105 boxes from 0.15 down to 0.10 are 47 recovered against 58
-spurious, which is worse than a coin flip. Reading A would keep going to 0.10;
-reading B says stop at 0.15. 0.15 is the value both agree on.
+**Everything below 0.15 buys nothing measurable.** The extra 105 boxes from 0.15
+down to 0.10 are 47 recovered against 58 spurious — worse than a coin flip — and
+the count improvement does not move (−0.212 → −0.204) while its CI widens through
+zero and admitted-box precision decays to 0.49. At 0.10 the per-frame tally is 53
+frames better against 56 worse: a wash bought with a 5-point drop in precision.
+
+Note what the improvement is worth even at its best: **−0.212 against a 2.14
+undercount**. Dropping the threshold to 0.15 recovers about a tenth of the
+counting error. It is real and it is measured, but it does not fix the
+undercount — 197 of the 242 missing surfers on these frames are still missing at
+0.15, and the detector never proposed most of them at any confidence.
 
 ## Not adopted yet
 

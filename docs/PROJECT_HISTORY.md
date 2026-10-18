@@ -5557,27 +5557,39 @@ Production at 0.195 runs 91.8% precision on the 142 COCO-labelled frames, so
 every box a lower threshold admits is about twice as likely to be wrong as what
 is already in.
 
-**Per-frame count error improves all the way down to 0.10, and that is error
-cancellation rather than accuracy.** The detector undercounts by 2.1–3.0 surfers
-a frame on these 113 frames, so boxes that are wrong half the time still close
-the gap. Box-level precision falls the whole way down. The two readings of the
-review's frame-level `boxes_missed` column (does it include the surfers the coral
-boxes recovered, or not?) give current undercounts of 2.14 and 2.96 per frame and
-disagree about how deep to go:
+**`boxes_missed` is not a review answer, and reading it as one briefly produced
+a wrong floor.** The generator copied the column in as `missed - merged` from
+`review_all.csv` (named `nobox_misses_this_frame` until it was shortened on
+2026-10-15). The first cut of the scoring script treated it as ambiguous and
+carried two readings, one of which put the 92 recovered surfers *outside* it and
+pointed at a floor of 0.10. Joel pointed out he had never filled that column in.
+Its provenance settles it: that earlier review was scored against `boxes_drawn`,
+the boxes production emits at 0.195, and the band boxes were never drawn in it —
+so a surfer whose only box is a band box counted there as having no box at all,
+and **the 92 are inside `boxes_missed`**. Current undercount 2.14/frame, 242
+uncounted surfers over the 113 frames, 92 of them (38%) already proposed below
+threshold.
 
-| T | admits | recovered | spurious | precision | A: Δ\|err\| | p | B: Δ\|err\| | p |
+| T | admits | recovered | spurious | precision | Δ\|err\| | 95% CI | p | better/worse |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 0.180 | 34 | 19 | 15 | 0.559 | −0.124 | 0.029 | −0.071 | 0.202 |
-| 0.160 | 62 | 36 | 26 | 0.581 | −0.283 | 0.0004 | −0.159 | 0.042 |
-| **0.150** | **82** | **45** | **37** | **0.549** | **−0.389** | **<0.0001** | **−0.212** | **0.023** |
-| 0.140 | 108 | 59 | 49 | 0.546 | −0.442 | 0.0001 | −0.212 | 0.087 |
-| 0.100 | 187 | 92 | 95 | 0.492 | −0.558 | 0.0009 | −0.204 | 0.233 |
+| 0.180 | 34 | 19 | 15 | 0.559 | −0.071 | −0.186 to +0.044 | 0.202 | 17/13 |
+| 0.170 | 44 | 25 | 19 | 0.568 | −0.124 | −0.248 to +0.000 | 0.056 | 25/14 |
+| 0.160 | 62 | 36 | 26 | 0.581 | −0.159 | −0.310 to −0.018 | 0.042 | 33/20 |
+| **0.150** | **82** | **45** | **37** | **0.549** | **−0.212** | **−0.389 to −0.035** | **0.023** | **39/27** |
+| 0.140 | 108 | 59 | 49 | 0.546 | −0.212 | −0.434 to +0.009 | 0.087 | 43/35 |
+| 0.120 | 145 | 74 | 71 | 0.510 | −0.204 | −0.469 to +0.062 | 0.159 | 50/48 |
+| 0.100 | 187 | 92 | 95 | 0.492 | −0.204 | −0.522 to +0.097 | 0.233 | 53/56 |
 
-Paired bootstrap CI and Wilcoxon over the 113 frames. **0.150 is the
-recommendation** — the deepest step significant under both readings, inside the
-0.15–0.18 range where admitted-box precision peaks at 0.55–0.58. The extra 105
-boxes from 0.15 down to 0.10 are 47 recovered against 58 spurious, and reading B
-stops improving below 0.14 while precision decays to 0.49.
+Paired bootstrap CI and Wilcoxon over the 113 frames. **0.150 is the floor** —
+the largest improvement in the sweep, the only one clearing p < 0.05 with room,
+and inside the 0.15–0.18 range where admitted-box precision peaks at 0.55–0.58.
+Everything below it buys nothing measurable: the extra 105 boxes from 0.15 to
+0.10 are 47 recovered against 58 spurious, the improvement does not move, its CI
+widens through zero, and precision decays to 0.49. At 0.10 the tally is 53 frames
+better against 56 worse. And even at its best this is **−0.212 against a 2.14
+undercount** — about a tenth of the counting error. 197 of the 242 missing
+surfers are still missing at 0.15, most of them never proposed at any
+confidence.
 
 **Not adopted.** All 113 frames carry band boxes and came from days chosen
 because they had misses, so the set is biased toward undercounting; on frames

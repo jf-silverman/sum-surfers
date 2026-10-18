@@ -109,14 +109,16 @@ the band is **92 real against 95 spurious, 49.2% precision**, against 91.8% for
 what production already emits. Of the 92 recovered, **64 are prone and side-on
 prone (34) is the biggest group, not end-on (16)**.
 
-Per-frame count error improves all the way down to 0.10, but that is error
-cancellation: the detector undercounts by 2–3 surfers a frame on this set, so
-boxes that are wrong half the time still close the gap while box-level precision
-falls. **The measured floor is 0.150** — the deepest step significant under both
-readings of the review's `boxes_missed` column (−0.389 and −0.212 mean |count
-error|, p < 0.0001 and p = 0.023 over 113 frames), and inside the 0.15–0.18 range
-where admitted-box precision peaks at 0.55–0.58. Below 0.14 the conservative
-reading stops improving while precision decays to 0.49.
+**The measured floor is 0.150.** Against a current undercount of 2.14
+surfers/frame on these 113 frames, it cuts mean |count error| by **0.212**
+(95% CI −0.389 to −0.035, Wilcoxon p = 0.023, 39 frames better against 27 worse)
+— the largest improvement in the sweep and the only one clearing p < 0.05 with
+room, sitting inside the 0.15–0.18 range where admitted-box precision peaks at
+0.55–0.58. Everything below it buys nothing measurable: the extra 105 boxes from
+0.15 down to 0.10 are 47 recovered against 58 spurious, the count improvement
+does not move (−0.204, p = 0.233), and admitted-box precision decays to 0.49.
+Even at its best this recovers about a tenth of the counting error — 197 of the
+242 missing surfers on these frames are still missing at 0.15.
 
 **The threshold has not been changed.** The review frames are biased toward
 undercounting — all of them were chosen because they had misses — so the
