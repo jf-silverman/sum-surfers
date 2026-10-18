@@ -5620,3 +5620,47 @@ fog-gate review), and three separate notes proposing box size relative to other
 boxes at the same y as a discriminator — which `analysis/shore_head_zone/` found
 carries the opposite sign inside the bluff zone (false positives median width
 12.8 against 25.7 for true positives), so any size rule has to be per-region.
+
+### 2026-10-17 — Bluff-head review completed: the zone rule is a 5:1 trade, and untunable
+
+Joel judged all 24 boxes the shore-head zone rule fires on. Scored by
+`analysis/shore_head_zone/score_bluff_review.py`.
+
+**19 shore heads** (17 "head on shore", 1 "head and arms", 1 cowboy hat),
+**1 box on a surfer who already had a better box**, and **4 boxes that are the
+only box on a real surfer**. Deleting a duplicate changes no count, so it scores
+with the suppressions: **20 of 24 correct, 5:1**. That takes the evidence base
+from the 6 false positives the rule was originally fitted on to 30 judged boxes,
+which is what `measure_shore_zone.py` said would settle it.
+
+**The 0.04 boundary gap was the wrong thing to have been worried about.** Nothing
+separates the 4 real surfers from the 19 shore heads — confidence 0.24–0.46
+against 0.20–0.49, width 12.3–20.1 against 9.2–27.3, height 10.4–16.9 against
+7.9–16.3, y1 162.7–169.6 against 163.2–171.8, centre x 534.7–662.6 against
+537.9–672.3. Every range overlaps. Tighter variants score better (`x<=620` 8.5:1,
+`conf<0.40` 12:1) but each is fitted to which of **four** boxes it happens to
+exclude. The rule is a flat trade: take it as specified or not at all.
+
+**Worth 0.080 boxes/frame — 0.063 false counts removed against 0.013 real
+surfers lost, net −0.05/frame.** That net runs the wrong way for the count,
+since the detector already undercounts by 2.14 surfers/frame. The case for
+adopting it anyway is that shore heads are a *systematic* bias rather than noise:
+they recur at the same bluff positions day after day and concentrate on clear
+bright days, so they do not average out across hours the way a random false
+positive does. Precision improves and the count cost is a fortieth of the
+undercount it adds to.
+
+**It should go in before any `CONF_THRESH` change.** The band review holds 9
+rejected shore heads over 113 frames, all currently excluded by the threshold
+alone; a 0.15 floor admits 3 of them (0.027/frame, a third of what the zone
+catches) and a 0.10 floor admits all 9, doubling it. (The earlier estimate of 8
+was made at 136 of 187 rows filled.)
+
+Two items raised and not acted on. One of the 4 real surfers is noted "surfer
+standing on beach w/ board in-hand" — whether a person on the beach holding a
+board is a count is a definition this series has never written down, and it
+changes the rule's ratio to 6.7:1 if the answer is no. And the first reviewed
+frame is noted "blurry w/ condensation over 80% and should be gated out of
+detection" despite passing the quality gate; it belongs with the 23 frames in
+the fog-gate review. The x-range watch item stands: two of the four real surfers
+sit in the right third of the 400–680 zone, as does the rightmost shore head.

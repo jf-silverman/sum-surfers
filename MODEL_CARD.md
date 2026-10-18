@@ -132,7 +132,15 @@ threshold or any lower one.
 - **Birds**, and in one measured case a **bird's reflection**, counted as
   surfers. Low-flying birds over water produce a detached reflection below them.
 - **People on the beach** and, occasionally, one surfer split into two
-  side-by-side boxes.
+  side-by-side boxes. The beach case has a measured shape: the ROI is rows
+  420–600 of the 720-row frame, and the bluff path runs at y 590–660, so only
+  the top of a head enters the image and the box is always clipped by the ROI's
+  bottom edge. A zone rule on that signature — centre in x 400–680, bottom edge
+  at or past y 179, confidence under 0.50 — was hand-checked against all 24
+  boxes it fires on in a 300-frame sample: **19 shore heads, 1 duplicate box,
+  4 real surfers, a 5:1 trade** at 0.080 boxes/frame. Nothing separates the 4
+  from the 19 on confidence, size or position, so the rule cannot be tuned, only
+  taken or left. Not yet adopted — see `analysis/shore_head_zone/`.
 - **Whitewater band (bottom of frame)** has the weakest recall: 78%, against 86%
   mid-frame and 84% top. Not a threshold problem — dropping that band's
   threshold to 0.08 moves recall only to 80%. It needs labeled whitewater.

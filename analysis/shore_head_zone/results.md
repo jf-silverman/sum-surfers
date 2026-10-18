@@ -103,26 +103,75 @@ and a measured per-hour noise floor of about 1.5 surfers.
 
 ## Where this leaves it
 
-Not adopted. The direction is right and the rule is clean, but it rests on
-**six false positives**, and the gap between the highest FP (0.49) and the
-lowest true positive (0.53) is 0.04 — fitted to this sample, not a margin.
-Nothing about the count justifies the risk at that evidence level: 0.08 per
-frame is a twentieth of the noise floor.
+**Reviewed and settled, 2026-10-17.** Option 1 below was done: all 24 firing
+boxes were rendered and judged. Scored by
+`python analysis/shore_head_zone/score_bluff_review.py`.
 
-What would change that:
+| | n |
+|---|---:|
+| head on shore | 17 |
+| head and arms on shore | 1 |
+| cowboy hat on shore | 1 |
+| box on a surfer who already has a better box | 1 |
+| **the only box on a real surfer** | **4** |
 
-1. **A targeted review.** `sample_boxes_unlabeled.csv` already holds the 24
-   firing boxes. Rendering those 23 frames and judging each would take the
-   evidence from 6 to 30 and either widen the 0.04 gap or kill the rule.
-2. **A lower `CONF_THRESH`.** The band review found 8 shore heads in 187 boxes
-   across 113 frames — all between 0.10 and 0.195, so all currently excluded by
-   the threshold alone. Lowering the threshold to 0.10 would admit them at
-   roughly 0.07 per frame, doubling what the zone has to catch and making it
-   worth having *before* the threshold moves.
+Deleting a box that duplicates an already-counted surfer changes no count, so
+it scores with the suppressions. **20 of 24 correct, a 5:1 trade**, and the
+evidence base goes from 6 points to 30. The 0.04 boundary gap that held the
+rule back is gone as a concern — not because it widened, but because it was
+the wrong thing to be looking at.
 
-Watch item either way: the x range 400–680 is fitted to six points, and the
-bluff carries people further right than that. Any future evidence should
-re-derive the range rather than assume it.
+**Nothing separates the 4 real surfers from the 19 shore heads.** Confidence,
+width, height, top edge and centre-x all overlap completely:
+
+| | real surfers | shore heads |
+|---|---|---|
+| confidence | 0.24–0.46 | 0.20–0.49 |
+| width | 12.3–20.1 | 9.2–27.3 |
+| height | 10.4–16.9 | 7.9–16.3 |
+| y1 | 162.7–169.6 | 163.2–171.8 |
+| centre x | 534.7–662.6 | 537.9–672.3 |
+
+So the rule is a flat trade, not something to be tuned. Tighter variants look
+better on paper — `x<=620` is 8.5:1, `conf<0.40` is 12:1 — but each one is
+fitted to which of **four** boxes it happens to exclude, and the ranges above
+say there is no real boundary there to find. Take the rule as specified or not
+at all.
+
+**What it is worth.** 0.080 boxes/frame firing: **0.063 false counts removed,
+0.013 real surfers lost**, net −0.05 counts/frame against a mean hourly count
+of 14.7 and a ~1.5-surfer noise floor.
+
+That net is in the wrong direction for the count on its own terms — the
+detector undercounts by 2.14 surfers/frame
+(`analysis/conf_band_decision/`), so removing boxes, even mostly wrong ones,
+moves the count further down. The case for adopting it anyway is that shore
+heads are a **systematic** bias, not noise: they fire at the same handful of
+bluff positions day after day, so they do not average out across hours the way
+a random false positive does, and they concentrate on the clear bright days
+when people are on the bluff — the same days the count is already most trusted.
+Precision improves; the count cost is a fortieth of the undercount it adds to.
+
+**It is also a precondition for lowering `CONF_THRESH`.** The band review holds
+9 rejected shore heads over 113 frames, all currently excluded by the threshold
+alone. A 0.15 floor admits 3 of them (0.027/frame, a third of what the zone
+catches); a 0.10 floor admits all 9 (0.080/frame, doubling it). The zone should
+go in first either way.
+
+**Open question for Joel, worth one line:** one of the 4 real surfers is noted
+"surfer standing on beach w/ board in-hand". If a person on the beach holding a
+board is not a count — the series measures water crowding — the rule is 6.7:1
+rather than 5:1, and that definition should be written down somewhere, because
+it will keep coming up in this zone.
+
+**Watch item, unchanged.** The x range 400–680 is still fitted. Two of the four
+real surfers sit in its right third (centre x 662 and 668), and so does the
+rightmost shore head (672). The bluff carries people further right than 680;
+any future evidence should re-derive the range rather than assume it.
+
+**Logged, not acted on.** The first reviewed frame carries the note "blurry w/
+condensation over 80% and should be gated out of detection" — it passed the
+quality gate. It belongs with the 23 frames already in the fog-gate review.
 
 ## Files
 
