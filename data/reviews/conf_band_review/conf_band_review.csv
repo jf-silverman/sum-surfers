@@ -2,13 +2,13 @@ image,date,time_local,box,confidence,is_surfer,pose,js_confidence,boxes_missed,n
 2025-10-25_0823_2.png,2025-10-25,08:23,1,0.193,y,e,.9,5,,crop2025-10-25_08-23-00.jpg
 2025-10-25_0823_2.png,2025-10-25,08:23,2,0.159,y,sitting,1,5,,crop2025-10-25_08-23-00.jpg
 2025-10-25_1159_1.png,2025-10-25,11:59,1,0.181,y,e,.6,0,edge truncated; could be on shore person's head.,crop2025-10-25_11-59-00.jpg
-2025-10-25_1253_1.png,2025-10-25,12:53,1,0.194,n,,,1,edge truncated,crop2025-10-25_12-53-00.jpg
-2025-10-25_1535_1.png,2025-10-25,15:35,1,0.116,y,s,1,0,box has 60% of surfer + 20% of sitting surfer to the right.,crop2025-10-25_15-35-00.jpg
+2025-10-25_1253_1.png,2025-10-25,12:53,1,0.194,n,,,1,edge truncated; tree bough?,crop2025-10-25_12-53-00.jpg
+2025-10-25_1535_1.png,2025-10-25,15:35,1,0.116,n,,,0,This box is on parts of 2 surfers who already have boxes,crop2025-10-25_15-35-00.jpg
 2025-10-25_1723_3.png,2025-10-25,17:23,1,0.191,y,s,.8,3,,crop2025-10-25_17-23-00.jpg
 2025-10-25_1723_3.png,2025-10-25,17:23,2,0.14,y,s,.8,3,,crop2025-10-25_17-23-00.jpg
-2025-10-25_1723_3.png,2025-10-25,17:23,3,0.159,y,s,.9,3,,crop2025-10-25_17-23-00.jpg
+2025-10-25_1723_3.png,2025-10-25,17:23,3,0.159,y,sitting,.9,3,there are 2 surfers. the other has a good box,crop2025-10-25_17-23-00.jpg
 2025-10-25_1817_1.png,2025-10-25,18:17,1,0.182,n,,,0,,crop2025-10-25_18-17-00.jpg
-2025-11-04_1347_2.png,2025-11-04,13:47,1,0.115,y,a,.9,2,"that's actually 2 prone surfers (a), side-by-side",crop2025-11-04_13-47-00.jpg
+2025-11-04_1347_2.png,2025-11-04,13:47,1,0.115,y,a,.9,2,"that's actually 2 prone surfers in this box; the other one has a box already",crop2025-11-04_13-47-00.jpg
 2025-11-04_1347_2.png,2025-11-04,13:47,2,0.166,n,,,2,It's actually just above a sitting surfer that was detected though.,crop2025-11-04_13-47-00.jpg
 2025-11-04_1441_1.png,2025-11-04,14:41,1,0.122,y,a,1,6,,crop2025-11-04_14-41-00.jpg
 2025-11-04_1535_1.png,2025-11-04,15:35,1,0.149,n,,,1,"wave shadow; smooth water, grainy low light.",crop2025-11-04_15-35-00.jpg
@@ -24,10 +24,10 @@ image,date,time_local,box,confidence,is_surfer,pose,js_confidence,boxes_missed,n
 2026-03-12_0917_1.png,2026-03-12,09:17,1,0.186,y,s,.7,0,could be a small wave shadow.,crop2026-03-12_09-17-00.jpg
 2026-03-12_1011_2.png,2026-03-12,10:11,1,0.167,y,a,.6,6,,crop2026-03-12_10-11-00.jpg
 2026-03-12_1011_2.png,2026-03-12,10:11,2,0.119,y,a,.7,6,,crop2026-03-12_10-11-00.jpg
-2026-03-12_1159_1.png,2026-03-12,11:59,1,0.12,y,sitting & e,1,9,"sitting surfer on left, prone (e) on right",crop2026-03-12_11-59-00.jpg
+2026-03-12_1159_1.png,2026-03-12,11:59,1,0.12,y,unknown,1,9,"box has 2 surfers. other one has a box.",crop2026-03-12_11-59-00.jpg
 2026-03-12_1441_1.png,2026-03-12,14:41,1,0.11,n,,,0,,crop2026-03-12_14-41-00.jpg
-2026-03-12_1535_2.png,2026-03-12,15:35,1,0.14,y,s,1,0,,crop2026-03-12_15-35-00.jpg
-2026-03-12_1535_2.png,2026-03-12,15:35,2,0.151,y,s,.8,0,also includes portion of another surfer,crop2026-03-12_15-35-00.jpg
+2026-03-12_1535_2.png,2026-03-12,15:35,1,0.14,n,s,1,0,this is a 4th box that is on 2 surfers.  Each has a good box and there are 2 bad boxes (including this one).,crop2026-03-12_15-35-00.jpg
+2026-03-12_1535_2.png,2026-03-12,15:35,2,0.151,y,s,.8,0,also includes portion of another surfer who has a good box,crop2026-03-12_15-35-00.jpg
 2026-03-12_1629_1.png,2026-03-12,16:29,1,0.156,y,s,.8,0,,crop2026-03-12_16-29-00.jpg
 2026-03-12_1723_4.png,2026-03-12,17:23,1,0.115,y,s,.8,2,,crop2026-03-12_17-23-00.jpg
 2026-03-12_1723_4.png,2026-03-12,17:23,2,0.113,y,s,.8,2,,crop2026-03-12_17-23-00.jpg
@@ -36,22 +36,22 @@ image,date,time_local,box,confidence,is_surfer,pose,js_confidence,boxes_missed,n
 2026-03-12_1911_1.png,2026-03-12,19:11,1,0.144,n,,,0,this is a head of a person on shore. ,crop2026-03-12_19-11-00.jpg
 2026-07-25_0617_1.png,2026-07-25,06:17,1,0.163,y,s,.6,0,grainy,crop2026-07-25_06-17-00.jpg
 2026-07-25_0711_2.png,2026-07-25,07:11,1,0.153,n,,,1,that's just the surfboard. the surfer is already in a separate box,crop2026-07-25_07-11-00.jpg
-2026-07-25_0711_2.png,2026-07-25,07:11,2,0.136,n,,,1,This is a surfer and the surfboard. The surfer already has a box though (and it overlaps with this box).,crop2026-07-25_07-11-00.jpg
-2026-07-25_0805_2.png,2026-07-25,08:05,1,0.146,n,,,0,,crop2026-07-25_08-05-00.jpg
+2026-07-25_0711_2.png,2026-07-25,07:11,2,0.136,n,,,1,this is 2 surfers and this is a 3rd box partly on both; each already has a good box.,crop2026-07-25_07-11-00.jpg
+2026-07-25_0805_2.png,2026-07-25,08:05,1,0.146,n,,,0,This is a 5th box on 3 surfers. not needed.,crop2026-07-25_08-05-00.jpg
 2026-07-25_0805_2.png,2026-07-25,08:05,2,0.152,y,e,.9,0,,crop2026-07-25_08-05-00.jpg
 2026-07-25_0859_1.png,2026-07-25,08:59,1,0.114,n,,,1,,crop2026-07-25_08-59-00.jpg
 2026-07-25_0953_5.png,2026-07-25,09:53,1,0.167,y,s,,8,,crop2026-07-25_09-53-00.jpg
-2026-07-25_0953_5.png,2026-07-25,09:53,2,0.102,y,e,,8,,crop2026-07-25_09-53-00.jpg
+2026-07-25_0953_5.png,2026-07-25,09:53,2,0.102,n,e,,8,sun glare on wave. much narrower than surfer at this y level,crop2026-07-25_09-53-00.jpg
 2026-07-25_0953_5.png,2026-07-25,09:53,3,0.102,y,a,.9,8,,crop2026-07-25_09-53-00.jpg
 2026-07-25_0953_5.png,2026-07-25,09:53,4,0.156,y,a,.7,8,,crop2026-07-25_09-53-00.jpg
 2026-07-25_0953_5.png,2026-07-25,09:53,5,0.126,n,,.6,8,,crop2026-07-25_09-53-00.jpg
-2026-07-25_1047_1.png,2026-07-25,10:47,1,0.126,n,,,0,,crop2026-07-25_10-47-00.jpg
-2026-07-25_1141_3.png,2026-07-25,11:41,1,0.131,y,s,,2,"this box is part of a cluster of 3 boxes.  One box has 2 sitting surfers, another has a prone (s) surfer. This box sits in between covering part of each.  It shouls not be there, but 1 more box is needed to get all three surfers.",crop2026-07-25_11-41-00.jpg
+2026-07-25_1047_1.png,2026-07-25,10:47,1,0.126,n,,,0,tree bough on edge,crop2026-07-25_10-47-00.jpg
+2026-07-25_1141_3.png,2026-07-25,11:41,1,0.131,y,s,,2,"this box is part of a cluster of 3 boxes.  One box has 2 sitting surfers, another has a prone (s) surfer. This box sits in between covering part of each.  Basically the count is right, but this box should be tigher on the sitting surfer.",crop2026-07-25_11-41-00.jpg
 2026-07-25_1141_3.png,2026-07-25,11:41,2,0.108,y,s,.8,2,covers part of another surfer that already has a box.,crop2026-07-25_11-41-00.jpg
-2026-07-25_1141_3.png,2026-07-25,11:41,3,0.124,y,unknown,.9,2,,crop2026-07-25_11-41-00.jpg
-2026-07-25_1235_2.png,2026-07-25,12:35,1,0.147,n,,,7,,crop2026-07-25_12-35-00.jpg
-2026-07-25_1235_2.png,2026-07-25,12:35,2,0.122,n,,,7,on edge of frame,crop2026-07-25_12-35-00.jpg
-2026-07-25_1329_2.png,2026-07-25,13:29,1,0.113,y,wipeout,,2,"2 surfers, each wiped out.",crop2026-07-25_13-29-00.jpg
+2026-07-25_1141_3.png,2026-07-25,11:41,3,0.124,y,unknown,.9,2,I think this is 2 surfers (e) in one box.  There is also another box that partially covers both plus the reflection of a SUP boarder above.,crop2026-07-25_11-41-00.jpg
+2026-07-25_1235_2.png,2026-07-25,12:35,1,0.147,y,wipeout,,7,,crop2026-07-25_12-35-00.jpg
+2026-07-25_1235_2.png,2026-07-25,12:35,2,0.122,n,,,7,on edge of frame. maybe tree bough,crop2026-07-25_12-35-00.jpg
+2026-07-25_1329_2.png,2026-07-25,13:29,1,0.113,y,wipeout,,2,"2 surfers, each wiped out. this appears to be a 3rd box that's not needed",crop2026-07-25_13-29-00.jpg
 2026-07-25_1329_2.png,2026-07-25,13:29,2,0.193,y,e,.9,2,,crop2026-07-25_13-29-00.jpg
 2026-07-25_1423_2.png,2026-07-25,14:23,1,0.135,n,,,0,This is a third box in between 2 other surfers that are already each boxed.,crop2026-07-25_14-23-00.jpg
 2026-07-25_1423_2.png,2026-07-25,14:23,2,0.191,n,,,0,This is a third box in between 2 other surfers that are already each boxed.,crop2026-07-25_14-23-00.jpg
@@ -135,54 +135,54 @@ image,date,time_local,box,confidence,is_surfer,pose,js_confidence,boxes_missed,n
 2026-09-27_1629_3.png,2026-09-27,16:29,1,0.168,n,,.6,4,,crop2026-09-27_16-29-00.jpg
 2026-09-27_1629_3.png,2026-09-27,16:29,2,0.193,y,s,,4,,crop2026-09-27_16-29-00.jpg
 2026-09-27_1629_3.png,2026-09-27,16:29,3,0.189,y,e,,4,in after-wave foam zone,crop2026-09-27_16-29-00.jpg
-2026-09-27_1723_3.png,2026-09-27,17:23,1,0.19,,,,15,,crop2026-09-27_17-23-00.jpg
-2026-09-27_1723_3.png,2026-09-27,17:23,2,0.112,,,,15,,crop2026-09-27_17-23-00.jpg
-2026-09-27_1723_3.png,2026-09-27,17:23,3,0.154,,,,15,,crop2026-09-27_17-23-00.jpg
-2026-09-27_1817_3.png,2026-09-27,18:17,1,0.143,,,,4,,crop2026-09-27_18-17-00.jpg
-2026-09-27_1817_3.png,2026-09-27,18:17,2,0.177,,,,4,,crop2026-09-27_18-17-00.jpg
-2026-09-27_1817_3.png,2026-09-27,18:17,3,0.148,,,,4,,crop2026-09-27_18-17-00.jpg
-2026-09-28_0823_2.png,2026-09-28,08:23,1,0.128,,,,0,,crop2026-09-28_08-23-00.jpg
-2026-09-28_0917_1.png,2026-09-28,09:17,1,0.188,,,,0,,crop2026-09-28_09-17-00.jpg
-2026-09-28_1535_2.png,2026-09-28,15:35,1,0.163,,,,2,,crop2026-09-28_15-35-00.jpg
-2026-09-28_1535_2.png,2026-09-28,15:35,2,0.126,,,,2,,crop2026-09-28_15-35-00.jpg
-2026-09-28_1723_3.png,2026-09-28,17:23,1,0.145,,,,13,,crop2026-09-28_17-23-00.jpg
-2026-09-28_1723_3.png,2026-09-28,17:23,2,0.186,,,,13,,crop2026-09-28_17-23-00.jpg
-2026-09-28_1817_4.png,2026-09-28,18:17,1,0.118,,,,5,,crop2026-09-28_18-17-00.jpg
-2026-09-28_1817_4.png,2026-09-28,18:17,2,0.125,,,,5,,crop2026-09-28_18-17-00.jpg
-2026-09-28_1817_4.png,2026-09-28,18:17,3,0.129,,,,5,,crop2026-09-28_18-17-00.jpg
-2026-09-28_1817_4.png,2026-09-28,18:17,4,0.101,,,,5,,crop2026-09-28_18-17-00.jpg
-2026-09-29_0635_2.png,2026-09-29,06:35,1,0.12,,,,2,,crop2026-09-29_06-35-00.jpg
-2026-09-29_0635_2.png,2026-09-29,06:35,2,0.16,,,,2,,crop2026-09-29_06-35-00.jpg
-2026-09-29_0729_1.png,2026-09-29,07:29,1,0.147,,,,0,,crop2026-09-29_07-29-00.jpg
-2026-09-29_0823_1.png,2026-09-29,08:23,1,0.184,,,,6,,crop2026-09-29_08-23-00.jpg
-2026-09-29_0917_2.png,2026-09-29,09:17,1,0.172,,,,6,,crop2026-09-29_09-17-00.jpg
-2026-09-29_0917_2.png,2026-09-29,09:17,2,0.109,,,,6,,crop2026-09-29_09-17-00.jpg
-2026-09-29_1011_1.png,2026-09-29,10:11,1,0.192,,,,0,,crop2026-09-29_10-11-00.jpg
-2026-09-29_1159_1.png,2026-09-29,11:59,1,0.169,,,,0,,crop2026-09-29_11-59-00.jpg
-2026-09-29_1441_2.png,2026-09-29,14:41,1,0.135,,,,0,,crop2026-09-29_14-41-00.jpg
-2026-09-29_1629_3.png,2026-09-29,16:29,1,0.148,,,,11,,crop2026-09-29_16-29-00.jpg
-2026-09-29_1629_3.png,2026-09-29,16:29,2,0.151,,,,11,,crop2026-09-29_16-29-00.jpg
-2026-09-29_1629_3.png,2026-09-29,16:29,3,0.143,,,,11,,crop2026-09-29_16-29-00.jpg
-2026-09-29_1723_2.png,2026-09-29,17:23,1,0.122,,,,6,,crop2026-09-29_17-23-00.jpg
-2026-09-29_1723_2.png,2026-09-29,17:23,2,0.12,,,,6,,crop2026-09-29_17-23-00.jpg
-2026-10-01_1011_1.png,2026-10-01,10:11,1,0.122,,,,0,,crop2026-10-01_10-11-00.jpg
-2026-10-01_1253_1.png,2026-10-01,12:53,1,0.127,,,,0,,crop2026-10-01_12-53-00.jpg
-2026-10-01_1347_1.png,2026-10-01,13:47,1,0.13,,,,0,,crop2026-10-01_13-47-00.jpg
-2026-10-01_1535_1.png,2026-10-01,15:35,1,0.152,,,,0,,crop2026-10-01_15-35-00.jpg
-2026-10-01_1723_2.png,2026-10-01,17:23,1,0.187,,,,2,,crop2026-10-01_17-23-00.jpg
-2026-10-01_1723_2.png,2026-10-01,17:23,2,0.188,,,,2,,crop2026-10-01_17-23-00.jpg
-2026-10-01_1817_2.png,2026-10-01,18:17,1,0.161,,,,1,,crop2026-10-01_18-17-00.jpg
-2026-10-01_1817_2.png,2026-10-01,18:17,2,0.179,,,,1,,crop2026-10-01_18-17-00.jpg
-2026-10-02_0823_1.png,2026-10-02,08:23,1,0.126,,,,0,,crop2026-10-02_08-23-00.jpg
-2026-10-02_0917_1.png,2026-10-02,09:17,1,0.117,,,,1,,crop2026-10-02_09-17-00.jpg
-2026-10-02_1105_1.png,2026-10-02,11:05,1,0.16,,,,0,,crop2026-10-02_11-05-00.jpg
-2026-10-02_1535_2.png,2026-10-02,15:35,1,0.126,,,,0,,crop2026-10-02_15-35-00.jpg
-2026-10-03_0635_2.png,2026-10-03,06:35,1,0.131,,,,3,,crop2026-10-03_06-35-00.jpg
-2026-10-03_0635_2.png,2026-10-03,06:35,2,0.123,,,,3,,crop2026-10-03_06-35-00.jpg
-2026-10-03_0917_1.png,2026-10-03,09:17,1,0.19,,,,0,,crop2026-10-03_09-17-00.jpg
-2026-10-03_1011_2.png,2026-10-03,10:11,1,0.173,,,,0,,crop2026-10-03_10-11-00.jpg
-2026-10-03_1011_2.png,2026-10-03,10:11,2,0.172,,,,0,,crop2026-10-03_10-11-00.jpg
-2026-10-03_1105_1.png,2026-10-03,11:05,1,0.177,,,,8,,crop2026-10-03_11-05-00.jpg
-2026-10-03_1159_2.png,2026-10-03,11:59,1,0.142,,,,0,,crop2026-10-03_11-59-00.jpg
-2026-10-03_1253_2.png,2026-10-03,12:53,1,0.186,,,,12,,crop2026-10-03_12-53-00.jpg
-2026-10-03_1253_2.png,2026-10-03,12:53,2,0.141,,,,12,,crop2026-10-03_12-53-00.jpg
+2026-09-27_1723_3.png,2026-09-27,17:23,1,0.19,y,a & a,,15,this is 2 surfers; neither with a box besides this one that encloses both,crop2026-09-27_17-23-00.jpg
+2026-09-27_1723_3.png,2026-09-27,17:23,2,0.112,n,,,15,there is already a better box on this surfer,crop2026-09-27_17-23-00.jpg
+2026-09-27_1723_3.png,2026-09-27,17:23,3,0.154,y,s,,15,keep this box for this surfer.  There is another one that encloses it plus another.,crop2026-09-27_17-23-00.jpg
+2026-09-27_1817_3.png,2026-09-27,18:17,1,0.143,y,a,,4,this is a prone surfer on a wave; getting ready to stand up,crop2026-09-27_18-17-00.jpg
+2026-09-27_1817_3.png,2026-09-27,18:17,2,0.177,y,s,,4,,crop2026-09-27_18-17-00.jpg
+2026-09-27_1817_3.png,2026-09-27,18:17,3,0.148,y,s,,4,,crop2026-09-27_18-17-00.jpg
+2026-09-28_0823_2.png,2026-09-28,08:23,1,0.128,n,,,0,this is an extra box that encloses 2 surfers who each already have a good box.,crop2026-09-28_08-23-00.jpg
+2026-09-28_0917_1.png,2026-09-28,09:17,1,0.188,n,,,0,truncated edge of a shore head; we may want to reconsider how we treat bottom edge truncated detections,crop2026-09-28_09-17-00.jpg
+2026-09-28_1535_2.png,2026-09-28,15:35,1,0.163,y,sitting,,2,,crop2026-09-28_15-35-00.jpg
+2026-09-28_1535_2.png,2026-09-28,15:35,2,0.126,y,unknown,,2,,crop2026-09-28_15-35-00.jpg
+2026-09-28_1723_3.png,2026-09-28,17:23,1,0.145,y,e & a,,13,"two surfers, one box, side by side",crop2026-09-28_17-23-00.jpg
+2026-09-28_1723_3.png,2026-09-28,17:23,2,0.186,y,unknown,,13,,crop2026-09-28_17-23-00.jpg
+2026-09-28_1817_4.png,2026-09-28,18:17,1,0.118,n,,.6,5,,crop2026-09-28_18-17-00.jpg
+2026-09-28_1817_4.png,2026-09-28,18:17,2,0.125,y,unknown,.6,5,,crop2026-09-28_18-17-00.jpg
+2026-09-28_1817_4.png,2026-09-28,18:17,3,0.129,y,s,.9,5,,crop2026-09-28_18-17-00.jpg
+2026-09-28_1817_4.png,2026-09-28,18:17,4,0.101,y,e,,5,,crop2026-09-28_18-17-00.jpg
+2026-09-29_0635_2.png,2026-09-29,06:35,1,0.12,y,unknown,.7,2,looks like 2 surfers. one already has a box. this frame may be too foggy,crop2026-09-29_06-35-00.jpg
+2026-09-29_0635_2.png,2026-09-29,06:35,2,0.16,y,unknown,.6,2,,crop2026-09-29_06-35-00.jpg
+2026-09-29_0729_1.png,2026-09-29,07:29,1,0.147,n,,,0,there's already a box on this prone(s) surfer,crop2026-09-29_07-29-00.jpg
+2026-09-29_0823_1.png,2026-09-29,08:23,1,0.184,y,sitting,.8,6,This box covers two surfers. The other one already has a good box on it.,crop2026-09-29_08-23-00.jpg
+2026-09-29_0917_2.png,2026-09-29,09:17,1,0.172,y,s,,6,,crop2026-09-29_09-17-00.jpg
+2026-09-29_0917_2.png,2026-09-29,09:17,2,0.109,n,,.6,6,This frame may be too foggy,crop2026-09-29_09-17-00.jpg
+2026-09-29_1011_1.png,2026-09-29,10:11,1,0.192,n,,,0,,crop2026-09-29_10-11-00.jpg
+2026-09-29_1159_1.png,2026-09-29,11:59,1,0.169,n,,,0,tree branch,crop2026-09-29_11-59-00.jpg
+2026-09-29_1441_2.png,2026-09-29,14:41,1,0.135,n,,,0,,crop2026-09-29_14-41-00.jpg
+2026-09-29_1629_3.png,2026-09-29,16:29,1,0.148,y,standing,,11,,crop2026-09-29_16-29-00.jpg
+2026-09-29_1629_3.png,2026-09-29,16:29,2,0.151,y,standing,,11,,crop2026-09-29_16-29-00.jpg
+2026-09-29_1629_3.png,2026-09-29,16:29,3,0.143,y,e,.8,11,,crop2026-09-29_16-29-00.jpg
+2026-09-29_1723_2.png,2026-09-29,17:23,1,0.122,y,s,,6,"there are 3 surfers here; one has a box, this proposed box is ok; there is one more w/o a box.",crop2026-09-29_17-23-00.jpg
+2026-09-29_1723_2.png,2026-09-29,17:23,2,0.12,y,e,,6,,crop2026-09-29_17-23-00.jpg
+2026-10-01_1011_1.png,2026-10-01,10:11,1,0.122,n,,,0,classic sun glare on left side of frame. Do these always happen during a certain midday period?,crop2026-10-01_10-11-00.jpg
+2026-10-01_1253_1.png,2026-10-01,12:53,1,0.127,n,,,0,,crop2026-10-01_12-53-00.jpg
+2026-10-01_1347_1.png,2026-10-01,13:47,1,0.13,n,,,0,,crop2026-10-01_13-47-00.jpg
+2026-10-01_1535_1.png,2026-10-01,15:35,1,0.152,n,,,0,shore head. can't we jjust up threshold if box touches bottom center edge?,crop2026-10-01_15-35-00.jpg
+2026-10-01_1723_2.png,2026-10-01,17:23,1,0.187,y,s,,2,,crop2026-10-01_17-23-00.jpg
+2026-10-01_1723_2.png,2026-10-01,17:23,2,0.188,n,,,2,this is a 3rd box on top of two prone surfers who box already have boxes,crop2026-10-01_17-23-00.jpg
+2026-10-01_1817_2.png,2026-10-01,18:17,1,0.161,y,s,,1,I think for some reason the resolution is a little worse on the left in general,crop2026-10-01_18-17-00.jpg
+2026-10-01_1817_2.png,2026-10-01,18:17,2,0.179,n,,,1,it's a box partly covering two surfers who have boxes,crop2026-10-01_18-17-00.jpg
+2026-10-02_0823_1.png,2026-10-02,08:23,1,0.126,n,,,0,,crop2026-10-02_08-23-00.jpg
+2026-10-02_0917_1.png,2026-10-02,09:17,1,0.117,n,,,1,much smaller that adjacent surfers. Can we use that sort of info?,crop2026-10-02_09-17-00.jpg
+2026-10-02_1105_1.png,2026-10-02,11:05,1,0.16,n,,,0,much smaller than surfer in similar y level of the frame.  can we use that info?,crop2026-10-02_11-05-00.jpg
+2026-10-02_1535_2.png,2026-10-02,15:35,1,0.126,n,,,0,probably a bird. Basically a black dot.  This should not accept this small an object at this y level of the frame.,crop2026-10-02_15-35-00.jpg
+2026-10-03_0635_2.png,2026-10-03,06:35,1,0.131,y,unknown,.6,3,very grainy low light,crop2026-10-03_06-35-00.jpg
+2026-10-03_0635_2.png,2026-10-03,06:35,2,0.123,y,e,.9,3,very grainy low light,crop2026-10-03_06-35-00.jpg
+2026-10-03_0917_1.png,2026-10-03,09:17,1,0.19,n,,,0,extra box on top of surfers that have other boxes.  ,crop2026-10-03_09-17-00.jpg
+2026-10-03_1011_2.png,2026-10-03,10:11,1,0.173,n,,,0,just typical midday sun glare on left side of frame,crop2026-10-03_10-11-00.jpg
+2026-10-03_1011_2.png,2026-10-03,10:11,2,0.172,n,,,0,just typical midday sun glare on left side of frame,crop2026-10-03_10-11-00.jpg
+2026-10-03_1105_1.png,2026-10-03,11:05,1,0.177,y,sitting,,8,,crop2026-10-03_11-05-00.jpg
+2026-10-03_1159_2.png,2026-10-03,11:59,1,0.142,y,s,,0,there is also a box 2 in this image.  It is on a tree bough.,crop2026-10-03_11-59-00.jpg
+2026-10-03_1253_2.png,2026-10-03,12:53,1,0.186,n,,,12,extra box on surfer,crop2026-10-03_12-53-00.jpg
+2026-10-03_1253_2.png,2026-10-03,12:53,2,0.141,y,wipeout,,12,,crop2026-10-03_12-53-00.jpg

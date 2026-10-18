@@ -33,7 +33,9 @@ crowded is it" — not "exactly how many people are in the water".
   area relative to the larger one and survives ordinary NMS.
 - **Confidence threshold 0.195.** Re-swept across 0.05–0.60 on 76 held-out
   frames in September 2026 and left unchanged: count MAE bottoms out at 0.200
-  and F1 is flat from 0.125 to 0.425.
+  and F1 is flat from 0.125 to 0.425. A box-level hand review of everything the
+  band 0.10–0.195 would admit now puts the measured floor at **0.150** — see
+  Performance below. Unchanged pending the clear-day overcount re-check.
 
 ### Training data
 The production checkpoint (`data/model_out/20260921_fog/`) was trained on
@@ -96,8 +98,33 @@ something that is not a surfer and 11 were a duplicate box. By pose: 223 prone,
 a 0.02 confidence floor shows that dropping `CONF_THRESH` from 0.195 to 0.10
 adds 197 boxes and closes the count gap almost exactly (3,900 against 3,880),
 and those boxes appear where the misses were (frames with more no-box misses
-gain more boxes, rho = +0.425, p = 4.7e-11). Whether they are surfers is under
-review; the threshold has not been changed.
+gain more boxes, rho = +0.425, p = 4.7e-11).
+
+**Scored by hand, 2026-10-17 — half of them are surfers the count is missing.**
+All 187 of those boxes that can actually reach `predictions.csv` were judged
+box-by-box (`analysis/conf_band_decision/`). Counting a box as a hit only when
+it adds a surfer the count does not already have — a second box on an
+already-counted surfer inflates the count exactly as a box on open water does —
+the band is **92 real against 95 spurious, 49.2% precision**, against 91.8% for
+what production already emits. Of the 92 recovered, **64 are prone and side-on
+prone (34) is the biggest group, not end-on (16)**.
+
+Per-frame count error improves all the way down to 0.10, but that is error
+cancellation: the detector undercounts by 2–3 surfers a frame on this set, so
+boxes that are wrong half the time still close the gap while box-level precision
+falls. **The measured floor is 0.150** — the deepest step significant under both
+readings of the review's `boxes_missed` column (−0.389 and −0.212 mean |count
+error|, p < 0.0001 and p = 0.023 over 113 frames), and inside the 0.15–0.18 range
+where admitted-box precision peaks at 0.55–0.58. Below 0.14 the conservative
+reading stops improving while precision decays to 0.49.
+
+**The threshold has not been changed.** The review frames are biased toward
+undercounting — all of them were chosen because they had misses — so the
+clear-day overcount set has to be re-checked first. The cheaper move is
+unblocked: **28 of the 95 spurious boxes sit in static zones** (18 tree bough on
+the right edge, 9 shore head at the bottom centre, 1 wind sock), and masking
+those lifts the band to 57.9% precision at no cost in recall, at the current
+threshold or any lower one.
 
 ### Known failure modes
 - **Birds**, and in one measured case a **bird's reflection**, counted as

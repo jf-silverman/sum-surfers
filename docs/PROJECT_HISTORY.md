@@ -5540,3 +5540,71 @@ The interaction itself is not in doubt in the counts. The tree ensemble simply
 already has it — trees represent interactions by splitting on one feature
 inside a branch of another, so the product column was a hint the learner did
 not need.
+
+### 2026-10-17 — Confidence-band review completed and scored: the floor is 0.15, not 0.10
+
+Joel finished all 187 rows of `conf_band_review.csv` and revised some early
+answers on a second pass. Scored in `analysis/conf_band_decision/`.
+
+**The scoring rule Joel applied is stricter than the one the guide asked for, and
+it changes the verdict.** He marked `is_surfer = n` whenever the surfer under the
+coral box already had a grey (accepted) box — so `n` means "admitting this box
+adds a count that should not be added", whether the box is on open water or is a
+second box on a surfer already counted. Under the guide's looser question ("is a
+surfer under this box") the band is 114/187 = 61.0% real. Under the rule applied
+it is **92/187 = 49.2%**. The 22-box gap is real surfers, already counted.
+Production at 0.195 runs 91.8% precision on the 142 COCO-labelled frames, so
+every box a lower threshold admits is about twice as likely to be wrong as what
+is already in.
+
+**Per-frame count error improves all the way down to 0.10, and that is error
+cancellation rather than accuracy.** The detector undercounts by 2.1–3.0 surfers
+a frame on these 113 frames, so boxes that are wrong half the time still close
+the gap. Box-level precision falls the whole way down. The two readings of the
+review's frame-level `boxes_missed` column (does it include the surfers the coral
+boxes recovered, or not?) give current undercounts of 2.14 and 2.96 per frame and
+disagree about how deep to go:
+
+| T | admits | recovered | spurious | precision | A: Δ\|err\| | p | B: Δ\|err\| | p |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.180 | 34 | 19 | 15 | 0.559 | −0.124 | 0.029 | −0.071 | 0.202 |
+| 0.160 | 62 | 36 | 26 | 0.581 | −0.283 | 0.0004 | −0.159 | 0.042 |
+| **0.150** | **82** | **45** | **37** | **0.549** | **−0.389** | **<0.0001** | **−0.212** | **0.023** |
+| 0.140 | 108 | 59 | 49 | 0.546 | −0.442 | 0.0001 | −0.212 | 0.087 |
+| 0.100 | 187 | 92 | 95 | 0.492 | −0.558 | 0.0009 | −0.204 | 0.233 |
+
+Paired bootstrap CI and Wilcoxon over the 113 frames. **0.150 is the
+recommendation** — the deepest step significant under both readings, inside the
+0.15–0.18 range where admitted-box precision peaks at 0.55–0.58. The extra 105
+boxes from 0.15 down to 0.10 are 47 recovered against 58 spurious, and reading B
+stops improving below 0.14 while precision decays to 0.49.
+
+**Not adopted.** All 113 frames carry band boxes and came from days chosen
+because they had misses, so the set is biased toward undercounting; on frames
+that already overcount, 49%-precision boxes can only hurt. The clear-day
+overcount re-check and Joel's explicit go-ahead both still stand between this and
+a `CONF_THRESH` change.
+
+**The cheaper move is unblocked.** 28 of the 95 spurious boxes sit in static
+locations already known about — 18 tree bough on the right edge, 9 shore head at
+the bottom centre, 1 wind sock. `TREE_MASK = (1268, 58, 1280, 87)` is too small
+to catch the 18, and `FLAG_MASK` does not reach the wind sock's top. Masking them
+lifts the band to 57.9% precision and removes the same false positives at the
+current threshold or any lower one, at no cost in recall.
+
+**The pose question is answered, and the guide's hypothesis was wrong.** Of the 92
+recovered surfers, 64 are prone — but **side-on prone (34) outnumbers end-on (16)
+by more than two to one**. The guide supposed end-on would dominate because it is
+the smallest silhouette. The surfers the detector nearly misses are mostly lying
+flat and broadside. Reviewer confidence was filled on 42 of the 92, median 0.80,
+at or below 0.70 on only 15, so the recovered set does not rest on uncertain
+calls.
+
+Three things in the notes were logged but not acted on: lens flare called out as
+a repeatable same-place artifact (plus 4 more midday left-side glare boxes), 5
+band boxes in frames Joel flagged as too foggy to judge that nevertheless passed
+`QUALITY_LAPVAR_THRESH = 12.7` (they belong with the 23 frames already in the
+fog-gate review), and three separate notes proposing box size relative to other
+boxes at the same y as a discriminator — which `analysis/shore_head_zone/` found
+carries the opposite sign inside the bluff zone (false positives median width
+12.8 against 25.7 for true positives), so any size rule has to be per-region.
