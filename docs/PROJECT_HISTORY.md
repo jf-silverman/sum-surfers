@@ -5795,3 +5795,49 @@ Also in this change: `detect_surfers.py` now has a single detection path.
 body — the duplication was live, and a tool written against the wrong copy is
 what produced the phantom upward count changes recorded above. Verified
 behaviour-identical: recounting 20 already-recounted rows changes nothing.
+
+---
+
+## 2026-10-18 — The protocol gap is measured: the direct count reads 11% low
+
+The disagreement that blocked three rule families turned out to be answerable
+from data already on disk, with no review at all. 15 labelled frames are also in
+`spotcheck` and 11 in `reviewdays`, so each count protocol can be compared
+against CVAT box truth on the same frames.
+
+| | mean gap vs CVAT | n | below / above | sign p |
+|---|---:|---:|---|---:|
+| `reviewdays` (box-by-box) | +0.27 | 11 | 5 / 5 | 1.00 |
+| `spotcheck` (direct count) | **−3.27** | 15 | **14 / 0** | **0.0001** |
+
+The direct `my_count` protocol reads **−14.4% relative**, flat across crowd
+levels (r = −0.08, p = 0.77). Correcting `spotcheck` for that single bias
+reverses its verdict on every rule measured this week: the combined
+crowd-dependent threshold and adaptive containment go from +0.349 (p = 0.029,
+against) to **−0.502 (p = 0.000, for)**, and its production ratio moves from
+1.021 to 0.907 — landing with CVAT's 0.924 and `reviewdays`' 0.926.
+
+**All three protocols agree once the measured bias is removed.** The direction is
+the opposite of the hypothesis the two-frame overlap suggested: it is not that
+the box-by-box review reads high, it is that a direct count of a crowded scene
+reads low, which is the known behaviour of direct enumeration.
+
+This also retires the reasoning in `analysis/conf_thresh_recheck/` that
+`spotcheck` is "the set a change must clear." It was the only set independent of
+the band review, but it is also the only one carrying a measured bias.
+
+**What is still open** is narrower: which protocol is right. CVAT annotation and
+`reviewdays` share a mode of looking — slow, magnified, box-assisted — so the 11%
+is either real surfers a glance misses or marginal blobs close looking
+manufactures. No existing frame separates those, because every frame with a
+careful count was counted carefully.
+
+`data/reviews/protocol_review/` settles it: 30 fresh frames counted twice by the
+same reviewer, direct count first and unprimed, box-by-box second on a different
+shuffle, drawn from the current model era across five crowd strata and excluding
+every frame already in `reviewdays`, `spotcheck` or the CVAT splits. Pass B is
+not generated until pass A is returned — if both sheets exist at once the second
+anchors on the first and the paired difference collapses. Built by
+`code/make_protocol_review.py`; protocol in that folder's
+`counting-protocol-review.md`. Paired, n = 30 detects 0.53 × SD ≈ 1.32 surfers
+against an effect of about 3.3.

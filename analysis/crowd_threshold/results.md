@@ -107,6 +107,37 @@ plain count/truth — no IoU matching enters:
 Two protocols that share no frames and no method agree that the detector keeps
 about 92.5% of the surfers. The third says it keeps 102%.
 
+### The gap is measurable directly, and it is `spotcheck` that moves
+
+**Added 2026-10-18, after the above.** 15 labelled frames are also in
+`spotcheck` and 11 in `reviewdays`, so each count protocol can be compared
+against CVAT box truth on the *same frames* — no review needed. (Train
+contamination is irrelevant here: this compares two human protocols, not the
+model.)
+
+| | mean gap vs CVAT | n | below / above | sign p | Wilcoxon p |
+|---|---:|---:|---|---:|---:|
+| `reviewdays` | **+0.27** | 11 | 5 / 5 | 1.00 | 1.00 |
+| `spotcheck` | **−3.27** | 15 | **14 / 0** | **0.0001** | **0.0009** |
+
+The direct count reads **−14.4% relative**, and the bias is flat rather than
+crowd-dependent (r = −0.08, p = 0.77). Correcting `spotcheck`'s truth for the
+measured 0.888 ratio **reverses its verdict on every rule**:
+
+| `spotcheck` truth | production ratio | both rules: Δ\|err\| | p |
+|---|---:|---:|---:|
+| as recorded | 1.021 | **+0.349** | 0.029 |
+| corrected ×1/0.888 | **0.907** | **−0.502** | **0.000** |
+
+Corrected, its production ratio (0.907) lands with CVAT (0.924) and `reviewdays`
+(0.926), and all three protocols endorse the rules. **The entire disagreement
+that blocked three rule families is one protocol reading about 11% low.**
+
+This supersedes the two-frame hint below, and reverses its direction: it is not
+that the box-by-box protocol reads high, it is that the direct count reads low —
+consistent with the known tendency of direct enumeration to undercount dense
+scenes.
+
 The earlier re-check also explained the gap as a difference in crowd mix. **That
 explanation is wrong** and is corrected here: the two sets' crowd mixes are
 nearly identical, and if anything `reviewdays` is the emptier one (23% of its
@@ -138,8 +169,15 @@ the right size, and direct enumeration is known to undercount dense scenes.
   threshold, and density-adaptive containment — and all three split the same way:
   `reviewdays` and box-level truth gain, `spotcheck` loses. That is no longer a
   property of any one rule.
-- **The decisive next measurement is a review task, not a code change.**
-  Hand-count ~30 frames with ONE protocol, chosen to include frames already in
-  `reviewdays`, and the protocol gap becomes a number instead of a two-frame hint.
-  If the box-by-box protocol is reading ~1.5 high, `spotcheck` is right and all of
-  this stays off. If it is not, two protocols already say adopt.
+- **The remaining question is narrower than it was.** The gap is now measured
+  (−3.27, p = 0.0001) and all three protocols agree once it is removed. What is
+  still open is which protocol is *right*: CVAT and `reviewdays` share a mode of
+  looking — slow, magnified, box-assisted — so the 11% is either real surfers a
+  glance misses or marginal blobs close looking manufactures. Every frame with a
+  careful count was counted carefully, so no existing data separates those.
+- **`data/reviews/protocol_review/` settles it**: 30 fresh frames counted twice
+  by the same reviewer, direct count first and unprimed, box-by-box second, on
+  frames never reviewed before, stratified across five crowd levels. Built by
+  `code/make_protocol_review.py`; the protocol is in that folder's
+  `counting-protocol-review.md`. n = 30 detects 0.53 × SD ≈ 1.32 surfers against
+  an effect of ~3.3.
