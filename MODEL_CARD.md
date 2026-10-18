@@ -30,7 +30,13 @@ crowded is it" — not "exactly how many people are in the water".
 - Cross-tile duplicates removed by **NMS at IoU 0.45**, then **containment
   suppression at 0.7** (intersection ÷ smaller box area), which catches the
   nested-box case NMS misses — a small box inside a large one shares little
-  area relative to the larger one and survives ordinary NMS.
+  area relative to the larger one and survives ordinary NMS. Measured against
+  box-level truth in October 2026, this suppression costs more than it buys:
+  only **10 of 183 held-out false positives are a second box on an
+  already-counted surfer**, and loosening the rule in dense neighbourhoods lifts
+  recall. Both a crowd-indexed confidence threshold and density-adaptive
+  containment are implemented and **off by default** pending a truth-protocol
+  question — see `analysis/crowd_threshold/results.md`.
 - **Confidence threshold 0.195.** Re-swept across 0.05–0.60 on 76 held-out
   frames in September 2026 and left unchanged: count MAE bottoms out at 0.200
   and F1 is flat from 0.125 to 0.425. A box-level hand review of everything the
@@ -120,10 +126,25 @@ does not move (−0.204, p = 0.233), and admitted-box precision decays to 0.49.
 Even at its best this recovers about a tenth of the counting error — 197 of the
 242 missing surfers on these frames are still missing at 0.15.
 
-**The threshold has not been changed.** The review frames are biased toward
-undercounting — all of them were chosen because they had misses — so the
-clear-day overcount set has to be re-checked first. The cheaper move is
-unblocked: **28 of the 95 spurious boxes sit in static zones** (18 tree bough on
+**The threshold has not been changed, and the re-check said no.** The review
+frames are biased toward undercounting — all of them were chosen because they
+had misses — so the clear-day overcount set was re-checked
+(`analysis/conf_thresh_recheck/`): the two hand-count sets disagree in sign at
+every threshold, and a flat cut costs +0.056 mean error on the emptiest
+quartile while buying −0.246 on the busiest. The threshold is not a dial on
+accuracy but one that trades empty-frame precision for crowded-frame recall.
+
+A **count-indexed threshold** removes that objection — below a count of 10 it is
+0.195, so the emptiest quartile is untouched — and together with density-adaptive
+containment it moves box-level |error| 2.31 → 1.85 (p = 0.002) and `reviewdays`
+1.50 → 1.30 (p = 0.010), against `spotcheck` 1.23 → 1.58 (p = 0.030). It is built
+and off. What blocks adoption is no longer the instrument but the truth data: at
+matched crowd levels, box-level CVAT annotation and `reviewdays` agree on a ratio
+of 0.924 and 0.926 while `spotcheck` reads 1.021, and the only 2 frames in both
+count sets have the box-by-box protocol reading +2 and +1 above the direct count.
+Settling that needs ~30 frames hand-counted under one protocol.
+
+The cheaper move is unblocked: **28 of the 95 spurious boxes sit in static zones** (18 tree bough on
 the right edge, 9 shore head at the bottom centre, 1 wind sock), and masking
 those lifts the band to 57.9% precision at no cost in recall, at the current
 threshold or any lower one.
@@ -132,7 +153,11 @@ threshold or any lower one.
 - **Birds**, and in one measured case a **bird's reflection**, counted as
   surfers. Low-flying birds over water produce a detached reflection below them.
 - **People on the beach** and, occasionally, one surfer split into two
-  side-by-side boxes. The beach case has a measured shape: the ROI is rows
+  side-by-side boxes. The split-box case is **rarer than it looks**: on the 61
+  held-out labelled frames only 22 of 1,394 kept boxes overlap another at
+  IoU ≥ 0.3, and the false-positive rate is flat against local crowding (0.129 at
+  zero neighbours, 0.158 at five or more). Boxes piling onto a cluster are mostly
+  real adjacent surfers. The beach case has a measured shape: the ROI is rows
   420–600 of the 720-row frame, and the bluff path runs at y 590–660, so only
   the top of a head enters the image and the box is always clipped by the ROI's
   bottom edge. A zone rule on that signature — centre in x 400–680, bottom edge
