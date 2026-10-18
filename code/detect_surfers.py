@@ -234,18 +234,98 @@ def nms_across_tiles(all_boxes_global, iou_thresh=IOU_NMS):
 CONTAINMENT_THRESH = 0.7
 
 
-def suppress_contained(boxes, thresh=None):
+# Crowd-dependence for both of the above (measured 2026-10-18, BOTH OFF).
+#
+# The two constants above are global, and neither error they control is global.
+# Box-level ground truth on the 61 held-out labelled frames says the detector
+# keeps 0.924 of the surfers that are there, and the shortfall grows with the
+# crowd: -0.25 surfers on frames holding <=5, -3.23 on frames holding 40+.
+# Lowering either constant flatly recovers crowded frames and damages near-empty
+# ones -- measured, as a flat 0.150 threshold costing +0.056 mean error on the
+# emptiest quartile. Indexing them on the frame's own crowd level is the standard
+# answer: Chattopadhyay et al. 2016 set per-image detector thresholds from a
+# predicted count, and Adaptive NMS (Liu et al., CVPR 2019) argues the
+# suppression threshold should RISE with local density, because in a crowd heavy
+# overlap is evidence of two people rather than one found twice.
+#
+# CROWD_THRESH_SCHEDULE: [(min_count, threshold), ...], last matching step wins.
+# Needs two passes -- count at CONF_THRESH, look the threshold up from that
+# count, re-threshold -- so inference runs at the schedule's lowest threshold.
+#
+# CONTAINMENT_DENSITY_SLOPE: containment threshold becomes
+# CONTAINMENT_THRESH + slope * (neighbours within CONTAINMENT_NEIGHBOUR_PX).
+# A box with no neighbour therefore keeps exactly CONTAINMENT_THRESH, so this
+# cannot touch the isolated clear-day false positives that containment
+# suppression was adopted for in the first place.
+#
+# Measured on all three truth protocols (analysis/crowd_threshold/). Together,
+# schedule [(0,.195),(10,.17),(20,.15),(30,.12)] with slope 0.10:
+#   box-level CVAT, 61 held-out frames   |err| 2.31 -> 1.85  (p=0.002), ratio 0.924 -> 0.953
+#   reviewdays, 220 hand-counted frames  |err| 1.50 -> 1.30  (p=0.010), ratio 0.926 -> 0.964
+#   spotcheck,   43 hand-counted frames  |err| 1.23 -> 1.58  (p=0.030), ratio 1.021 -> 1.056
+#   emptiest 57 frames (hand count 0-2)  |err| 0.228 -> 0.246
+# Two independent protocols gain, the third loses, and the sparse end is
+# essentially untouched. OFF until the protocol disagreement is settled: at
+# matched crowd levels box-level annotation and `reviewdays` agree band for band
+# (0.90-0.95) while `spotcheck` sits at 1.00-1.11, and the two frames that appear
+# in both count sets have the box-by-box protocol reading +2 and +1 higher than
+# the direct count. That gap, not the instrument, is what blocks adoption.
+CROWD_THRESH_SCHEDULE = None          # e.g. [(0, 0.195), (10, 0.17), (20, 0.15), (30, 0.12)]
+CONTAINMENT_DENSITY_SLOPE = 0.0       # e.g. 0.10
+CONTAINMENT_NEIGHBOUR_PX = 40
+
+
+def crowd_threshold(count, schedule=None):
+    """Confidence threshold for a frame whose first-pass count was `count`."""
+    schedule = CROWD_THRESH_SCHEDULE if schedule is None else schedule
+    if not schedule:
+        return CONF_THRESH
+    t = schedule[0][1]
+    for lo, v in schedule:
+        if count >= lo:
+            t = v
+    return t
+
+
+def local_density(boxes, radius=None):
+    """Neighbouring box centres within `radius` of each box's centre."""
+    radius = CONTAINMENT_NEIGHBOUR_PX if radius is None else radius
+    out = []
+    for i, b in enumerate(boxes):
+        cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
+        n = 0
+        for j, k in enumerate(boxes):
+            if i == j:
+                continue
+            kx, ky = (k[0] + k[2]) / 2, (k[1] + k[3]) / 2
+            if ((cx - kx) ** 2 + (cy - ky) ** 2) ** 0.5 <= radius:
+                n += 1
+        out.append(n)
+    return out
+
+
+def suppress_contained(boxes, thresh=None, slope=None):
     """Drop the lower-confidence box of any pair where one mostly covers the other.
 
     boxes: [x1, y1, x2, y2, conf]. Greedy by confidence: a box is dropped when
     its overlap with an already-kept box, divided by the smaller of the two
     areas, exceeds thresh.
+
+    With `slope` non-zero the threshold for each box becomes
+    `thresh + slope * neighbours`, so a box in a dense neighbourhood needs more
+    overlap before it counts as a duplicate. A box with no neighbour is scored at
+    exactly `thresh`, which keeps the flat behaviour where it was measured.
     """
     thresh = CONTAINMENT_THRESH if thresh is None else thresh
+    slope = CONTAINMENT_DENSITY_SLOPE if slope is None else slope
     if thresh is None or len(boxes) < 2:
         return list(boxes)
+    order = sorted(range(len(boxes)), key=lambda i: -boxes[i][4])
+    dens = local_density(boxes) if slope else None
     kept = []
-    for b in sorted(boxes, key=lambda b: -b[4]):
+    for i in order:
+        b = boxes[i]
+        t = thresh if not slope else min(max(thresh + slope * dens[i], 0.1), 1.0)
         area_b = max(b[2] - b[0], 0) * max(b[3] - b[1], 0)
         dup = False
         for k in kept:
@@ -254,7 +334,7 @@ def suppress_contained(boxes, thresh=None):
                 continue
             area_k = (k[2] - k[0]) * (k[3] - k[1])
             smaller = min(area_b, area_k)
-            if smaller > 0 and (iw * ih) / smaller > thresh:
+            if smaller > 0 and (iw * ih) / smaller > t:
                 dup = True
                 break
         if not dup:
@@ -288,64 +368,59 @@ def filter_false_positive_zones(boxes):
     return kept
 
 
-def run_inference(model, img_path):
-    """
-    Tile the image, run inference on each tile, merge boxes into global
-    ROI coordinates, apply NMS, and return (surfer_count, confidence_avg).
-    """
+def _tile_proposals(model, img_path, conf):
+    """Raw boxes from every tile at `conf`, in global ROI coords. No merging."""
     import shutil
     tiles, tmp_dir = tile_image_paths(img_path)
-
     all_boxes = []
-    for tile_idx, x_offset, tile_path in tiles:
+    for _tile_idx, x_offset, tile_path in tiles:
         results = model.predict(
             source=str(tile_path),
-            conf=CONF_THRESH,
+            conf=conf,
             device=DEVICE,
             verbose=False,
         )[0]
         for box in results.boxes:
             x1, y1, x2, y2 = box.xyxy[0].cpu().tolist()
-            conf = float(box.conf[0].cpu())
+            conf_b = float(box.conf[0].cpu())
             # translate tile-local x coords back to global ROI coords
-            all_boxes.append([x1 + x_offset, y1, x2 + x_offset, y2, conf])
-
+            all_boxes.append([x1 + x_offset, y1, x2 + x_offset, y2, conf_b])
     shutil.rmtree(tmp_dir, ignore_errors=True)
+    return all_boxes
 
-    kept = suppress_contained(nms_across_tiles(all_boxes))
-    kept = filter_false_positive_zones(kept)
-    count = len(kept)
-    avg_conf = (sum(b[4] for b in kept) / count) if count > 0 else 0.0
-    return count, round(avg_conf, 4)
+
+def _merge(boxes, thresh):
+    """Cross-tile NMS, containment suppression and the static zones, at `thresh`."""
+    kept = [b for b in boxes if b[4] >= thresh]
+    return filter_false_positive_zones(suppress_contained(nms_across_tiles(kept)))
 
 
 def run_inference_with_boxes(model, img_path):
-    """Same tiling/NMS/false-positive-filtering pipeline as run_inference(), but
-    also returns the surviving boxes (global ROI coords: [x1,y1,x2,y2,conf]) instead
-    of discarding them — for drawing detection boxes on an image (e.g.
-    plot_daily_prediction.py's daily detection-review image), not used by the
-    regular counting pipeline."""
-    import shutil
-    tiles, tmp_dir = tile_image_paths(img_path)
+    """Tile, merge, de-duplicate and zone-filter; return the surviving boxes.
 
-    all_boxes = []
-    for tile_idx, x_offset, tile_path in tiles:
-        results = model.predict(
-            source=str(tile_path),
-            conf=CONF_THRESH,
-            device=DEVICE,
-            verbose=False,
-        )[0]
-        for box in results.boxes:
-            x1, y1, x2, y2 = box.xyxy[0].cpu().tolist()
-            conf = float(box.conf[0].cpu())
-            all_boxes.append([x1 + x_offset, y1, x2 + x_offset, y2, conf])
+    Boxes are [x1, y1, x2, y2, conf] in global ROI coords. This is the single
+    detection path -- run_inference() is a thin wrapper that counts what this
+    returns, so the two can never drift apart.
 
-    shutil.rmtree(tmp_dir, ignore_errors=True)
+    With CROWD_THRESH_SCHEDULE set this runs two passes: inference at the
+    schedule's lowest threshold, a first merge at CONF_THRESH to read the frame's
+    crowd level, then a second merge at the threshold that level selects.
+    """
+    floor = (min(t for _, t in CROWD_THRESH_SCHEDULE)
+             if CROWD_THRESH_SCHEDULE else CONF_THRESH)
+    all_boxes = _tile_proposals(model, img_path, floor)
+    if not CROWD_THRESH_SCHEDULE:
+        return _merge(all_boxes, CONF_THRESH)
+    first = _merge(all_boxes, CONF_THRESH)
+    return _merge(all_boxes, crowd_threshold(len(first)))
 
-    kept = suppress_contained(nms_across_tiles(all_boxes))
-    kept = filter_false_positive_zones(kept)
-    return kept
+
+def run_inference(model, img_path):
+    """(surfer_count, confidence_avg) for one crop."""
+    kept = run_inference_with_boxes(model, img_path)
+    count = len(kept)
+    avg_conf = (sum(b[4] for b in kept) / count) if count > 0 else 0.0
+    return count, round(avg_conf, 4)
 
 
 def side_frame_paths(primary_img_path):

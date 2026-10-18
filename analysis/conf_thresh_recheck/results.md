@@ -52,9 +52,19 @@ undercounting frames it takes off **−0.453**.
 
 So the threshold is not a dial on accuracy, it is a dial that **trades
 empty-frame precision for crowded-frame recall**. A single global constant is
-the wrong instrument for an error whose sign depends on the crowd. That also
-explains the two sets cleanly without either being wrong — they differ in how
-much of their mass sits in near-empty frames.
+the wrong instrument for an error whose sign depends on the crowd.
+
+> **Corrected 2026-10-18.** This section originally added that the two sets are
+> explained by differing in how much of their mass sits in near-empty frames.
+> That is wrong. Their crowd mixes are nearly identical, and `reviewdays` is if
+> anything the emptier one (23% of its frames hold ≤2 surfers against
+> `spotcheck`'s 14%; 22% vs 21% hold 30+), so crowd mix cannot account for a
+> disagreement in sign. The live explanation is the truth-protocol confound named
+> below, which `analysis/crowd_threshold/results.md` takes further: a third and
+> independent protocol, box-level CVAT annotation, agrees with `reviewdays` band
+> for band at matched crowd levels (0.924 vs 0.926 overall) while `spotcheck`
+> sits at 1.021. The reasoning in this file that `spotcheck` is "the set a change
+> must clear" rests on it being the only independent set, and it is not.
 
 ## One confound worth naming
 
@@ -77,6 +87,8 @@ Nothing here separates that from a real difference between the sets, so the
   threshold alone — including the 18 tree boughs and 9 shore heads in that set.
   Any future case for a lower threshold has to carry zones for those first.
 - **A crowd-dependent threshold is the direction this points at**, not a lower
-  constant. It would need two passes (count, then re-threshold) and it is not
-  built, measured, or recommended yet — it is only what the quartile table
-  implies.
+  constant. **Built and measured 2026-10-18** — see
+  `analysis/crowd_threshold/results.md`. It does remove the empty-frame cost
+  entirely (the emptiest quartile stays at production's 0.296, against 0.352 for
+  a flat 0.150) and still gains on the crowded end. It is implemented and OFF,
+  because it splits the truth protocols the same way every other rule does.

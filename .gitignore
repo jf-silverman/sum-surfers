@@ -262,3 +262,4 @@ analysis/count_variability/hour_sparse/frames/
 
 # Boxed renders of the probe frames (regenerable from frames/ + the model)
 analysis/count_variability/hour_sparse/frames_boxed/
+analysis/crowd_threshold/handcount_proposals.pkl

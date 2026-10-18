@@ -5739,3 +5739,59 @@ downward.
 The lesson generalises past this change: `frame_count_*` are derived columns, not
 hand-entered ones, and any tool that rewrites `surfer_count` without rewriting
 them leaves the file internally inconsistent.
+
+---
+
+## 2026-10-18 — Crowd-dependent threshold and crowd-aware suppression: built, measured, off
+
+Two requests: build the crowd-dependent threshold the `CONF_THRESH` re-check
+pointed at, and fix the overlapping boxes on clustered surfers. Both are built,
+tested and **inert by default**. Full numbers in
+`analysis/crowd_threshold/results.md`.
+
+**The overlapping-box problem runs the other way.** On the 61 held-out labelled
+frames production keeps 1,394 boxes, 183 of them false positives — and only
+**10 of those 183 are a second box on an already-counted surfer**. 173 are
+isolated, and the false-positive rate is flat against local density (0.129 at
+zero neighbours, 0.158 at five or more). The boxes piling onto clusters are
+mostly real adjacent surfers, and `CONTAINMENT_THRESH = 0.7` is deleting them:
+scored against box-level truth, suppression is monotone the wrong way on both
+train and held-out frames, with "off" giving the best recall and count error.
+This is the Adaptive NMS result (Liu et al., CVPR 2019) — in a crowd, heavy
+overlap is evidence of two people rather than one found twice. Suppressing
+harder, the instinctive fix, makes every set worse.
+
+**A crowd-dependent threshold removes the objection that sank the flat cut.**
+The flat 0.150 was rejected partly because it cost +0.056 mean error on the
+emptiest quartile. A count-indexed ramp costs nothing there — below a count of 10
+it *is* 0.195 — while still taking 0.33 off the busiest quartile. The labelled
+set cannot test this (its emptiest quartile averages 8.3 surfers), so it was
+measured on the 263 hand-counted frames by replay.
+
+**The blocker is the truth data, not the instrument.** Three rule families have
+now been measured — flat threshold, count-indexed threshold, density-adaptive
+containment — and all three split identically: `reviewdays` and box-level truth
+gain, `spotcheck` loses. Together the two rules move box-level |error| 2.31 → 1.85
+(p=0.002) and `reviewdays` 1.50 → 1.30 (p=0.010), against `spotcheck` 1.23 → 1.58
+(p=0.030).
+
+**Two corrections to the re-check that preceded this.** First, it treated
+`spotcheck` as the set a change must clear because it was the only set
+independent of the band review. There is a third protocol: box-level CVAT
+annotation, independent of both, which at matched crowd levels agrees with
+`reviewdays` band for band (0.924 against 0.926 overall) while `spotcheck` sits
+at 1.021. Second, it explained the disagreement as a difference in crowd mix.
+That is wrong — the mixes are nearly identical and `reviewdays` is the emptier
+set. What remains is the protocol confound: the 2 frames that appear in both
+count sets have the box-by-box truth reading +2 and +1 above the direct count,
+mean +1.5 against a set-level gap of 1.65.
+
+**The decisive next step is a review task.** Hand-count ~30 frames with one
+protocol, including frames already in `reviewdays`, and the gap becomes a number
+instead of a two-frame hint.
+
+Also in this change: `detect_surfers.py` now has a single detection path.
+`run_inference()` wraps `run_inference_with_boxes()` rather than duplicating its
+body — the duplication was live, and a tool written against the wrong copy is
+what produced the phantom upward count changes recorded above. Verified
+behaviour-identical: recounting 20 already-recounted rows changes nothing.

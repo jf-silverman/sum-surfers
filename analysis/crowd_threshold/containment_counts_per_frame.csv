@@ -1,0 +1,264 @@
+filename,truth,set,flat 0.7 (production),looser in crowds  0.7 +0.05/nb,looser in crowds  0.7 +0.10/nb,looser in crowds  0.7 +0.15/nb,flat 0.9,off,tighter in crowds 0.7 -0.05/nb,q
+crop2026-07-16_05-23-00.jpg,0.0,spotcheck,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-07-16_14-23-00.jpg,5.0,spotcheck,5,5,5,5,5,5,5,Q2
+crop2026-07-17_17-05-00.jpg,9.0,spotcheck,7,7,7,7,7,7,7,Q2
+crop2026-07-18_11-41-00.jpg,30.0,spotcheck,30,31,32,32,31,32,30,Q4 busiest
+crop2026-07-19_14-23-00.jpg,0.0,spotcheck,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-07-20_17-05-00.jpg,0.0,spotcheck,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-07-21_10-47-00.jpg,40.0,spotcheck,41,41,41,41,41,42,41,Q4 busiest
+crop2026-07-21_19-47-00.jpg,17.0,spotcheck,20,20,20,20,20,20,19,Q3
+crop2026-07-22_14-23-00.jpg,9.0,spotcheck,10,10,10,10,10,10,10,Q2
+crop2026-07-23_08-05-00.jpg,24.0,spotcheck,25,25,26,26,26,26,25,Q3
+crop2026-07-23_17-05-00.jpg,3.0,spotcheck,3,3,3,3,3,3,3,Q1 emptiest
+crop2026-07-24_10-47-00.jpg,23.0,spotcheck,21,21,22,22,22,22,21,Q3
+crop2026-07-24_19-47-00.jpg,0.0,spotcheck,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-07-25_13-29-00.jpg,31.0,spotcheck,31,31,31,31,31,31,31,Q4 busiest
+crop2026-07-26_07-11-00.jpg,17.0,spotcheck,18,18,18,18,18,18,18,Q3
+crop2026-07-26_17-05-00.jpg,7.0,spotcheck,8,8,8,8,8,8,8,Q2
+crop2026-07-27_10-56-00.jpg,24.0,spotcheck,25,26,26,26,26,26,25,Q3
+crop2026-07-27_19-56-00.jpg,4.0,spotcheck,5,5,5,5,5,5,5,Q1 emptiest
+crop2026-07-28_13-38-00.jpg,14.0,spotcheck,20,20,20,20,21,21,20,Q2
+crop2026-07-31_10-02-00.jpg,54.0,spotcheck,55,55,55,55,55,55,53,Q4 busiest
+crop2026-07-31_19-02-00.jpg,15.0,spotcheck,21,21,21,21,21,21,21,Q3
+crop2026-08-01_12-44-00.jpg,6.0,spotcheck,6,6,6,6,6,6,6,Q2
+crop2026-08-02_16-20-00.jpg,8.0,spotcheck,8,8,8,9,8,9,8,Q2
+crop2026-08-03_10-02-00.jpg,30.0,spotcheck,24,24,24,24,24,24,24,Q4 busiest
+crop2026-08-03_19-02-00.jpg,11.0,spotcheck,11,11,11,13,11,13,11,Q2
+crop2026-08-04_12-44-00.jpg,1.0,spotcheck,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-08-07_09-08-00.jpg,4.0,spotcheck,3,3,3,3,3,4,3,Q1 emptiest
+crop2026-08-07_18-08-00.jpg,0.0,spotcheck,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-08-08_13-47-00.jpg,22.0,spotcheck,22,23,24,24,24,24,22,Q3
+crop2026-08-09_07-29-00.jpg,46.0,spotcheck,47,47,47,48,47,48,47,Q4 busiest
+crop2026-08-09_16-29-00.jpg,18.0,spotcheck,20,20,21,21,21,21,19,Q3
+crop2026-08-10_10-11-00.jpg,12.0,spotcheck,14,14,14,14,14,14,14,Q2
+crop2026-08-10_19-11-00.jpg,3.0,spotcheck,2,2,2,2,2,2,2,Q1 emptiest
+crop2026-08-11_12-53-00.jpg,12.0,spotcheck,11,11,11,11,11,11,11,Q2
+crop2026-08-12_16-29-00.jpg,22.0,spotcheck,19,19,20,20,20,20,19,Q3
+crop2026-08-13_10-11-00.jpg,24.0,spotcheck,24,25,27,27,26,27,23,Q3
+crop2026-08-14_14-41-00.jpg,5.0,spotcheck,5,5,5,5,5,5,5,Q2
+crop2026-08-15_08-23-00.jpg,41.0,spotcheck,43,43,44,44,44,44,42,Q4 busiest
+crop2026-08-15_17-23-00.jpg,44.0,spotcheck,43,43,43,43,43,43,41,Q4 busiest
+crop2026-08-16_11-05-00.jpg,42.0,spotcheck,42,42,42,42,42,42,41,Q4 busiest
+crop2026-08-17_14-41-00.jpg,3.0,spotcheck,2,2,2,2,2,2,2,Q1 emptiest
+crop2026-08-18_09-17-00.jpg,24.0,spotcheck,26,26,26,26,26,26,25,Q3
+crop2026-08-18_18-17-00.jpg,11.0,spotcheck,10,10,10,10,10,10,10,Q2
+crop2025-10-25_07-29-00.jpg,13.0,reviewdays,13,14,14,14,14,14,13,Q2
+crop2025-10-25_08-23-00.jpg,22.0,reviewdays,15,15,15,15,15,15,15,Q3
+crop2025-10-25_09-17-00.jpg,12.0,reviewdays,12,12,12,12,12,12,12,Q2
+crop2025-10-25_10-11-00.jpg,24.0,reviewdays,21,21,21,21,21,21,21,Q3
+crop2025-10-25_11-05-00.jpg,18.0,reviewdays,19,19,19,19,19,19,19,Q3
+crop2025-10-25_11-59-00.jpg,14.0,reviewdays,14,14,14,14,14,14,13,Q2
+crop2025-10-25_12-53-00.jpg,5.0,reviewdays,4,4,4,4,4,4,4,Q2
+crop2025-10-25_13-47-00.jpg,9.0,reviewdays,6,6,6,6,6,6,6,Q2
+crop2025-10-25_14-41-00.jpg,17.0,reviewdays,16,16,16,16,16,16,14,Q3
+crop2025-10-25_15-35-00.jpg,32.0,reviewdays,31,31,33,33,32,33,31,Q4 busiest
+crop2025-10-25_16-29-00.jpg,46.0,reviewdays,46,46,46,46,46,46,45,Q4 busiest
+crop2025-10-25_17-23-00.jpg,54.0,reviewdays,51,51,51,51,51,51,51,Q4 busiest
+crop2025-10-25_18-17-00.jpg,32.0,reviewdays,32,32,33,33,32,33,32,Q4 busiest
+crop2025-11-04_06-35-00.jpg,1.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2025-11-04_07-29-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2025-11-04_08-23-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2025-11-04_09-17-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2025-11-04_10-11-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2025-11-04_11-05-00.jpg,4.0,reviewdays,4,4,4,4,4,4,4,Q1 emptiest
+crop2025-11-04_11-59-00.jpg,13.0,reviewdays,14,14,14,14,14,14,14,Q2
+crop2025-11-04_12-53-00.jpg,46.0,reviewdays,45,46,46,46,45,46,45,Q4 busiest
+crop2025-11-04_13-47-00.jpg,23.0,reviewdays,21,21,21,21,21,21,21,Q3
+crop2025-11-04_14-41-00.jpg,17.0,reviewdays,11,11,11,11,11,11,11,Q3
+crop2025-11-04_15-35-00.jpg,18.0,reviewdays,17,17,17,17,17,17,17,Q3
+crop2025-11-04_16-29-00.jpg,21.0,reviewdays,20,20,20,20,20,20,20,Q3
+crop2025-11-04_17-23-00.jpg,9.0,reviewdays,9,9,9,9,9,9,9,Q2
+crop2025-12-02_07-56-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2025-12-02_08-50-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2025-12-02_09-44-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2025-12-02_10-38-00.jpg,5.0,reviewdays,5,5,5,5,5,5,5,Q2
+crop2025-12-02_11-32-00.jpg,23.0,reviewdays,24,24,24,24,24,25,24,Q3
+crop2025-12-02_12-26-00.jpg,19.0,reviewdays,18,19,19,19,19,19,18,Q3
+crop2025-12-02_13-20-00.jpg,17.0,reviewdays,17,17,17,17,17,17,17,Q3
+crop2025-12-02_14-14-00.jpg,13.0,reviewdays,12,12,12,12,12,12,12,Q2
+crop2025-12-02_15-08-00.jpg,21.0,reviewdays,21,21,21,21,21,21,21,Q3
+crop2025-12-02_16-02-00.jpg,29.0,reviewdays,28,28,28,28,28,28,28,Q4 busiest
+crop2025-12-02_16-56-00.jpg,24.0,reviewdays,25,25,26,26,25,26,25,Q3
+crop2026-03-12_07-29-00.jpg,4.0,reviewdays,4,4,4,4,4,4,4,Q1 emptiest
+crop2026-03-12_08-23-00.jpg,10.0,reviewdays,10,10,10,10,10,10,10,Q2
+crop2026-03-12_09-17-00.jpg,25.0,reviewdays,26,26,26,26,26,26,25,Q3
+crop2026-03-12_10-11-00.jpg,32.0,reviewdays,26,26,26,26,26,26,26,Q4 busiest
+crop2026-03-12_11-05-00.jpg,30.0,reviewdays,29,29,29,29,29,29,29,Q4 busiest
+crop2026-03-12_11-59-00.jpg,40.0,reviewdays,31,31,31,31,31,31,30,Q4 busiest
+crop2026-03-12_12-53-00.jpg,18.0,reviewdays,18,18,18,19,18,19,18,Q3
+crop2026-03-12_13-47-00.jpg,23.0,reviewdays,23,23,23,23,23,23,23,Q3
+crop2026-03-12_14-41-00.jpg,27.0,reviewdays,27,27,27,27,27,27,27,Q3
+crop2026-03-12_15-35-00.jpg,36.0,reviewdays,38,39,41,41,40,41,37,Q4 busiest
+crop2026-03-12_16-29-00.jpg,34.0,reviewdays,34,34,34,34,34,34,34,Q4 busiest
+crop2026-03-12_17-23-00.jpg,40.0,reviewdays,38,40,40,40,40,40,38,Q4 busiest
+crop2026-03-12_18-17-00.jpg,41.0,reviewdays,40,40,40,40,40,40,40,Q4 busiest
+crop2026-03-12_19-11-00.jpg,30.0,reviewdays,30,30,30,30,30,30,30,Q4 busiest
+crop2026-07-25_06-17-00.jpg,16.0,reviewdays,16,16,16,16,16,16,16,Q3
+crop2026-07-25_07-11-00.jpg,54.0,reviewdays,53,54,54,54,54,54,52,Q4 busiest
+crop2026-07-25_08-05-00.jpg,70.0,reviewdays,70,70,71,71,70,71,68,Q4 busiest
+crop2026-07-25_08-59-00.jpg,48.0,reviewdays,47,47,47,47,47,47,47,Q4 busiest
+crop2026-07-25_09-53-00.jpg,38.0,reviewdays,31,31,31,31,31,31,31,Q4 busiest
+crop2026-07-25_10-47-00.jpg,46.0,reviewdays,47,47,47,47,47,47,47,Q4 busiest
+crop2026-07-25_11-41-00.jpg,67.0,reviewdays,64,65,65,65,65,65,63,Q4 busiest
+crop2026-07-25_12-35-00.jpg,34.0,reviewdays,27,28,28,29,29,29,27,Q4 busiest
+crop2026-07-25_13-29-00.jpg,33.0,reviewdays,31,31,31,31,31,31,31,Q4 busiest
+crop2026-07-25_14-23-00.jpg,64.0,reviewdays,63,63,64,64,64,64,63,Q4 busiest
+crop2026-07-25_15-17-00.jpg,43.0,reviewdays,42,43,43,43,43,43,41,Q4 busiest
+crop2026-07-25_16-11-00.jpg,40.0,reviewdays,38,38,38,38,38,38,37,Q4 busiest
+crop2026-07-25_17-05-00.jpg,17.0,reviewdays,17,17,17,17,17,17,17,Q3
+crop2026-07-25_17-59-00.jpg,22.0,reviewdays,16,17,17,18,17,18,16,Q3
+crop2026-07-25_19-47-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-08-16_06-35-00.jpg,24.0,reviewdays,17,17,17,17,17,17,17,Q3
+crop2026-08-16_07-29-00.jpg,26.0,reviewdays,13,13,13,13,13,13,13,Q3
+crop2026-08-16_08-23-00.jpg,56.0,reviewdays,56,57,57,57,57,57,56,Q4 busiest
+crop2026-08-16_09-17-00.jpg,62.0,reviewdays,59,59,59,59,59,59,59,Q4 busiest
+crop2026-08-16_10-11-00.jpg,73.0,reviewdays,70,72,73,74,73,74,70,Q4 busiest
+crop2026-08-16_11-05-00.jpg,43.0,reviewdays,42,42,42,42,42,42,41,Q4 busiest
+crop2026-08-16_11-59-00.jpg,48.0,reviewdays,46,47,47,47,47,47,46,Q4 busiest
+crop2026-08-16_12-53-00.jpg,35.0,reviewdays,35,35,35,35,35,35,33,Q4 busiest
+crop2026-08-16_13-47-00.jpg,1.0,reviewdays,1,2,2,2,2,2,1,Q1 emptiest
+crop2026-08-16_14-41-00.jpg,1.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-08-16_15-35-00.jpg,2.0,reviewdays,2,2,2,2,2,2,2,Q1 emptiest
+crop2026-08-16_16-29-00.jpg,19.0,reviewdays,19,19,19,19,19,19,19,Q3
+crop2026-08-16_17-23-00.jpg,27.0,reviewdays,27,27,27,27,27,27,27,Q3
+crop2026-08-16_18-17-00.jpg,37.0,reviewdays,37,38,38,38,38,38,37,Q4 busiest
+crop2026-08-16_19-11-00.jpg,34.0,reviewdays,34,34,34,35,34,35,34,Q4 busiest
+crop2026-08-16_20-05-00.jpg,10.0,reviewdays,9,9,9,9,9,9,9,Q2
+crop2026-09-23_07-20-00.jpg,12.0,reviewdays,11,11,11,11,11,11,11,Q2
+crop2026-09-23_08-14-00.jpg,11.0,reviewdays,11,11,11,11,11,11,11,Q2
+crop2026-09-23_09-08-00.jpg,11.0,reviewdays,11,11,11,11,11,11,11,Q2
+crop2026-09-23_10-02-00.jpg,2.0,reviewdays,2,2,2,2,2,3,2,Q1 emptiest
+crop2026-09-23_10-56-00.jpg,2.0,reviewdays,2,2,2,2,2,2,2,Q1 emptiest
+crop2026-09-23_11-50-00.jpg,8.0,reviewdays,8,8,8,8,8,8,8,Q2
+crop2026-09-23_12-44-00.jpg,21.0,reviewdays,21,21,22,22,22,22,21,Q3
+crop2026-09-23_13-38-00.jpg,38.0,reviewdays,36,36,36,37,37,37,35,Q4 busiest
+crop2026-09-23_14-32-00.jpg,34.0,reviewdays,33,33,34,34,33,35,33,Q4 busiest
+crop2026-09-23_15-26-00.jpg,28.0,reviewdays,27,27,28,28,27,28,27,Q4 busiest
+crop2026-09-23_16-20-00.jpg,24.0,reviewdays,23,23,23,24,23,24,23,Q3
+crop2026-09-23_17-14-00.jpg,12.0,reviewdays,12,12,12,12,12,12,12,Q2
+crop2026-09-23_18-08-00.jpg,8.0,reviewdays,8,8,8,8,8,8,8,Q2
+crop2026-09-23_19-02-00.jpg,4.0,reviewdays,3,3,3,3,3,3,3,Q1 emptiest
+crop2026-09-24_06-26-00.jpg,11.0,reviewdays,10,10,11,11,11,11,10,Q2
+crop2026-09-24_07-20-00.jpg,16.0,reviewdays,15,15,15,16,15,16,15,Q3
+crop2026-09-24_08-14-00.jpg,10.0,reviewdays,10,10,10,10,10,10,10,Q2
+crop2026-09-24_09-08-00.jpg,7.0,reviewdays,7,7,7,7,7,7,7,Q2
+crop2026-09-24_10-02-00.jpg,1.0,reviewdays,2,2,2,2,2,2,2,Q1 emptiest
+crop2026-09-24_10-56-00.jpg,1.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-09-24_11-50-00.jpg,5.0,reviewdays,5,5,5,5,5,5,5,Q2
+crop2026-09-24_12-44-00.jpg,5.0,reviewdays,5,5,5,5,5,5,5,Q2
+crop2026-09-24_13-38-00.jpg,12.0,reviewdays,10,10,10,10,10,10,10,Q2
+crop2026-09-24_14-32-00.jpg,27.0,reviewdays,26,27,29,29,28,29,26,Q3
+crop2026-09-24_15-26-00.jpg,17.0,reviewdays,15,15,16,17,15,17,15,Q3
+crop2026-09-24_16-20-00.jpg,24.0,reviewdays,23,23,23,23,23,23,23,Q3
+crop2026-09-24_17-14-00.jpg,15.0,reviewdays,15,15,15,15,15,15,15,Q3
+crop2026-09-24_18-08-00.jpg,23.0,reviewdays,20,20,20,20,20,20,20,Q3
+crop2026-09-24_19-02-00.jpg,8.0,reviewdays,8,8,8,8,8,8,8,Q2
+crop2026-09-25_06-26-00.jpg,9.0,reviewdays,2,2,2,2,2,2,2,Q2
+crop2026-09-25_07-20-00.jpg,15.0,reviewdays,14,14,14,14,14,14,14,Q3
+crop2026-09-25_08-14-00.jpg,18.0,reviewdays,18,18,18,18,18,18,18,Q3
+crop2026-09-25_09-08-00.jpg,1.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-09-25_10-02-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-09-25_10-56-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-09-25_11-50-00.jpg,2.0,reviewdays,2,2,2,2,2,2,2,Q1 emptiest
+crop2026-09-25_12-44-00.jpg,5.0,reviewdays,5,5,5,5,5,5,5,Q2
+crop2026-09-25_13-38-00.jpg,26.0,reviewdays,23,25,25,25,24,25,23,Q3
+crop2026-09-25_14-32-00.jpg,34.0,reviewdays,29,30,31,31,30,31,29,Q4 busiest
+crop2026-09-25_15-26-00.jpg,23.0,reviewdays,23,23,23,23,23,24,23,Q3
+crop2026-09-25_16-20-00.jpg,40.0,reviewdays,37,38,39,39,39,39,37,Q4 busiest
+crop2026-09-25_17-14-00.jpg,27.0,reviewdays,26,26,26,26,26,26,26,Q3
+crop2026-09-25_18-08-00.jpg,20.0,reviewdays,19,19,21,21,20,21,19,Q3
+crop2026-09-25_19-02-00.jpg,24.0,reviewdays,24,25,25,25,25,25,24,Q3
+crop2026-09-26_06-26-00.jpg,5.0,reviewdays,4,4,4,4,4,4,3,Q2
+crop2026-09-26_07-20-00.jpg,17.0,reviewdays,15,15,16,16,15,16,15,Q3
+crop2026-09-26_08-14-00.jpg,20.0,reviewdays,19,19,19,19,19,19,19,Q3
+crop2026-09-26_09-08-00.jpg,14.0,reviewdays,13,13,13,13,13,13,13,Q2
+crop2026-09-26_10-02-00.jpg,9.0,reviewdays,3,3,3,3,3,3,3,Q2
+crop2026-09-26_10-56-00.jpg,6.0,reviewdays,3,3,3,3,3,3,3,Q2
+crop2026-09-26_11-50-00.jpg,0.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-09-26_12-44-00.jpg,2.0,reviewdays,2,2,2,2,2,2,2,Q1 emptiest
+crop2026-09-26_13-38-00.jpg,10.0,reviewdays,8,9,9,10,10,10,8,Q2
+crop2026-09-26_14-32-00.jpg,43.0,reviewdays,39,40,42,42,40,42,39,Q4 busiest
+crop2026-09-26_15-26-00.jpg,45.0,reviewdays,45,45,45,45,45,45,43,Q4 busiest
+crop2026-09-26_16-20-00.jpg,40.0,reviewdays,37,38,38,38,38,38,36,Q4 busiest
+crop2026-09-26_17-14-00.jpg,38.0,reviewdays,34,35,37,38,35,38,34,Q4 busiest
+crop2026-09-26_18-08-00.jpg,23.0,reviewdays,23,23,23,23,23,23,23,Q3
+crop2026-09-26_19-02-00.jpg,12.0,reviewdays,11,11,11,11,11,11,11,Q2
+crop2026-09-27_06-35-00.jpg,11.0,reviewdays,9,9,9,9,9,9,9,Q2
+crop2026-09-27_07-29-00.jpg,33.0,reviewdays,32,32,32,32,32,32,32,Q4 busiest
+crop2026-09-27_08-23-00.jpg,27.0,reviewdays,27,27,28,28,27,28,27,Q3
+crop2026-09-27_09-17-00.jpg,13.0,reviewdays,13,13,13,13,13,13,13,Q2
+crop2026-09-27_10-11-00.jpg,3.0,reviewdays,3,3,3,3,3,4,3,Q1 emptiest
+crop2026-09-27_11-05-00.jpg,8.0,reviewdays,8,8,8,8,8,8,8,Q2
+crop2026-09-27_11-59-00.jpg,1.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-09-27_12-53-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-09-27_13-47-00.jpg,1.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-09-27_15-35-00.jpg,42.0,reviewdays,32,32,32,32,32,33,32,Q4 busiest
+crop2026-09-27_16-29-00.jpg,33.0,reviewdays,29,29,30,30,30,30,29,Q4 busiest
+crop2026-09-27_17-23-00.jpg,54.0,reviewdays,39,39,39,39,39,39,39,Q4 busiest
+crop2026-09-27_18-17-00.jpg,31.0,reviewdays,26,27,27,27,27,27,26,Q4 busiest
+crop2026-09-27_19-11-00.jpg,10.0,reviewdays,8,8,8,8,8,8,8,Q2
+crop2026-09-28_06-35-00.jpg,3.0,reviewdays,3,3,3,3,3,3,3,Q1 emptiest
+crop2026-09-28_07-29-00.jpg,10.0,reviewdays,10,10,10,11,10,11,10,Q2
+crop2026-09-28_08-23-00.jpg,14.0,reviewdays,14,14,14,14,14,14,14,Q2
+crop2026-09-28_09-17-00.jpg,4.0,reviewdays,4,4,4,4,4,4,4,Q1 emptiest
+crop2026-09-28_10-11-00.jpg,2.0,reviewdays,2,2,2,2,2,2,2,Q1 emptiest
+crop2026-09-28_11-05-00.jpg,0.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-09-28_11-59-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-09-28_12-53-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-09-28_13-47-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-09-28_14-41-00.jpg,8.0,reviewdays,8,8,8,8,9,9,8,Q2
+crop2026-09-28_15-35-00.jpg,29.0,reviewdays,27,27,28,28,27,28,27,Q4 busiest
+crop2026-09-28_16-29-00.jpg,33.0,reviewdays,33,33,34,34,33,34,32,Q4 busiest
+crop2026-09-28_17-23-00.jpg,30.0,reviewdays,17,17,17,17,17,17,17,Q4 busiest
+crop2026-09-28_18-17-00.jpg,26.0,reviewdays,21,21,21,21,21,21,21,Q3
+crop2026-09-28_19-11-00.jpg,5.0,reviewdays,3,3,3,3,3,3,3,Q2
+crop2026-09-29_06-35-00.jpg,11.0,reviewdays,9,9,9,9,9,9,9,Q2
+crop2026-09-29_07-29-00.jpg,25.0,reviewdays,24,24,24,24,24,24,24,Q3
+crop2026-09-29_08-23-00.jpg,16.0,reviewdays,10,10,10,10,10,10,10,Q3
+crop2026-09-29_09-17-00.jpg,15.0,reviewdays,9,10,10,10,10,10,9,Q3
+crop2026-09-29_10-11-00.jpg,6.0,reviewdays,6,6,6,6,6,6,6,Q2
+crop2026-09-29_11-05-00.jpg,0.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-09-29_11-59-00.jpg,0.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-09-29_12-53-00.jpg,0.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-09-29_13-47-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-09-29_14-41-00.jpg,2.0,reviewdays,2,2,2,2,2,2,2,Q1 emptiest
+crop2026-09-29_15-35-00.jpg,20.0,reviewdays,19,19,19,19,19,19,19,Q3
+crop2026-09-29_16-29-00.jpg,33.0,reviewdays,22,22,23,23,22,23,22,Q4 busiest
+crop2026-09-29_17-23-00.jpg,35.0,reviewdays,29,29,29,29,29,29,29,Q4 busiest
+crop2026-09-29_18-17-00.jpg,10.0,reviewdays,8,8,8,8,8,8,8,Q2
+crop2026-09-29_19-11-00.jpg,7.0,reviewdays,7,7,7,7,7,7,7,Q2
+crop2026-10-01_09-17-00.jpg,4.0,reviewdays,4,4,4,4,4,4,4,Q1 emptiest
+crop2026-10-01_10-11-00.jpg,6.0,reviewdays,7,7,7,7,7,7,7,Q2
+crop2026-10-01_11-05-00.jpg,1.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-10-01_11-59-00.jpg,1.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-10-01_12-53-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-10-01_13-47-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-10-01_14-41-00.jpg,0.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-10-01_15-35-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-10-01_16-29-00.jpg,3.0,reviewdays,3,3,3,3,3,3,3,Q1 emptiest
+crop2026-10-01_17-23-00.jpg,11.0,reviewdays,9,10,10,10,10,10,9,Q2
+crop2026-10-01_18-17-00.jpg,24.0,reviewdays,23,23,23,23,23,23,23,Q3
+crop2026-10-01_19-11-00.jpg,14.0,reviewdays,14,14,14,14,14,15,14,Q2
+crop2026-10-02_08-23-00.jpg,19.0,reviewdays,19,19,19,19,19,19,19,Q3
+crop2026-10-02_09-17-00.jpg,17.0,reviewdays,16,16,16,16,16,16,16,Q3
+crop2026-10-02_10-11-00.jpg,10.0,reviewdays,11,11,11,13,11,13,11,Q2
+crop2026-10-02_11-05-00.jpg,1.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-10-02_11-59-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-10-02_12-53-00.jpg,2.0,reviewdays,4,4,4,4,4,4,4,Q1 emptiest
+crop2026-10-02_13-47-00.jpg,0.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-10-02_14-41-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-10-02_15-35-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-10-02_16-29-00.jpg,1.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-10-02_17-23-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-10-02_18-17-00.jpg,11.0,reviewdays,11,11,11,11,11,11,11,Q2
+crop2026-10-02_19-11-00.jpg,14.0,reviewdays,10,10,10,10,10,10,10,Q2
+crop2026-10-03_06-35-00.jpg,4.0,reviewdays,1,1,1,1,1,1,1,Q1 emptiest
+crop2026-10-03_08-23-00.jpg,9.0,reviewdays,10,10,10,10,10,10,10,Q2
+crop2026-10-03_09-17-00.jpg,17.0,reviewdays,17,18,18,18,18,18,17,Q3
+crop2026-10-03_10-11-00.jpg,19.0,reviewdays,18,19,19,19,19,19,18,Q3
+crop2026-10-03_11-05-00.jpg,22.0,reviewdays,15,15,15,15,15,15,15,Q3
+crop2026-10-03_11-59-00.jpg,18.0,reviewdays,18,18,18,18,18,18,18,Q3
+crop2026-10-03_12-53-00.jpg,27.0,reviewdays,15,15,15,15,15,15,15,Q3
+crop2026-10-03_13-47-00.jpg,8.0,reviewdays,8,8,8,8,8,8,8,Q2
+crop2026-10-03_14-41-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest
+crop2026-10-03_15-35-00.jpg,0.0,reviewdays,0,0,0,0,0,0,0,Q1 emptiest

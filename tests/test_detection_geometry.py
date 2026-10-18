@@ -225,3 +225,57 @@ def test_bluff_zone_drops_every_box_the_hand_review_judged():
 def test_box_outside_every_zone_survives():
     box = [5, 5, 15, 15, 0.9]
     assert ds.filter_false_positive_zones([box]) == [box]
+
+
+# --- crowd-dependence (added 2026-10-18, both rules default OFF) -------------
+
+def test_crowd_dependence_is_off_by_default():
+    """The constants ship inert, so a default run is the measured production one."""
+    assert ds.CROWD_THRESH_SCHEDULE is None
+    assert ds.CONTAINMENT_DENSITY_SLOPE == 0.0
+    assert ds.crowd_threshold(0) == ds.CONF_THRESH
+    assert ds.crowd_threshold(500) == ds.CONF_THRESH
+
+
+def test_crowd_threshold_reads_the_last_matching_step():
+    sched = [(0, 0.195), (10, 0.17), (20, 0.15), (30, 0.12)]
+    assert ds.crowd_threshold(0, sched) == 0.195
+    assert ds.crowd_threshold(9, sched) == 0.195
+    assert ds.crowd_threshold(10, sched) == 0.17
+    assert ds.crowd_threshold(29, sched) == 0.15
+    assert ds.crowd_threshold(1000, sched) == 0.12
+
+
+def test_local_density_counts_neighbours_not_self():
+    # three boxes: two within 40px of each other, one far away
+    boxes = [[100, 100, 110, 110, 0.9],
+             [115, 100, 125, 110, 0.8],
+             [600, 100, 610, 110, 0.7]]
+    assert ds.local_density(boxes, radius=40) == [1, 1, 0]
+    assert ds.local_density(boxes, radius=5) == [0, 0, 0]
+
+
+def test_density_slope_leaves_isolated_boxes_at_the_flat_threshold():
+    """The point of the slope: it cannot alter a box that has no neighbour.
+
+    Containment suppression was adopted for isolated clear-day false positives,
+    so a rule that loosens it in crowds must leave the isolated case alone.
+    """
+    # a small box fully inside a big one, far from anything else
+    boxes = [[100, 100, 140, 140, 0.9], [110, 110, 125, 125, 0.5]]
+    flat = ds.suppress_contained(boxes, 0.7, slope=0.0)
+    sloped = ds.suppress_contained(boxes, 0.7, slope=0.10)
+    assert len(flat) == 1          # contained box dropped
+    assert sloped == flat          # and the slope changes nothing here
+
+
+def test_density_slope_spares_a_duplicate_only_when_it_is_in_a_crowd():
+    """With neighbours present the same overlap stops counting as a duplicate."""
+    pair = [[100, 100, 140, 140, 0.9], [108, 108, 136, 136, 0.5]]
+    # overlap/smaller is above 0.7, so flat suppression drops the small box
+    assert len(ds.suppress_contained(pair, 0.7, slope=0.0)) == 1
+    # surround them with neighbours: the threshold rises and both survive
+    crowd = pair + [[c, 100, c + 10, 110, 0.4] for c in (95, 125, 150)]
+    out = ds.suppress_contained(crowd, 0.7, slope=0.10)
+    kept = [b for b in out if b in pair]
+    assert len(kept) == 2
