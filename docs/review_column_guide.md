@@ -66,7 +66,7 @@ convenience, not structure. Scroll past them to row 4 to start work.
 | `boxes_drawn` | how many boxes the detector drew (also in the image filename) |
 | `forecast` | what the model predicted for that hour, for context only |
 | `filename` | the source crop in `data/j_shore_cam/surf_crops/` |
-| `image` | the rendered PNG to look at, in `full_day_<date>/` |
+| `image` | the rendered PNG to look at, in `full_days/full_day_<date>/` |
 
 ### If your editor drops a column
 

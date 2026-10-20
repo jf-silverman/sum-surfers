@@ -129,7 +129,7 @@ def main():
     args = p.parse_args()
 
     out_dir = Path(args.out_dir) if args.out_dir else \
-        _PROJECT_ROOT / "data" / "reviews" / f"full_day_{args.date}"
+        _PROJECT_ROOT / "data" / "reviews" / "full_days" / f"full_day_{args.date}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     df = pd.read_csv(PREDS, float_precision="round_trip")
