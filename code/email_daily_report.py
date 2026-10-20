@@ -28,7 +28,7 @@ Usage:
 import argparse
 import shutil
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import cv2
@@ -143,6 +143,100 @@ def reconstruct_forecast(target_date):
 
 
 FEATURES_CSV = _PROJECT_ROOT / "data" / "training_features.csv"
+
+# Thresholds for band_health_note. 0.30 is the point agreed on 2026-10-20: the
+# forecast's lower band edge moved q0.10 -> q0.15 that day because the 10th
+# percentile of hourly surfer count had become exactly zero, and the share of
+# empty hours is seasonal (7.6% in 2026-08, 19.5% in 2026-10, against 33.8%
+# and 38.9% recorded in 2025-11 and 2025-12). Past roughly 30% the single
+# quantile model is fighting the data hard enough that the hurdle model in
+# code/eval_hurdle_model.py -- already measured 2026-09-22, better pinball on
+# 5 of 5 seeds, left unadopted -- is worth the model-family swap. This note
+# exists so that decision is prompted by the data rather than remembered.
+EMPTY_SHARE_TRIGGER = 0.30
+EMPTY_SHARE_WINDOW_DAYS = 30
+
+
+def band_health_note():
+    """Flags the two conditions that would reopen the forecast-band question.
+
+    Cheap on purpose: one 2,000-row CSV read (~7ms) and one 13-row read, no
+    model fitting. Refitting anything -- let alone re-running the hurdle
+    comparison, which fits nine quantile models twice over several seeds --
+    would be far too heavy for a nightly job, and is not needed to know
+    WHETHER to look.
+
+    Two signals, strongest first:
+
+    1. The newest forecast's lower edges. A lower edge sitting at zero is the
+       symptom itself, not a proxy for it: counts are never negative, so such
+       a band cannot be missed from below and hands the coverage metric free
+       credit. This is what went unnoticed from 2026-10-12 to 2026-10-19,
+       which is the reason this check exists.
+    2. The share of empty hours, cumulative and over the trailing window. The
+       leading indicator -- it is what drags the low quantiles onto the floor
+       in the first place, and it moves seasonally, so it gives warning before
+       the band actually collapses.
+
+    Returns "" when both are fine, so the email stays quiet unless there is
+    something to act on.
+    """
+    lines = []
+
+    # 1. the band that was just written for tomorrow
+    newest = sorted(pdp.FORECASTS_DIR.glob("forecast_20*.csv"))
+    if newest:
+        try:
+            fc = pd.read_csv(newest[-1])
+            lo_q = float(fc["band_lower_q"].iloc[0]) if "band_lower_q" in fc else 0.10
+            pinned = int((fc["lower_q10"] <= 0).sum())
+            if pinned:
+                lines.append(
+                    f"The forecast band's lower edge is pinned at zero on {pinned} of "
+                    f"{len(fc)} hours in {newest[-1].name} (nominal lower quantile "
+                    f"q{lo_q:g}). A band that cannot be missed from below inflates the "
+                    f"coverage figure instead of describing the uncertainty. The q{lo_q:g} "
+                    f"model has most likely collapsed to a constant again -- check for "
+                    f"'Degenerate quantile level(s)' in the chart step's output, and see "
+                    f"PROJECT_HISTORY 2026-10-20.")
+        except (OSError, ValueError, KeyError, IndexError) as e:
+            lines.append(f"Could not read {newest[-1].name} to check the band "
+                         f"({type(e).__name__}).")
+
+    # 2. the empty-hour share that drives it
+    if FEATURES_CSV.exists():
+        try:
+            df = pd.read_csv(FEATURES_CSV, float_precision="round_trip")
+            df = df[df["surfer_count"].notna()]
+            if len(df):
+                share_all = float((df["surfer_count"] == 0).mean())
+                cutoff = (datetime.now().date()
+                          - timedelta(days=EMPTY_SHARE_WINDOW_DAYS)).isoformat()
+                recent = df[df["date"].astype(str) >= cutoff]
+                share_recent = (float((recent["surfer_count"] == 0).mean())
+                                if len(recent) else None)
+                hits = []
+                if share_all >= EMPTY_SHARE_TRIGGER:
+                    hits.append(f"{share_all:.0%} of all {len(df):,} recorded hours")
+                if share_recent is not None and share_recent >= EMPTY_SHARE_TRIGGER:
+                    hits.append(f"{share_recent:.0%} of the last "
+                                f"{EMPTY_SHARE_WINDOW_DAYS} days ({len(recent):,} hours)")
+                if hits:
+                    lines.append(
+                        f"Empty hours have passed the {EMPTY_SHARE_TRIGGER:.0%} mark: "
+                        + "; ".join(hits)
+                        + ". That was the agreed point to take up the hurdle model in "
+                          "code/eval_hurdle_model.py -- P(anyone out) times the count "
+                          "quantiles fit on non-empty rows only -- rather than keep "
+                          "lowering the band's edge. It was measured on 2026-09-22 "
+                          "(better pinball on 5 of 5 seeds) and left unadopted because "
+                          "it moved 80% coverage the wrong way on 3 of 5; the trade is "
+                          "different once this many hours are empty.")
+        except (OSError, ValueError, KeyError) as e:
+            lines.append(f"Could not read the training table to check the empty-hour "
+                         f"share ({type(e).__name__}).")
+
+    return ("\n".join(f"Forecast band check: {ln}" for ln in lines) + "\n") if lines else ""
 
 
 def tide_by_hour(target_date):
@@ -549,6 +643,9 @@ def main():
                          f"{tide_at_peak:.2f} ft; the day's low was {lowest[1]:.2f} ft at "
                          f"{lowest[0].hour}:00.\n")
 
+    # Quiet unless the forecast band needs attention. See band_health_note.
+    band_note = band_health_note()
+
     look = []
     if (PUBLISHED_DIR / "latest.png").exists():
         look.append("tomorrow's hourly forecast")
@@ -559,7 +656,8 @@ def main():
 
     body = (f"Surf crowd forecast vs. actual for {target_date.strftime('%A, %B %d, %Y')}\n\n"
             f"{headline}\n"
-            f"{tide_note}\n"
+            + (f"\n{band_note}" if band_note else "")
+            + f"{tide_note}\n"
             f"Hour by hour:\n{table}\n\n"
             f"Detector frames attached, at the three points where counting is hardest\n"
             f"to trust:\n{frame_lines}\n\n"
@@ -580,6 +678,9 @@ def main():
         f'<div style="color:#666;font-size:13px;margin-bottom:14px;">'
         f'{target_date.strftime("%A, %B %d, %Y")}</div>'
         f'<p style="margin:0 0 14px 0;"><b>{headline}</b></p>'
+        + (f'<p style="margin:0 0 14px 0;padding:10px 12px;background:#fdf3e3;'
+           f'border-left:3px solid #d08a1d;color:#5a4209;font-size:13px;">'
+           f'{band_note.strip()}</p>' if band_note else "")
         + (f'<p style="margin:0 0 14px 0;color:#444;">{tide_note.strip()}</p>' if tide_note else "")
         + f'<h3 style="font-size:14px;margin:18px 0 6px 0;">Hour by hour</h3>'
         + hourly_table_html(forecast_rows, actuals)

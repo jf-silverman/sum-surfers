@@ -5915,3 +5915,38 @@ Three things worth recording about the edges of this change:
 already measured 2026-09-22 — better pinball on 5 of 5 seeds but 80% coverage
 moves the wrong way on 3 of 5). Still Joel's call; q0.15 is the smaller change
 and does not alter the model family or require re-exporting the public release.
+
+### 2026-10-20 — the band condition now checks itself in the nightly email
+
+The q0.10 collapse above went unnoticed for eight days. Nothing raised: the
+only trace was a `NOTE:` line in the chart step's output, and the printed band
+looked like a band. The condition is now checked every night in step 10 and
+reported in the email, with no change to what runs when things are fine.
+
+`band_health_note()` in `code/email_daily_report.py` reads two signals:
+
+1. **The newest forecast's lower edges.** The symptom itself rather than a
+   proxy — an edge at zero cannot be missed from below, so it inflates
+   coverage instead of describing uncertainty. Fires on a partial pin as well
+   as a total one, because the 09-30 episode was partial.
+2. **The share of empty hours**, cumulative and over the trailing 30 days,
+   against `EMPTY_SHARE_TRIGGER = 0.30`. The leading indicator: it is what
+   drags the low quantiles onto the floor, and it moves seasonally, so it
+   gives warning before a band actually collapses. 0.30 is the point at which
+   the hurdle model in `code/eval_hurdle_model.py` is worth the model-family
+   swap, so the message names it and the measurement behind it.
+
+**Cost is why it is these two signals and not a refit.** Measured at **11 ms**
+— one 1,984-row CSV read and one 13-row read, no model fitting. Re-running the
+hurdle comparison would fit nine quantile models twice over several seeds,
+which is far too heavy nightly and is not needed to know whether to look. The
+email stays silent when both signals are clear, so the note means something
+when it appears.
+
+`tests/test_forecast_band_health.py` covers it: fires on a full and a partial
+pin, quiet on a two-sided band, reads the newest forecast rather than the
+oldest, does not mistake `forecast_log.csv` for a forecast (it shares the
+directory and the columns), inclusive at the trigger boundary, and reports
+rather than raises on a missing or unreadable file. Also asserts
+`BAND_LABEL` still matches `FAN_LEVELS`, since a typed label is what let the
+displayed band drift from the fitted levels in the first place. 34 tests pass.
