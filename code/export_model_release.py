@@ -9,7 +9,8 @@ What it writes to data/model_release/:
     surf_count_model.joblib   fitted point + lower/upper quantile models,
                               the train-set standardization statistics, and
                               the exact feature column order
-    holdout_test_set.csv      the 292 held-out rows the models never saw —
+    holdout_test_set.csv      the held-out rows the models never saw (count in
+                              release_metadata.json; it grows as the record does) —
                               raw (un-standardized, human-readable) predictor
                               values, the true surfer count, and this run's
                               predictions
@@ -52,6 +53,7 @@ from sklearn.model_selection import train_test_split
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fit_surfer_count_model import (  # noqa: E402
     load_and_prepare, standardize, fit_quantile_model_robust, split_by_day,
+    BAND_LOWER_Q, BAND_UPPER_Q, BAND_LABEL,
 )
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -59,7 +61,16 @@ RELEASE_DIR = _PROJECT_ROOT / "data" / "model_release"
 
 TEST_SIZE = 0.2
 RANDOM_STATE = 42
-LOWER_Q, UPPER_Q = 0.10, 0.90
+# The band the release ships, taken from the same pair production draws so the
+# card's figures describe the band a reader actually sees on the chart. This was
+# a fixed 0.10/0.90 until 2026-10-20; the lower edge moved to 0.15 because the
+# 10th percentile of surfer_count had become exactly zero as the share of empty
+# hours rose seasonally, and a lower edge on the floor cannot be missed from
+# below, so it reported free coverage instead of uncertainty. A re-export was
+# needed rather than optional: fit_quantile_model_robust keeps
+# allow_degenerate=False here on purpose, and the q0.10 fit had decayed to
+# surviving only at the last min_samples_leaf candidate it tries.
+LOWER_Q, UPPER_Q = BAND_LOWER_Q, BAND_UPPER_Q
 
 # Same hyperparameters as fit_surfer_count_model.py and demo_predictions.py.
 POINT_KWARGS = dict(max_iter=300, learning_rate=0.05, max_depth=4,
@@ -154,20 +165,22 @@ def main():
             "mae": float(np.mean(np.abs(pred - y_test.to_numpy()))),
             "rmse": float(np.sqrt(np.mean((pred - y_test.to_numpy()) ** 2))),
             "mean_bias": float(np.mean(pred - y_test.to_numpy())),
-            "interval_coverage_80pct": float(covered),
+            f"interval_coverage_{BAND_LABEL.rstrip('%')}pct": float(covered),
+            "interval_nominal": round(UPPER_Q - LOWER_Q, 4),
         },
-        # The README's calibration section reports 71.6% for the same interval
-        # on the same rows. Both are right: the calibration chart fits a
-        # 9-level quantile ladder (0.10..0.90) and enforces monotonicity across
-        # all of it, which nudges the q0.90 bound up and catches two more rows.
-        # This release ships only the q0.10/q0.90 pair, so it enforces
-        # monotonicity between those two alone. The gap is 2 rows out of 292.
-        # No specific README figure is quoted here: an earlier version hardcoded
-        # one (71.6%), and it went stale the moment the underlying counts changed.
+        # The calibration chart can report a different figure for the same
+        # nominal band on the same rows, and both are right: it fits a 9-level
+        # quantile ladder and enforces monotonicity across all of it, which
+        # nudges the upper bound and can catch an extra row or two, while this
+        # release ships one pair and enforces monotonicity between those two
+        # alone. Historically the gap was 2 rows out of 292. No specific figure
+        # is quoted here: an earlier version hardcoded one (71.6%) and it went
+        # stale the moment the underlying counts changed.
         "coverage_note": (
-            "Coverage here is computed from the shipped q0.10/q0.90 pair alone. The README's "
-            "calibration chart fits a 9-level quantile ladder and enforces monotonicity "
-            "across all levels, so its 80% figure can differ from this one by a row or two."
+            f"Coverage here is computed from the shipped q{LOWER_Q:g}/q{UPPER_Q:g} pair "
+            f"alone. The README's calibration chart fits a 9-level quantile ladder and "
+            f"enforces monotonicity across all levels, so its figure for the same nominal "
+            f"band can differ from this one by a row or two."
         ),
         # Version-sensitive: a joblib pickle is not guaranteed to load under a
         # different scikit-learn. Recorded so a load failure is diagnosable

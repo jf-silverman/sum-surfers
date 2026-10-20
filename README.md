@@ -443,7 +443,7 @@ optimistic. The demo set is the clean check.
 
 ### Check the forecast model against held-out data
 
-`data/model_release/` holds the fitted forecast model, the **352 rows it was
+`data/model_release/` holds the fitted forecast model, the **417 rows it was
 never trained on** (the most recent days, held out as a block), and the metadata to reproduce the split:
 
 ```bash

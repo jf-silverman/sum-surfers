@@ -195,18 +195,28 @@ ahead, from publicly available surf and weather forecasts.
 
 ### Architecture
 `HistGradientBoostingRegressor` with Poisson loss for the point estimate, plus
-two quantile models for the prediction interval. **This released bundle ships
-the q0.10 / q0.90 pair**, and every interval figure in this card is measured on
-that pair. The live forecast moved its lower edge to **q0.15 on 2026-10-20** — a
-75% central interval — because the 10th percentile of hourly surfer count has
-become exactly zero as the share of empty hours rises seasonally; see the README
-section "Why the prediction range is 75% and not 80%". Two consequences for
-anyone re-exporting this bundle: the interval numbers below describe an 80% band
-that production no longer draws, and the q0.10 fit here is now marginal — on the
-current record it survives only at `min_samples_leaf` 200, the last candidate
-`fit_quantile_model_robust` tries, so the next export may raise rather than
-silently ship a flat zero. That is the intended behaviour: calibration and
-release code keep `allow_degenerate=False`, and only display code opts in. The target is
+two quantile models for the prediction interval. The band is **q0.15 / q0.90 —
+a 75% central interval** — since 2026-10-20, and the bundle was re-exported that
+day so every interval figure in this card describes the band the chart actually
+draws. The lower edge was q0.10 until then; it moved because the 10th percentile
+of hourly surfer count had become exactly zero as the share of empty hours rose
+seasonally, and a lower edge resting on zero cannot be missed from below, so it
+reported free coverage rather than uncertainty. See the README section "Why the
+prediction range is 75% and not 80%".
+
+One thing that re-export settled, and it cuts against the change: on the
+forward train split q0.10 had **not** collapsed — it still fitted, though only
+at `min_samples_leaf` 200, the last candidate `fit_quantile_model_robust` tries,
+and it was a varying model rather than a floor (18.2% of actuals fell below it).
+Measured on the same held-out rows, the old q0.10/q0.90 band reaches 74.8%
+against its 80% target while the new q0.15/q0.90 band reaches only 59.5% against
+75%. The collapse is real on the full record the chart fits (every
+`min_samples_leaf` from 20 to 200 gives a training standard deviation of
+0.0000), so the chart had no choice, but the band is **not better calibrated for
+having moved** — it is more honestly labelled and worse covered. The reason is
+the +4.01 bias on near-empty hours below: raising the lower edge pushes it
+further above actuals that sit at or near zero. That points at the hurdle model,
+not at the edge level, as the actual fix. The target is
 `round(frame_count_mean)` — the rounded mean of the three frames cut at
 1.0/2.5/4.0 s. The Poisson objective is load-bearing: squared
 error costs **+0.43 MAE** on 16 rolling origins (p < 0.05, better on only 3 of
@@ -223,13 +233,34 @@ on the most recent, so no day appears on both sides:
 
 | metric | value |
 |---|---|
-| MAE | **7.60 surfers** |
-| RMSE | 10.43 |
-| mean bias | −1.84 (predicted below actual) |
-| 80% interval coverage | **71.6%** |
+| MAE | **6.30 surfers** |
+| RMSE | 8.91 |
+| median \|error\| | 4.24 |
+| mean bias | +1.02 (predicted above actual) |
+| 75% interval coverage | **60.4%** |
 
-Measured on 352 held-out hours (2026-08-29 → 2026-09-21) against 1,242 training
-rows.
+Measured on 417 held-out hours (2026-09-20 → 2026-10-19) against 1,567 training
+rows, re-exported 2026-10-20 onto the q0.15/q0.90 band production draws.
+Reproduce with `python code/eval_surf_count_model.py`.
+
+**These are not comparable to the previous figures** (MAE 7.60, RMSE 10.43, bias
+−1.84, 80% coverage 71.6% on 352 rows, 2026-08-29 → 2026-09-21). The band
+changed, the held-out window moved forward a month, and the record grew by 390
+rows. The MAE improvement is mostly the easier window — mean actual count fell
+from 15.9 to 12.08 — not a better model.
+
+**Error by actual count**, which is where the structure is:
+
+| bucket | n | MAE | bias |
+|---|---:|---:|---:|
+| 0–5 | 149 | 4.18 | **+4.01** |
+| 5–15 | 132 | 5.77 | +3.73 |
+| 15–30 | 93 | 6.38 | −0.32 |
+| 30+ | 43 | **15.05** | **−14.74** |
+
+The model pulls everything toward the middle: it invents about four surfers on
+near-empty hours and loses fifteen on the busiest. The headline bias of +1.02 is
+those two errors cancelling, which is why it should not be read on its own.
 
 **Against naive baselines** (`code/eval_baselines.py`, same forward split, 378
 test rows as the record has since grown): the model's MAE of 6.79 beats the
@@ -258,11 +289,11 @@ the same observation. It also was not stable: the same definition returns 0.61,
 1.00 and 0.69 on the three dense hours. See
 [`analysis/count_variability/noise_floor/`](analysis/count_variability/noise_floor/).)*
 
-*(The calibration section below reports 71.9% for the same interval on the
-same rows. Both are right: the released bundle enforces monotonicity between the
-shipped q0.10/q0.90 pair alone, while the calibration chart fits a nine-level
-quantile ladder and enforces it across all of them, which nudges the upper bound
-and catches two more rows out of 352.)*
+*(The calibration section below reports 59.5% for the same interval on the same
+rows, against the bundle's 60.4%. Both are right: the released bundle enforces
+monotonicity between the shipped pair alone, while the calibration chart fits a
+ten-level quantile ladder and enforces it across all of them, which nudges the
+bounds and moves a row or two out of 417.)*
 
 **This number got worse on 2026-09-23 without the model changing.** Accuracy had
 been measured with a random 80/20 split of *hours*; at ~13 hours per day that
@@ -277,14 +308,23 @@ day-ahead forecast faces.
 lead times MAE 5.0 and coverage 76%.
 
 **The direction of the bias is not stable, and that matters more than its size.**
-The backtest above shows the model predicting 1.84 surfers BELOW actual. The live
-record since shows it predicting **1.87 surfers ABOVE** actual — nearly the same
-magnitude, opposite sign, 68% of hours over-forecast. The model is not biased in
-a fixed direction; it is **lagging the level**. Mean counts fell from 15.9
-surfers/hour in the backtest window to 11.5 in the live window, and a model
-trained mostly on busier months keeps forecasting the old level. Measured
-independently across 16 rolling origins, forecast bias tracks the train/test
-level gap at **r = −0.811**.
+The backtest run on 2026-09-23 showed the model predicting 1.84 surfers BELOW
+actual. The live record since showed it predicting **1.87 surfers ABOVE** actual
+— nearly the same magnitude, opposite sign, 68% of hours over-forecast. The
+model is not biased in a fixed direction; it is **lagging the level**. Mean
+counts fell from 15.9 surfers/hour in the backtest window to 11.5 in the live
+window, and a model trained mostly on busier months keeps forecasting the old
+level. Measured independently across 16 rolling origins, forecast bias tracks
+the train/test level gap at **r = −0.811**.
+
+**The 2026-10-20 re-export is a third data point for the same claim**, and it
+sits where the argument predicts. Re-fit on a month of newer, quieter data, the
+backtest bias flipped from −1.84 to **+1.02** — the held-out window moved into
+October, mean actual fell from 15.9 to 12.08, and the model now over-forecasts
+the window it is scored on exactly as it did live. The sign of this number has
+now been both ways on the same model family and the same split scheme, which is
+the strongest available evidence that it tracks the level gap rather than
+describing a fixed property of the model.
 
 Day-ahead alone the over-prediction is small and uniform: mean −0.82, median
 −1.07, 60% of hours over-forecast (t = −2.03, p = 0.044), and it over-forecasts
@@ -309,9 +349,15 @@ for the current record.
   2026-10-01 by `code/calibrate_lead_bands.py`, which widens each lead's band by
   a factor fitted on the scored record; the correction is gentle (1.02 to 1.21)
   and its slope is not yet significant.
-- **Prediction intervals are overconfident at every level** — measured coverage
-  15/26/36/71.9% against nominal 20/40/60/80%. The 80% band misses 9.4% low and
-  18.8% high against a 10% target on each side; the high edge is where it loses.
+- **Prediction intervals are overconfident at every level**, and since 2026-10-20
+  it is the LOWER edge that loses. Re-measured on the current record
+  (`analysis/surf_count_model_calibration/plot_calibration.py`, 417 held-out
+  rows): coverage 16.8/32.4/49.2/59.5/74.8% against nominal 20/40/60/75/80%. The
+  production 75% band misses **33.6% low against a 15% target** and 7.0% high
+  against 10%. This reverses the earlier reading (9.4% low, 18.8% high, high edge
+  losing) — the direction flipped with the window, and the cause is the +4.01
+  bias on near-empty hours above: the lower bound sits above actuals that are at
+  or near zero.
 - **The count distribution is zero-inflated, and seasonally so**, which the
   single-model-per-quantile design does not represent. Empty hours ran 7.6% in
   2026-08 and 19.5% in 2026-10, against 33.8% and 38.9% recorded in 2025-11 and
@@ -364,7 +410,7 @@ for the current record.
 
 The detector weights and a held-out evaluation set are committed; see
 [Run It Yourself](README.md#run-it-yourself). `data/model_release/` ships the
-fitted forecast model, the 352 held-out rows it never saw, and the metadata
+fitted forecast model, the 417 held-out rows it never saw, and the metadata
 above, so the reported accuracy can be recomputed rather than taken on trust.
 
 Full method and history: [`docs/HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md) and

@@ -373,13 +373,34 @@ from the nominal target:
 
 ![Prediction-interval calibration for the surf-count model](../analysis/surf_count_model_calibration/calibration_plot.png)
 
-Measured 2026-09-23, holding out the most recent days as a block: **15% vs 20%,
-26% vs 40%, 36% vs 60%, and 71.9% vs 80%**. Every band is overconfident — real
-counts fall outside them more often than the nominal level says — and the narrow
-bands badly so. The 80% band misses **9.4% low and 18.8% high** against a 10%
-target on each side. The low edge is about right; the high edge is where the
-model loses, which is the same mean-reversion that makes it under-call crowded
-hours.
+Re-measured 2026-10-20 on 417 held-out rows (2026-09-20 → 2026-10-19), holding
+out the most recent days as a block:
+
+| nominal | 20% | 40% | 60% | **75%** | 80% |
+|---|---:|---:|---:|---:|---:|
+| empirical coverage | 16.8% | 32.4% | 49.2% | **59.5%** | 74.8% |
+
+Every band is overconfident — real counts fall outside them more often than the
+nominal level says — and the narrow bands badly so. The 75% band is the one
+production draws; it misses **33.6% low against a 15% target** and 7.0% high
+against 10%.
+
+**The low edge is now the weak side, and that is a reversal.** The 2026-09-23
+measurement had the 80% band missing 9.4% low and 18.8% high, with the high edge
+losing. The direction flipped with the window, and the cause is visible in the
+error-by-count breakdown in [`MODEL_CARD.md`](../MODEL_CARD.md): the model runs
++4.01 surfers on hours with 0–5 actual, so the lower bound sits above actuals
+that are at or near zero.
+
+**An awkward detail worth stating.** On this same split the old q0.10 lower edge
+had not collapsed — it still fitted (at `min_samples_leaf` 200, the last
+candidate tried) and was a varying model, not a floor. Measured on these rows the
+old 80% band covers 74.8% of its target and the new 75% band only 59.5% of its.
+The collapse is real on the full record the chart fits, where every candidate
+from 20 to 200 returns a training standard deviation of 0.0000, so the chart had
+no alternative — but the band is not better calibrated for having moved, only
+more accurately labelled. The fix for the coverage itself is the hurdle model
+below, or recalibration, not another edge level.
 
 **A rule for reading any coverage number here**, learned twice the hard way:
 a coverage figure near its target is only good news once you have checked that

@@ -65,9 +65,9 @@ def test_one_source_of_truth_for_the_band():
 
     Repeating it is what broke predict_surf_count.py when the lower edge moved:
     it fitted a literal q0.10 with allow_degenerate=False and raised outright,
-    while demo_predictions.py silently printed a lower bound of zero. Both now
-    import these, and export_model_release.py deliberately does not -- it ships
-    the levels MODEL_CARD's figures were measured on.
+    while demo_predictions.py silently printed a lower bound of zero. The
+    released bundle was re-exported onto the same pair on 2026-10-20, so the
+    card's figures and the chart now describe one band.
     """
     import fit_surfer_count_model as fit
 
@@ -76,11 +76,30 @@ def test_one_source_of_truth_for_the_band():
     assert fit.BAND_LABEL == pdp.BAND_LABEL
 
     src = Path(__file__).resolve().parent.parent / "code"
-    for name in ("predict_surf_count.py", "demo_predictions.py"):
+    for name in ("predict_surf_count.py", "demo_predictions.py",
+                 "export_model_release.py"):
         body = (src / name).read_text()
         assert "BAND_LOWER_Q" in body, f"{name} should read the shared pair"
-    # The release bundle keeps its own, on purpose.
-    assert "LOWER_Q, UPPER_Q = 0.10, 0.90" in (src / "export_model_release.py").read_text()
+        assert "0.10, 0.90" not in body, f"{name} still hardcodes a band pair"
+
+
+def test_the_shipped_release_matches_the_current_band():
+    """The published bundle must describe the band the chart draws.
+
+    These drifted apart for one commit on 2026-10-20 -- the chart moved to
+    q0.15 while the bundle still shipped q0.10 -- which made every interval
+    figure in MODEL_CARD.md describe a band nobody could see.
+    """
+    import json
+
+    import fit_surfer_count_model as fit
+
+    meta = Path(__file__).resolve().parent.parent / "data" / "model_release" / "release_metadata.json"
+    if not meta.exists():
+        pytest.skip("no release bundle in this checkout")
+    q = json.loads(meta.read_text())["quantiles"]
+    assert q["lower"] == fit.BAND_LOWER_Q
+    assert q["upper"] == fit.BAND_UPPER_Q
 
 
 def test_the_median_is_still_the_middle_level():

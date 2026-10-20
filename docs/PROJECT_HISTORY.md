@@ -6003,3 +6003,76 @@ Docs brought in line with the 75% band and with what now watches it:
 rather than repeated — asserting `FAN_LEVELS` derives from it, the two labels
 agree, both command-line scripts import it, and `export_model_release.py`
 deliberately does not. 35 tests pass.
+
+### 2026-10-20 — the public release re-exported onto q0.15/q0.90
+
+The released bundle still shipped q0.10/q0.90 after the chart moved to
+q0.15/q0.90, so every interval figure in `MODEL_CARD.md` described a band
+nobody could see. Re-exported, and the card re-measured from the new bundle.
+`code/export_model_release.py` now reads `BAND_LOWER_Q`/`BAND_UPPER_Q` like
+everything else, and its coverage metric key and note are derived from the pair
+rather than naming a frozen "80pct".
+
+| | old bundle (2026-09-23) | new bundle (2026-10-20) |
+|---|---:|---:|
+| band | q0.10/q0.90 (80%) | **q0.15/q0.90 (75%)** |
+| held-out rows | 352 | **417** |
+| held-out window | 2026-08-29 → 09-21 | **2026-09-20 → 10-19** |
+| train rows | 1,242 | 1,567 |
+| MAE | 7.60 | **6.30** |
+| RMSE | 10.43 | **8.91** |
+| mean bias | −1.84 | **+1.02** |
+| interval coverage | 71.6% of 80% | **60.4% of 75%** |
+
+**None of those pairs are comparable**, and the card now says so: the band
+changed, the window moved forward a month, the record grew by 390 rows, and mean
+actual count fell from 15.9 to 12.08. The MAE improvement is mostly the easier
+window.
+
+**The re-export turned up a complication that cuts against the band change.**
+On the forward train split the old q0.10 edge had *not* collapsed. It still
+fitted — at `min_samples_leaf` 200, the last candidate — and it was a varying
+model rather than a floor, with 18.2% of actuals falling below it. Measured on
+the same 417 rows the old 80% band covers 74.8% against its target while the new
+75% band covers 59.5% against its. So:
+
+- The collapse is real where the chart fits, on all 1,984 rows, where every
+  candidate from 20 to 200 returns a training standard deviation of 0.0000. The
+  chart had no alternative.
+- But **the band is not better calibrated for having moved** — it is more
+  accurately labelled and worse covered. Raising the lower edge pushed it
+  further above a large mass of near-zero actuals.
+
+The cause is now visible in the error-by-count breakdown, which the card gained:
+
+| bucket | n | MAE | bias |
+|---|---:|---:|---:|
+| 0–5 | 149 | 4.18 | **+4.01** |
+| 5–15 | 132 | 5.77 | +3.73 |
+| 15–30 | 93 | 6.38 | −0.32 |
+| 30+ | 43 | **15.05** | **−14.74** |
+
+The model invents about four surfers on near-empty hours and loses fifteen on
+the busiest; the headline +1.02 is those cancelling. The production band now
+misses **33.6% low against a 15% target** and 7.0% high against 10% — a
+reversal of the 2026-09-23 reading (9.4% low, 18.8% high, high edge losing).
+That is the quiet-hour over-prediction, not the edge level, so the fix is the
+hurdle model or recalibration rather than another edge.
+
+**Third data point for the bias-instability claim.** The backtest bias has now
+been −1.84 and +1.02 on the same model family and the same split scheme, with
+the live record at +1.87 in between. The card's "it is lagging the level, not
+biased in a fixed direction" argument predicted this and now has a sign flip in
+the backtest itself to stand on.
+
+`analysis/surf_count_model_calibration/plot_calibration.py` gained level 0.15
+and the (0.15, 0.90) interval, so the ladder covers the band production draws
+and can be compared like for like with the bundle: 59.5% there against the
+bundle's 60.4%, the usual row-or-two difference from enforcing monotonicity
+across ten levels instead of two. Full ladder on the current record: 16.8 /
+32.4 / 49.2 / 59.5 / 74.8% against nominal 20 / 40 / 60 / 75 / 80%.
+
+Two tests added: the band pair is read rather than repeated in all three
+fitting scripts (no `0.10, 0.90` literal left in any of them), and the shipped
+`release_metadata.json` quantiles match `BAND_LOWER_Q`/`BAND_UPPER_Q`, so the
+bundle and the chart cannot drift apart again. 36 tests pass.

@@ -46,13 +46,22 @@ AXES_BG = "#111111"
 GRID = "#333333"
 TEXT = "white"
 
-# Nine levels, so coverage can be measured at every one. This is a superset
-# of code/plot_daily_prediction.py's FAN_LEVELS, which was cut to the three
-# the chart draws (0.10/0.50/0.90) on 2026-09-16 -- all
-# already-proven learnable on this dataset (see module docstring).
-LEVELS = [0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90]
-# Symmetric central intervals derivable from those 9 levels.
-INTERVALS = [(0.40, 0.60), (0.30, 0.70), (0.20, 0.80), (0.10, 0.90)]
+# Ten levels, so coverage can be measured at every one. A superset of
+# code/plot_daily_prediction.py's FAN_LEVELS, which was cut to the three the
+# chart draws on 2026-09-16 -- all already-proven learnable on this dataset
+# (see module docstring).
+#
+# 0.15 was added 2026-10-20, when the chart's lower edge moved there: without
+# it this ladder had no interval matching the band production actually draws,
+# so the two artifacts could not be compared like for like. Note the ladder
+# still fits 0.10 with allow_degenerate=False on purpose. It survives on this
+# split while the all-rows fit no longer does, and if it ever stops surviving
+# the right response is to see the error, not to paper over it with a constant.
+LEVELS = [0.10, 0.15, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90]
+# Central intervals derivable from those levels. (0.15, 0.90) is the production
+# band and is NOT symmetric, which is why it is labelled by its nominal width
+# rather than by its tails.
+INTERVALS = [(0.40, 0.60), (0.30, 0.70), (0.20, 0.80), (0.15, 0.90), (0.10, 0.90)]
 
 
 def main():
