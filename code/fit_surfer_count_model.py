@@ -242,6 +242,21 @@ QUANTILE_BASE_KWARGS = dict(max_iter=300, learning_rate=0.05, max_depth=3, l2_re
 QUANTILE_MIN_LEAF_CANDIDATES = (20, 30, 40, 50, 75, 100, 150, 200)
 QUANTILE_DEGENERATE_STD_THRESHOLD = 0.5
 
+# The band the project reports, as a (lower, upper) quantile pair, and the one
+# source of truth for it. The lower edge moved 0.10 -> 0.15 on 2026-10-20
+# because the 10th percentile of surfer_count had become exactly zero; the full
+# reasoning sits with FAN_LEVELS in code/plot_daily_prediction.py, which builds
+# its display triple from this pair. Anything that fits a band for display or
+# for a command-line prediction should use these rather than repeat the
+# numbers, which is how predict_surf_count.py came to raise and
+# demo_predictions.py came to print a floor of zero after the edge moved.
+#
+# code/export_model_release.py deliberately does NOT use these: it ships the
+# q0.10/q0.90 pair every figure in MODEL_CARD.md was measured on, and changing
+# the released bundle's band is a separate decision from changing the chart's.
+BAND_LOWER_Q, BAND_UPPER_Q = 0.15, 0.90
+BAND_LABEL = f"{round((BAND_UPPER_Q - BAND_LOWER_Q) * 100)}%"
+
 
 class ConstantQuantileModel:
     """Stand-in for a quantile level that is genuinely degenerate in this data.

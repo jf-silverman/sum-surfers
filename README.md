@@ -101,11 +101,8 @@ forecast-hours.**
 | average error, all lead times | **5.0 surfers** |
 | actual counts falling inside the prediction range | **80.3%** |
 
-The coverage figure above was measured on the 80% band used until 2026-10-20.
-From that date the band is 75% central (q0.15–q0.90): the 10th percentile of
-hourly surfer count is now exactly zero, so the old lower edge sat on the floor
-and could not be missed from below, which handed the coverage number free
-credit on 44% of scored hours. A fresh figure needs a season of the new band.
+*The coverage figure is for the 80% band in use until 2026-10-20. The range is
+now 75% — see below.*
 
 ![Forecast error and prediction-range coverage against lead time](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/forecast_accuracy.png?v=20261020)
 
@@ -120,8 +117,102 @@ really is.*
 *The most recently scored day, rebuilt and overwritten each night — the blue
 line is what was forecast the evening before, the coral line is what the
 detector counted, the shaded band is the prediction range, and the dashed
-green line is tide on the right-hand axis. This is the same chart that goes out
-in the nightly email.*
+green line is tide on the right-hand axis.*
+
+### Why the prediction range is 75% and not 80%
+
+Until 2026-10-20 the range was an 80% central interval — the 10th to 90th
+percentile of the predicted count. It is now **75%, the 15th to 90th
+percentile**, because the 10th percentile stopped carrying information.
+
+The count distribution is zero-inflated: a share of recorded hours have nobody
+out at all, and that share is **seasonal**, climbing through autumn into winter.
+
+| | 2026-07 | 2026-08 | 2026-09 | 2026-10 | 2025-11 | 2025-12 |
+|---|---:|---:|---:|---:|---:|---:|
+| hours with zero surfers | 8.0% | 7.6% | 13.0% | 19.5% | 33.8% | 38.9% |
+
+Once more than a tenth of hours are empty, the true 10th percentile of the count
+**is zero**, and a model fit to that level correctly learns to predict zero for
+every hour. The empirical quantiles say so plainly:
+
+| quantile | 0.05 | 0.10 | 0.15 | 0.20 | 0.25 |
+|---|---:|---:|---:|---:|---:|
+| surfers | 0.0 | **0.0** | 1.0 | 1.0 | 2.0 |
+
+A lower edge at zero is not merely uninformative, it is misleading about
+accuracy. **Counts are never negative, so a band floored at zero cannot be
+missed from below** — every hour scores as "inside the range" from that side for
+free. Splitting the scored record at the time of the change shows what that
+credit was worth:
+
+| | hours | coverage | missed low | missed high |
+|---|---:|---:|---:|---:|
+| lower edge pinned at zero | 1,024 (44%) | 96.6% | **0.0%** | 3.4% |
+| lower edge above zero | 1,323 | 69.3% | 22.3% | 8.4% |
+
+The headline 80.3% was a blend of a real 69% and a structurally free 97%. The
+15th percentile is the first level that still varies with the predictors, so
+that is where the lower edge moved. The published range is narrower now, and the
+coverage figure it earns will be lower — both because it is describing
+uncertainty rather than reporting a floor.
+
+**A coverage number means nothing until both edges can be missed.** This is the
+third time that lesson has cost this project a restated figure — the other two
+were a swell-data correction and a review of frames recorded outside the light
+window, both of which also moved the lower bound off zero and dropped coverage.
+
+### The collapse is now detected automatically
+
+The condition above went unnoticed for eight days in October 2026. Nothing
+failed: the band was computed, drawn and recorded exactly as designed, and a
+band with its floor on zero looks like a band. The only trace was a single line
+in a log.
+
+Two checks now run with every scored day and report when either trips:
+
+- **The lower edges of the newest forecast.** Any edge sitting at zero is
+  reported directly. This is the symptom itself rather than a proxy for it, and
+  it fires on a partial collapse as well as a total one — an earlier four-day
+  episode affected only some hours of each day.
+- **The share of empty hours**, cumulative and over the trailing 30 days,
+  against a **30% threshold**. This is the leading indicator: the share is what
+  drags the low quantiles onto the floor, and because it moves with the season
+  it gives warning before a band actually collapses.
+
+Both are deliberately cheap — two small table reads, about 11 ms, and no model
+is refitted. The check only has to decide whether the question needs looking at,
+not answer it.
+
+### What happens if the 30% threshold is crossed this winter
+
+Last winter reached 33.8% and 38.9% empty hours, so it is likely. Lowering the
+band's edge again is not the answer indefinitely; past some point the problem is
+the model's shape rather than the level being asked of it.
+
+A single quantile model is being asked to describe two different things at once:
+**whether anyone is out at all**, and **how many are out given that somebody
+is**. A **hurdle model** separates them:
+
+```
+P(count > 0)                      ->  a classifier
+quantiles of count | count > 0    ->  quantile models fit on non-empty hours only
+```
+
+and composes them back into a predictive quantile. For a target quantile q, if
+the probability of an empty hour already exceeds q the prediction is zero;
+otherwise it is the conditional quantile at `(q - p_zero) / (1 - p_zero)`. That
+gives the right answer in both regimes — genuinely zero on hours where
+emptiness is likely, a real number on hours where it is not — instead of one
+flat answer for both.
+
+It is already built and measured (`code/eval_hurdle_model.py`): **better pinball
+loss on 5 of 5 random splits** (mean 3%; pinball is the proper scoring rule for
+quantiles and, unlike coverage, cannot be bought with a floor) and better MAE on
+5 of 5. It is **not adopted**, because it moved 80% coverage the wrong way on
+3 of 5 splits — a sharper model rather than a strictly better one, and swapping
+the model family means re-exporting the released bundle. The 30% alert exists so
+that trade is revisited when the data makes it worth revisiting.
 
 ### What these numbers do not cover
 
@@ -214,7 +305,7 @@ detail and a link to the in-depth write-up.
 8. **Forecast the crowd.**
    ***A second model learns which conditions bring people out, then predicts tomorrow hour by hour with a likely range around each number.***
    Gradient-boosted trees fit the counts against those conditions: one model
-   for the expected count, two more for the edges of an 80%
+   for the expected count, two more for the edges of a 75%
    [prediction interval](docs/HOW_IT_WORKS.md#term-prediction-interval). It is
    a forecast, not a guarantee — see [forecast accuracy and calibration](docs/HOW_IT_WORKS.md#forecast-accuracy-and-calibration)
    for how often that range actually holds, measured rather than claimed.
@@ -401,8 +492,6 @@ Variables only matter once you want more than that. Copy `.env.example` to
 **Optional, everywhere:**
 
 - `MODEL_PATH` (override the default YOLO weights path)
-- `SMTP_USER` / `SMTP_APP_PASSWORD` / `EMAIL_TO` (Gmail App Password, for the
-  nightly report and storage warnings)
 - `CLIPS_DIR_LIMIT_GB` (local clip storage warning threshold, default 2.0)
 - `DETECT_MODE` / `DETECT_RECENT_DAYS` / `DETECT_START_DATE` (detection scope)
 - `SURFLINE_HISTORICAL_TOKEN` (optional override for

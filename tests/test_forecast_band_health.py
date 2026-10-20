@@ -60,6 +60,29 @@ def test_band_label_matches_the_fitted_levels():
     assert pdp.BAND_LABEL == f"{round((hi - lo) * 100)}%"
 
 
+def test_one_source_of_truth_for_the_band():
+    """Every band-fitting script reads the pair, rather than repeating it.
+
+    Repeating it is what broke predict_surf_count.py when the lower edge moved:
+    it fitted a literal q0.10 with allow_degenerate=False and raised outright,
+    while demo_predictions.py silently printed a lower bound of zero. Both now
+    import these, and export_model_release.py deliberately does not -- it ships
+    the levels MODEL_CARD's figures were measured on.
+    """
+    import fit_surfer_count_model as fit
+
+    assert pdp.FAN_LEVELS[0] == fit.BAND_LOWER_Q
+    assert pdp.FAN_LEVELS[-1] == fit.BAND_UPPER_Q
+    assert fit.BAND_LABEL == pdp.BAND_LABEL
+
+    src = Path(__file__).resolve().parent.parent / "code"
+    for name in ("predict_surf_count.py", "demo_predictions.py"):
+        body = (src / name).read_text()
+        assert "BAND_LOWER_Q" in body, f"{name} should read the shared pair"
+    # The release bundle keeps its own, on purpose.
+    assert "LOWER_Q, UPPER_Q = 0.10, 0.90" in (src / "export_model_release.py").read_text()
+
+
 def test_the_median_is_still_the_middle_level():
     # The point estimate is read as quantiles[0.50]; losing it would make the
     # forecast silently the wrong statistic.

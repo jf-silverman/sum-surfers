@@ -4,7 +4,7 @@ predict_surf_count.py
 Phase 3 of the surfer-count modeling plan: pulls live forward-looking
 predictors from Surfline (today + tomorrow, via get_surf_predictors.py's
 build_predictor_map() — no auth token needed) and outputs a surfer-count
-prediction with an 80% range, for one or more times.
+prediction with a central prediction range, for one or more times.
 
 Trains fresh, "production" versions of the GBT point + quantile models on
 ALL of data/training_features.csv (not an 80/20 split — the held-out split
@@ -29,7 +29,8 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import get_surf_predictors as sp  # noqa: E402
-from fit_surfer_count_model import load_and_prepare, fit_quantile_model_robust  # noqa: E402
+from fit_surfer_count_model import (load_and_prepare, fit_quantile_model_robust,  # noqa: E402
+                                    BAND_LOWER_Q, BAND_UPPER_Q, BAND_LABEL)
 from build_training_features import (  # noqa: E402
     simplify_weather_condition, GOOD_TIDE_MAX_FT, daylight_hours_for,
 )
@@ -49,7 +50,7 @@ def parse_args():
 def train_production_models(X, y, weather_categories):
     """Fit 10th/50th/90th quantile GBT models plus a separate mean-based (Poisson
     loss) model, on ALL rows. The MEDIAN model is the range-consistent point
-    estimate shown first — it's guaranteed to fall inside its own 80% range, which
+    estimate shown first — it's guaranteed to fall inside its own range, which
     a mean-based estimate isn't for a skewed target like this one (right-skewed
     count data: the mean sits above the median, pulled up by the long right tail of
     crowded days). The MEAN model is kept and reported alongside it (not dropped)
@@ -59,9 +60,9 @@ def train_production_models(X, y, weather_categories):
     models use fit_quantile_model_robust() — see its docstring for why a fixed
     hyperparameter combo isn't safe here (silent collapse to a near-constant
     prediction, observed twice on this dataset already)."""
-    lower_model, _ = fit_quantile_model_robust(X, y, 0.1)
+    lower_model, _ = fit_quantile_model_robust(X, y, BAND_LOWER_Q)
     median_model, _ = fit_quantile_model_robust(X, y, 0.5)
-    upper_model, _ = fit_quantile_model_robust(X, y, 0.9)
+    upper_model, _ = fit_quantile_model_robust(X, y, BAND_UPPER_Q)
     mean_model = HistGradientBoostingRegressor(loss="poisson", **MEAN_KWARGS).fit(X, y)
     return median_model, lower_model, upper_model, mean_model
 
@@ -191,7 +192,7 @@ def main():
             pct_diff = (mean_pred - point_pred) / point_pred
             if abs(pct_diff) > 0.25:
                 divergence_flag = f"  [mean/median diverge {pct_diff:+.0%} — check for growing skew]"
-        print(f"{hh_mm}: ~{point_pred:.0f} surfers [median] (80% range: {lower_pred:.0f}-{upper_pred:.0f})  "
+        print(f"{hh_mm}: ~{point_pred:.0f} surfers [median] ({BAND_LABEL} range: {lower_pred:.0f}-{upper_pred:.0f})  "
               f"mean-based: ~{mean_pred:.0f}{divergence_flag}")
         print(f"        conditions: {conditions}")
 
@@ -200,7 +201,7 @@ def main():
           f"mean-based estimate (~6.15 MAE vs ~6.96 for median — see fit_surfer_count_model.py) "
           f"is shown alongside it as a diagnostic: watch for the two drifting apart over time as "
           f"more data comes in and models improve, which would signal changing skew in the "
-          f"underlying crowd-size distribution. The 80% range's true empirical coverage varies by "
+          f"underlying crowd-size distribution. The {BAND_LABEL} range's true empirical coverage varies by "
           f"dataset snapshot — check fit_surfer_count_model.py's latest output rather than "
           f"trusting a fixed number here. Treat all of this as a directional estimate, not a "
           f"precise count.")

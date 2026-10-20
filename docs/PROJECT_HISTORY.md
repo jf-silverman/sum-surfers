@@ -5950,3 +5950,56 @@ directory and the columns), inclusive at the trigger boundary, and reports
 rather than raises on a missing or unreadable file. Also asserts
 `BAND_LABEL` still matches `FAN_LEVELS`, since a typed label is what let the
 displayed band drift from the fitted levels in the first place. 34 tests pass.
+
+### 2026-10-20 — the band change documented, and the three places it had broken
+
+Writing the band change up for the README surfaced that it had broken two
+command-line scripts, which is what repeating a constant in four files buys.
+
+- **`code/predict_surf_count.py` raised outright.** It fitted a literal q0.10
+  with `allow_degenerate=False` on all 1,984 rows, which is exactly the case
+  that now collapses at every `min_samples_leaf` candidate. The script is in the
+  README's "Run It Yourself", so it was broken for any reader following it.
+- **`code/demo_predictions.py` silently printed a floor of zero** — `[0, 42]`,
+  `[0, 24]` — because it fitted its own literal q0.10 on a split where the
+  collapse survives at leaf 200.
+- **`code/export_model_release.py` is one candidate from the same failure.** Its
+  q0.10 fit on the release split survives only at `min_samples_leaf` 200, the
+  last value tried, so a future re-export may raise. Left at 0.10 deliberately:
+  it ships the pair every interval figure in `MODEL_CARD.md` was measured on,
+  and changing the released bundle's band is a separate decision from changing
+  the chart's. Recorded in the model card and in `PROJECT_FILES.md` instead.
+
+`fit_surfer_count_model.BAND_LOWER_Q` / `BAND_UPPER_Q` / `BAND_LABEL` are now
+the single source of truth. `plot_daily_prediction.FAN_LEVELS` builds its
+display triple from the pair, and both command-line scripts read it, so the
+label cannot drift from the levels fitted. After the fix the ranges are
+informative where they should be and still zero where they should be: `[16, 42]`
+on a busy hour, `[0, 2]` on a genuinely empty one, and `predict_surf_count.py`
+prints "75% range" without the string appearing in it.
+
+Docs brought in line with the 75% band and with what now watches it:
+
+- **README** — three new subsections before "What these numbers do not cover":
+  why the range is 75% (with the seasonal empty-hour table, the empirical
+  quantiles, and the coverage split that shows 44% of scored hours were free
+  credit), what the two automatic checks are, and what the hurdle model is if
+  the 30% threshold is crossed this winter. The headline coverage row is now
+  labelled as the pre-2026-10-20 figure rather than silently restated.
+- **`docs/HOW_IT_WORKS.md`** — a zero-inflation section carrying the same
+  tables, the two checks, and the hurdle-model composition, plus a note in
+  "Known limitations" that coverage figures measured before 2026-10-20 describe
+  the older band and that `band_lower_q` separates the two eras.
+- **`MODEL_CARD.md`** — the architecture section now states that the bundle
+  ships q0.10/q0.90 while production draws q0.15/q0.90, that the card's interval
+  figures therefore describe a band production no longer draws, and that the
+  bundle's own q0.10 fit is marginal. A known-limitation bullet covers the
+  zero-inflation and the measured-but-unadopted hurdle model.
+- **Mentions of the nightly email removed from the README**, including the
+  `SMTP_*` / `EMAIL_TO` variable list entry; `.env.example` remains the full
+  reference for configuration.
+
+`tests/test_forecast_band_health.py` gained a test that the band pair is read
+rather than repeated — asserting `FAN_LEVELS` derives from it, the two labels
+agree, both command-line scripts import it, and `export_model_release.py`
+deliberately does not. 35 tests pass.

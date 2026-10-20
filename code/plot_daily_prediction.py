@@ -58,6 +58,7 @@ import get_surf_predictors as sp  # noqa: E402
 import detect_surfers as ds  # noqa: E402
 from fit_surfer_count_model import (  # noqa: E402
     load_and_prepare, fit_quantile_model_robust, split_by_day,
+    BAND_LOWER_Q, BAND_UPPER_Q,
 )
 from predict_surf_count import build_feature_row, add_tide_daylight_features, MEAN_KWARGS  # noqa: E402
 from build_training_features import simplify_weather_condition  # noqa: E402
@@ -125,7 +126,7 @@ TRAINED_HOUR_MIN, TRAINED_HOUR_MAX = 5, 20
 # 0.0000 for q0.10 at every candidate from 20 to 200). The interval is
 # therefore 75% central, not 80% -- BAND_LABEL below is derived, never typed,
 # so the chart and the table cannot drift from the levels actually fitted.
-FAN_LEVELS = [0.15, 0.50, 0.90]
+FAN_LEVELS = [BAND_LOWER_Q, 0.50, BAND_UPPER_Q]
 BAND_LABEL = f"{round((FAN_LEVELS[-1] - FAN_LEVELS[0]) * 100)}%"
 
 # How many days past today the week chart covers. The daily chart still

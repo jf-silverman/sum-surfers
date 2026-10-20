@@ -406,6 +406,53 @@ varies with the predictors. The numbers quoted above, and the 80% figures
 elsewhere in this file, describe the band as it was before that date; grouping
 `forecast_log.csv` by `band_lower_q` separates the two eras.
 
+### Zero-inflation, and why the band is 75%
+
+The reason the lower edge keeps drifting onto the floor is that the count
+distribution is **zero-inflated and seasonally so**. Empty hours by month:
+
+| | 2026-07 | 2026-08 | 2026-09 | 2026-10 | 2025-11 | 2025-12 |
+|---|---:|---:|---:|---:|---:|---:|
+| hours with zero surfers | 8.0% | 7.6% | 13.0% | 19.5% | 33.8% | 38.9% |
+
+Past roughly a tenth, the true 10th percentile of the count is zero, so a model
+fit to that level is *correct* to predict zero everywhere — "always predict 0"
+already nearly minimises the pinball loss. This is not a hyperparameter that can
+be tuned around: on the 2026-10-20 record, every `min_samples_leaf` candidate
+from 20 to 200 collapsed to a flat zero with a training standard deviation of
+0.0000. The 15th percentile is the first level that still varies with the
+predictors, which is where the band's lower edge now sits.
+
+### Two automatic checks, and the model that replaces this one if they trip
+
+The October 2026 collapse ran for eight days before anyone noticed, because
+nothing failed — the band was computed, drawn and recorded as designed, and a
+band with its floor on zero looks like a band. Two checks now run with every
+scored day:
+
+- **The lower edges of the newest forecast.** Any edge at zero is reported. The
+  symptom itself, not a proxy, and it fires on a partial collapse as well as a
+  total one — an earlier four-day episode affected only some hours per day.
+- **The share of empty hours**, cumulative and trailing 30 days, against a **30%
+  threshold**. The leading indicator, and because it moves seasonally it warns
+  before a band collapses rather than after.
+
+Both are two small table reads, about 11 ms, with no refitting: the check only
+decides whether the question needs looking at.
+
+If the 30% threshold is crossed, lowering the edge again stops being the right
+move, because the problem becomes the model's shape. One quantile model is being
+asked to describe two things at once — whether anyone is out at all, and how
+many are out given somebody is. A **hurdle model** separates them: a classifier
+for `P(count > 0)`, quantile models fit on non-empty hours only, composed back
+so that a target quantile q predicts zero when `P(empty)` exceeds q and the
+conditional quantile at `(q - p_zero) / (1 - p_zero)` otherwise. Measured in
+`code/eval_hurdle_model.py`: better pinball loss on 5 of 5 splits (pinball being
+the proper scoring rule, which unlike coverage cannot be bought with a floor)
+and better MAE on 5 of 5, but 80% coverage moves the wrong way on 3 of 5. So it
+is a sharper model rather than a strictly better one, and it stays measured and
+unadopted until the data makes the trade worth taking.
+
 Full investigation in `PROJECT_HISTORY.md`.
 
 ## Known limitations (short version)
@@ -425,6 +472,13 @@ case, a bird's *reflection*), people walking the beach, and one surfer
 occasionally split into two side-by-side boxes.
 [What isn't a surfer](non_surfer_objects.md) catalogs each one with its
 visual tell and current handling.
+
+The forecast's prediction range is **75%, not 80%** — the lower edge moved from
+the 10th to the 15th percentile on 2026-10-20, because a rising share of empty
+hours made the 10th percentile exactly zero and a band floored at zero cannot be
+missed from below. Coverage figures measured before that date describe the older
+band; grouping `data/forecasts/forecast_log.csv` by `band_lower_q` separates the
+two. See "Zero-inflation, and why the band is 75%" above.
 
 Full investigation, metrics, and known error rates are in
 `PROJECT_HISTORY.md`.

@@ -1,7 +1,7 @@
 """
 demo_predictions.py
 --------------------
-Small demo: picks 5 random held-out rows, shows the point prediction + 80%
+Small demo: picks 5 random held-out rows, shows the point prediction + the
 interval from fit_surfer_count_model.py's GBT models alongside the actual
 count and the main predictor conditions for that day/hour, so predictions
 can be eyeballed against real inputs rather than just aggregate metrics.
@@ -21,7 +21,9 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.model_selection import train_test_split
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fit_surfer_count_model import load_and_prepare, standardize, fit_quantile_model_robust  # noqa: E402
+from fit_surfer_count_model import (load_and_prepare, standardize,  # noqa: E402
+                                    fit_quantile_model_robust, BAND_LOWER_Q,
+                                    BAND_UPPER_Q, BAND_LABEL)
 
 POINT_KWARGS = dict(max_iter=300, learning_rate=0.05, max_depth=4, l2_regularization=1.0, random_state=42)
 
@@ -49,8 +51,8 @@ def main():
     X_train, X_test = standardize(X_train, X_test, numeric_cols)
 
     point_model = HistGradientBoostingRegressor(loss="poisson", **POINT_KWARGS).fit(X_train, y_train)
-    lower_model, _ = fit_quantile_model_robust(X_train, y_train, 0.1)
-    upper_model, _ = fit_quantile_model_robust(X_train, y_train, 0.9)
+    lower_model, _ = fit_quantile_model_robust(X_train, y_train, BAND_LOWER_Q)
+    upper_model, _ = fit_quantile_model_robust(X_train, y_train, BAND_UPPER_Q)
 
     pred_point = np.clip(point_model.predict(X_test), 0, None)
     pred_lower = np.clip(lower_model.predict(X_test), 0, None)
@@ -68,7 +70,7 @@ def main():
             "time": d["time_local"],
             "actual": int(d["surfer_count"]),
             "predicted": round(float(pred_point[i]), 1),
-            "range_80pct": f"[{pred_lower[i]:.0f}, {pred_upper[i]:.0f}]",
+            f"range_{BAND_LABEL.rstrip('%')}pct": f"[{pred_lower[i]:.0f}, {pred_upper[i]:.0f}]",
         }
         for col in DISPLAY_PREDICTORS:
             row[col] = d[col]

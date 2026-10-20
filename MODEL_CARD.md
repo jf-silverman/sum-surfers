@@ -195,7 +195,18 @@ ahead, from publicly available surf and weather forecasts.
 
 ### Architecture
 `HistGradientBoostingRegressor` with Poisson loss for the point estimate, plus
-two quantile models (q0.10 / q0.90) for the prediction interval. The target is
+two quantile models for the prediction interval. **This released bundle ships
+the q0.10 / q0.90 pair**, and every interval figure in this card is measured on
+that pair. The live forecast moved its lower edge to **q0.15 on 2026-10-20** — a
+75% central interval — because the 10th percentile of hourly surfer count has
+become exactly zero as the share of empty hours rises seasonally; see the README
+section "Why the prediction range is 75% and not 80%". Two consequences for
+anyone re-exporting this bundle: the interval numbers below describe an 80% band
+that production no longer draws, and the q0.10 fit here is now marginal — on the
+current record it survives only at `min_samples_leaf` 200, the last candidate
+`fit_quantile_model_robust` tries, so the next export may raise rather than
+silently ship a flat zero. That is the intended behaviour: calibration and
+release code keep `allow_degenerate=False`, and only display code opts in. The target is
 `round(frame_count_mean)` — the rounded mean of the three frames cut at
 1.0/2.5/4.0 s. The Poisson objective is load-bearing: squared
 error costs **+0.43 MAE** on 16 rolling origins (p < 0.05, better on only 3 of
@@ -301,6 +312,16 @@ for the current record.
 - **Prediction intervals are overconfident at every level** — measured coverage
   15/26/36/71.9% against nominal 20/40/60/80%. The 80% band misses 9.4% low and
   18.8% high against a 10% target on each side; the high edge is where it loses.
+- **The count distribution is zero-inflated, and seasonally so**, which the
+  single-model-per-quantile design does not represent. Empty hours ran 7.6% in
+  2026-08 and 19.5% in 2026-10, against 33.8% and 38.9% recorded in 2025-11 and
+  2025-12. Past roughly a tenth, the true 10th percentile is zero and the lowest
+  quantile levels stop carrying information — which is why the live band's lower
+  edge moved to q0.15. A hurdle model (P(anyone out) times the count quantiles
+  fit on non-empty hours only, `code/eval_hurdle_model.py`) scores better on
+  pinball loss on 5 of 5 splits but moves 80% coverage the wrong way on 3 of 5,
+  so it is measured and not adopted. An automatic check reports when empty hours
+  pass 30%, which is the point that trade is meant to be revisited.
 - **It is predictor-limited, not algorithm-limited.** Every model family and a
   72-combination hyperparameter grid landed within noise of each other.
   Measured and rejected on rolling origins: previous-day lags, lunar tide
