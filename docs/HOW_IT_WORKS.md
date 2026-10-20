@@ -394,6 +394,18 @@ which now sits under 1 surfer for 22% of hours instead of 72%. Coverage fell fro
 2026-09-08, when correcting the swell data moved the lower bound off zero and
 dropped coverage from 82.8% to 72%.
 
+**It happened a third time, and the fix was different.** From the 2026-10-12
+refit the lower edge pinned at zero on every hour again — but this time the data
+was right and the level was wrong. The empirical 10th percentile of hourly
+surfer count is now exactly 0.00, because the share of empty hours is seasonal
+and rising into winter (7.6% in 2026-08, 19.5% in 2026-10, against 33.8% and
+38.9% in 2025-11 and 2025-12), so a flat zero is the correct 10th percentile
+rather than a failed fit. On 2026-10-20 the band's lower edge moved to **q0.15,
+making the interval 75% central rather than 80%** — the first level that still
+varies with the predictors. The numbers quoted above, and the 80% figures
+elsewhere in this file, describe the band as it was before that date; grouping
+`forecast_log.csv` by `band_lower_q` separates the two eras.
+
 Full investigation in `PROJECT_HISTORY.md`.
 
 ## Known limitations (short version)

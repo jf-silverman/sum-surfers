@@ -94,6 +94,17 @@ def build():
         else bool(r["lower_q10"] <= r["actual"] <= r["upper_q90"]), axis=1)
     merged["band_width"] = merged["upper_q90"] - merged["lower_q10"]
 
+    # Which nominal band each row's edges came from. Written by
+    # plot_daily_prediction.forecast_row from 2026-10-20 on, when the lower
+    # edge moved 0.10 -> 0.15; every forecast file written before that used
+    # 0.10/0.90, so filling the gap with those values is a statement of fact,
+    # not a guess, and it keeps the column complete enough to group by.
+    # Coverage pooled across the two eras compares different nominal bands --
+    # scope to one with band_lower_q before quoting a coverage number.
+    for col, was in (("band_lower_q", 0.10), ("band_upper_q", 0.90)):
+        merged[col] = (was if col not in merged.columns
+                       else merged[col].fillna(was))
+
     # Week files record lead_days themselves; day-ahead files carry the time the
     # forecast was made, so derive it there and keep whatever is already present.
     existing_lead = merged["lead_days"] if "lead_days" in merged.columns else None
@@ -113,6 +124,7 @@ def build():
 
     front = ["date", "hour_local", "hour", "forecast_kind", "lead_days",
              "predicted", "lower_q10", "upper_q90",
+             "band_lower_q", "band_upper_q",
              "band_width", "actual", "actual_clips", "error", "abs_error",
              "inside_band"]
     rest = [c for c in merged.columns if c not in front]

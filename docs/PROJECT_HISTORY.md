@@ -5841,3 +5841,77 @@ anchors on the first and the paired difference collapses. Built by
 `code/make_protocol_review.py`; protocol in that folder's
 `counting-protocol-review.md`. Paired, n = 30 detects 0.53 × SD ≈ 1.32 surfers
 against an effect of about 3.3.
+
+### 2026-10-20 — the forecast's lower band edge moved q0.10 → q0.15
+
+Every band printed since the 2026-10-12 refit had `lower_q10 = 0` on every
+hour. Not the lead-time widening added in October — that factor is 1.023 at
+lead 1, which cannot move a 23.8-surfer prediction to zero. The cached q0.10
+model had collapsed to a constant:
+
+```
+data/model_cache/chart_models.joblib   fitted_at 2026-10-12T20:31:39
+  q0.1: ConstantQuantileModel   degenerate=True   value=0.0
+```
+
+This is the collapse `fit_quantile_model_robust` is built to detect, and
+`plot_daily_prediction` opts into it deliberately with `allow_degenerate=True`.
+It was not a mis-fit. The empirical 10th percentile of `surfer_count` is now
+exactly 0.00, so a flat zero is the correct answer at that level:
+
+| q | 0.05 | 0.10 | 0.15 | 0.20 | 0.25 |
+|---|---:|---:|---:|---:|---:|
+| value | 0.0 | **0.0** | 1.0 | 1.0 | 2.0 |
+
+The share of empty hours is seasonal and climbing into winter — 8.0% in
+2026-07, 7.6% in 2026-08, 13.0% in 2026-09, **19.5% in 2026-10**, against
+33.8% and 38.9% recorded in 2025-11 and 2025-12. That explains the earlier
+four-day episode (forecasts made 09-30 to 10-03) which recovered on its own on
+10-04: it was marginal then. It is not marginal now. Refitting on today's 1,984
+rows collapses at **every** `min_samples_leaf` candidate from 20 to 200, with a
+training std of 0.0000, so the condition would not have self-healed.
+
+**Why it mattered more than the chart.** A floor at zero cannot be missed from
+below, because counts are never negative, so it hands the coverage metric free
+credit — the trap `fit_quantile_intervals`' own docstring warns about. Across
+the 2,347 scored hours then in `forecast_log.csv`:
+
+| | n | coverage | miss low | miss high |
+|---|---:|---:|---:|---:|
+| lower edge pinned at 0 | 1,024 (44%) | 96.6% | **0.0%** | 3.4% |
+| lower edge above 0 | 1,323 | 69.3% | 22.3% | 8.4% |
+
+The headline coverage was a blend of a real 69% and a structurally free 97%.
+`calibrate_lead_bands.py` fits its widening factors off `lower_q10` in that
+log, so its `raw_required_k` of 1.0 at lead 1 is partly this artifact rather
+than a calibrated band — the lead-band question wants re-running once a season
+of two-sided bands exists.
+
+**The change.** `FAN_LEVELS` lower edge 0.10 → 0.15 — the first level that
+still learns anything (fits at `min_samples_leaf` 20, training std 5.36). The
+interval is now 75% central, and `BAND_LABEL` is derived from `FAN_LEVELS`
+rather than typed, so the chart legend, the side table and the email cannot
+drift from the levels actually fitted. A forced refit produced lower edges of
+0.70 to 13.62 across the day instead of thirteen zeros.
+
+Three things worth recording about the edges of this change:
+
+- `reconstruct_forecast` in `email_daily_report.py` indexed `q[0.10]` as a
+  literal and would have raised `KeyError` on the first day with no recorded
+  forecast. Now reads `pdp.FAN_LEVELS[0]`.
+- The CSV column names stay `lower_q10` / `upper_q90`: five readers address
+  them by name and `forecast_log.csv` holds 2,347 scored rows under them.
+  The levels are recorded beside them in new `band_lower_q` / `band_upper_q`
+  columns, so the seam is visible and a coverage number can be scoped to one
+  era instead of silently pooling two nominal bands. `build_forecast_log.py`
+  fills pre-2026-10-20 rows with 0.10/0.90, which is what they were.
+- The email label is read off the forecast FILE, not off today's constant, so
+  re-scoring an August day still calls its band 80%. Verified on 2026-10-19,
+  which still reports "14 of 14 hours inside the 80% range" with every lower
+  edge at 0 — the old behaviour, preserved, and a fair illustration of why it
+  needed changing.
+
+**Not adopted: the hurdle model** (option 2, `code/eval_hurdle_model.py`,
+already measured 2026-09-22 — better pinball on 5 of 5 seeds but 80% coverage
+moves the wrong way on 3 of 5). Still Joel's call; q0.15 is the smaller change
+and does not alter the model family or require re-exporting the public release.

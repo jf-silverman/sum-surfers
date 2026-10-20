@@ -2,8 +2,8 @@
 plot_daily_prediction.py
 --------------------------
 Generates the daily surfer-count prediction chart (point estimate = median
-GBT model, a shaded 80% prediction interval from the fitted q0.10/q0.90
-models, an 80% range side table, tide overlay, weather-coded markers,
+GBT model, a shaded central prediction interval from the two fitted edge
+quantiles in FAN_LEVELS, a matching range side table, tide overlay, weather-coded markers,
 night-hour shading, model/detector info footer, per-hour 1-5 crowd level) to
 data/charts/surfer_count_YYYY-MM-DD.png, a 7-day crowd outlook
 (data/charts/latest_week.png — a day x hour grid of crowd levels, see
@@ -103,15 +103,30 @@ DETECTOR_RECALL = 0.81342  # = sensitivity
 TRAINED_HOUR_MIN, TRAINED_HOUR_MAX = 5, 20
 
 # Prediction-interval quantile levels the chart is built from: just the three
-# it actually draws -- the 80% interval's two edges and the median
-# (0.50 = median = point estimate). The 10%-90% span (an 80% central
-# prediction interval) replaced the old fixed 33%/66% bands per Joel's
-# request. It used to fit nine levels and render a 40-band interpolated
-# gradient; Joel found that too busy (2026-09-16), and nine fits cost nine
-# models a run. The nine-level ladder still lives in
+# it actually draws -- the central interval's two edges and the median
+# (0.50 = median = point estimate). A central interval replaced the old fixed
+# 33%/66% bands per Joel's request. It used to fit nine levels and render a
+# 40-band interpolated gradient; Joel found that too busy (2026-09-16), and
+# nine fits cost nine models a run. The nine-level ladder still lives in
 # analysis/surf_count_model_calibration/plot_calibration.py, which needs the
 # full ladder to measure coverage at every level.
-FAN_LEVELS = [0.10, 0.50, 0.90]
+#
+# The lower edge moved 0.10 -> 0.15 on 2026-10-20. The 10th percentile of
+# surfer_count is now exactly 0.00 -- 14.9% of recorded hours are empty, and
+# the share is seasonal (7.6% in 2026-08, 19.5% in 2026-10, 33.8% and 38.9%
+# in 2025-11 and 2025-12) -- so the q0.10 model correctly collapses to a flat
+# zero and every band printed since the 2026-10-12 refit had lower_q10 = 0 on
+# every hour. A floor at zero cannot be missed from below, because counts are
+# never negative, so it hands the coverage metric free credit: across the
+# 2,347 scored hours in forecast_log.csv the 1,024 with a pinned lower edge
+# showed 96.6% coverage and 0.0% misses low, against 69.3% and 22.3% for the
+# rest. 0.15 is the first level that still learns anything (empirical q0.15 =
+# 1.0; it fits at min_samples_leaf 20 with a training std of 5.36, against
+# 0.0000 for q0.10 at every candidate from 20 to 200). The interval is
+# therefore 75% central, not 80% -- BAND_LABEL below is derived, never typed,
+# so the chart and the table cannot drift from the levels actually fitted.
+FAN_LEVELS = [0.15, 0.50, 0.90]
+BAND_LABEL = f"{round((FAN_LEVELS[-1] - FAN_LEVELS[0]) * 100)}%"
 
 # How many days past today the week chart covers. The daily chart still
 # targets tomorrow alone; this is the outlook chart's span (tomorrow through
@@ -367,7 +382,7 @@ def main():
     ax = fig.add_subplot(gs[0], facecolor=AXES_BG)
     ax_table = fig.add_subplot(gs[1], facecolor=AXES_BG)
 
-    y_top = d["quantiles"].apply(lambda q: q[0.90]).max() * 1.18
+    y_top = d["quantiles"].apply(lambda q: q[FAN_LEVELS[-1]]).max() * 1.18
     ax.set_ylim(bottom=0, top=y_top)
 
     for _, row in d.iterrows():
@@ -379,15 +394,16 @@ def main():
             ax.axvspan(row["hour"] - timedelta(minutes=30), row["hour"] + timedelta(minutes=30),
                        facecolor=CORAL, alpha=0.12, hatch="xx", edgecolor=CORAL, linewidth=0, zorder=0)
 
-    # One shaded 80% prediction interval, q0.10 to q0.90. This replaced a
+    # One shaded central prediction interval, FAN_LEVELS[0] to FAN_LEVELS[-1].
+    # This replaced a
     # 40-band alpha gradient interpolated across nine fitted quantiles
     # (2026-09-16): it looked like more information than the model has, and
     # the extra bands were reading as busy rather than informative.
     ax.fill_between(d["hour"],
-                    d["quantiles"].apply(lambda q: q[0.10]),
-                    d["quantiles"].apply(lambda q: q[0.90]),
+                    d["quantiles"].apply(lambda q: q[FAN_LEVELS[0]]),
+                    d["quantiles"].apply(lambda q: q[FAN_LEVELS[-1]]),
                     color=AQUA, alpha=0.22, linewidth=0, zorder=2)
-    fan_patch = Patch(facecolor=AQUA, alpha=0.22, label="80% prediction interval")
+    fan_patch = Patch(facecolor=AQUA, alpha=0.22, label=f"{BAND_LABEL} prediction interval")
     ax.plot(d["hour"], d["point"], color=AQUA, linewidth=2.5, zorder=3, label="Median")
 
     for wx in ["CLEAR", "CLOUDY_OVERCAST", "RAIN", "FOG"]:
@@ -486,13 +502,14 @@ def main():
         text.set_color(TEXT_COLOR)
     ax.grid(alpha=0.25, color=GRID_COLOR)
 
-    # Table panel: hour -> point prediction -> 80% range, rendered as part of
+    # Table panel: hour -> point prediction -> central range, rendered as part of
     # the same figure/image rather than a separate markdown table, so chart and
     # table always render side by side. The point column was added 2026-09-16;
     # before that the table showed only the range, which left the reader no
     # single number to act on.
     ax_table.axis("off")
-    ax_table.set_title("Predicted count, 80% range, crowd level", fontsize=10, pad=10, color=TEXT_COLOR)
+    ax_table.set_title(f"Predicted count, {BAND_LABEL} range, crowd level",
+                       fontsize=10, pad=10, color=TEXT_COLOR)
     # The Crowd column is read off the RATING_QUANTILE reading of the same
     # fitted quantiles, not off the Predicted column beside it — see
     # code/crowd_rating.py for why, and code/eval_crowd_rating.py for the
@@ -500,11 +517,11 @@ def main():
     # the point: the median under-reports crowded hours.
     cell_text = [[row["hour"].strftime("%-I:%M %p"),
                   f"{row['point']:.0f}",
-                  f"{row['quantiles'][0.10]:.0f}–{row['quantiles'][0.90]:.0f}",
+                  f"{row['quantiles'][FAN_LEVELS[0]]:.0f}–{row['quantiles'][FAN_LEVELS[-1]]:.0f}",
                   f"{row['crowd_level']} {level_info(row['crowd_level'])['name']}"]
                  for _, row in d.iterrows()]
     table_h = min(0.95, 0.062 * (len(cell_text) + 1))
-    tbl = ax_table.table(cellText=cell_text, colLabels=["Time", "Count", "80% range", "Crowd"],
+    tbl = ax_table.table(cellText=cell_text, colLabels=["Time", "Count", f"{BAND_LABEL} range", "Crowd"],
                           cellLoc="center", bbox=[0.0, 0.96 - table_h, 1.0, table_h])
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(8.5)
@@ -768,8 +785,19 @@ def forecast_row(target_date, r):
         "date": target_date.isoformat(),
         "hour_local": r["hour"].strftime("%H:%M"),
         "predicted": round(r["point"], 2),
+        # The column NAMES are frozen at the original q10/q90 because five
+        # readers address them by name (email_daily_report, build_forecast_log,
+        # plot_accuracy_charts, calibrate_lead_bands, plot_daily_prediction's
+        # own week record) and forecast_log.csv holds 2,347 scored rows under
+        # them. The levels they actually carry are written beside them, so the
+        # 2026-10-20 change of lower edge (0.10 -> 0.15, see FAN_LEVELS) is a
+        # visible seam in the record rather than a silent one: any coverage
+        # number pooled across it is mixing two different nominal bands, and
+        # band_lower_q is how a later analysis scopes to one era.
         "lower_q10": round(q[FAN_LEVELS[0]], 2),
         "upper_q90": round(q[FAN_LEVELS[-1]], 2),
+        "band_lower_q": FAN_LEVELS[0],
+        "band_upper_q": FAN_LEVELS[-1],
         "weather_simple": r["weather_simple"],
         "tide_ft": round(r["tide_ft"], 2),
         "in_training_range": r["in_training_range"],
@@ -817,7 +845,7 @@ LEAD_CALIBRATION_PATH = _PROJECT_ROOT / "data" / "forecasts" / "lead_band_calibr
 
 
 def load_lead_band_factors():
-    """{lead: multiplier} for widening the 80% band further out, or {} if absent.
+    """{lead: multiplier} for widening the central band further out, or {} if absent.
 
     Produced by code/calibrate_lead_bands.py from the scored record. Absent file
     means no correction rather than an error: a fresh clone has nothing to
@@ -969,7 +997,7 @@ def generate_week_chart(made_date, day_records, n_train_rows):
     """The 7-day outlook, as its OWN chart rather than a widened daily chart.
 
     Why separate: the daily chart already carries an hourly median line, a
-    shaded 80% band, a tide curve on a second axis, per-hour weather markers
+    shaded central band, a tide curve on a second axis, per-hour weather markers
     and labels, night shading and a side table, at a width the README embeds
     fixed. Seven days of that is roughly a hundred hourly points and seven
     tide curves in the same space — the fan and the labels would be illegible

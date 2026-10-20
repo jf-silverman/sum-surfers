@@ -2,7 +2,7 @@
 Evening email: the day's forecast with the day's actual counts drawn over it.
 
 Answers one question each night — how did today's forecast actually do? The
-chart shows the forecast (median line and 80% band) with the real hourly
+chart shows the forecast (median line and central band) with the real hourly
 detection counts plotted on top, so the misses are visible rather than
 summarized.
 
@@ -84,12 +84,20 @@ def load_recorded_forecast(target_date):
     if not path.exists():
         return None
     fc = pd.read_csv(path)
+    # The nominal band this file was written with. Forecast files from before
+    # 2026-10-20 have no band_* columns and used q0.10/q0.90, so the label is
+    # read off the file rather than off today's FAN_LEVELS: re-scoring an
+    # August day must still call its band 80%, because that is what it was.
+    lo_q = float(fc["band_lower_q"].iloc[0]) if "band_lower_q" in fc else 0.10
+    hi_q = float(fc["band_upper_q"].iloc[0]) if "band_upper_q" in fc else 0.90
+    band_label = f"{round((hi_q - lo_q) * 100)}%"
     rows = []
     for _, r in fc.iterrows():
         hh, mm = map(int, str(r["hour_local"]).split(":")[:2])
         rows.append(dict(
             hour=datetime(target_date.year, target_date.month, target_date.day, hh, mm),
-            point=float(r["predicted"]), lower=float(r["lower_q10"]), upper=float(r["upper_q90"])))
+            point=float(r["predicted"]), lower=float(r["lower_q10"]), upper=float(r["upper_q90"]),
+            band_label=band_label))
     made_at = str(fc["forecast_made_at"].iloc[0]) if "forecast_made_at" in fc else "unknown"
     return rows, made_at
 
@@ -129,7 +137,8 @@ def reconstruct_forecast(target_date):
             running = max(running, float(models[lv].predict(x1)[0]))
             q[lv] = running
         rows.append(dict(hour=datetime(target_date.year, target_date.month, target_date.day, hour, 0),
-                         point=q[0.50], lower=q[0.10], upper=q[0.90]))
+                         point=q[0.50], lower=q[pdp.FAN_LEVELS[0]],
+                         upper=q[pdp.FAN_LEVELS[-1]], band_label=pdp.BAND_LABEL))
     return sorted(rows, key=lambda r: r["hour"]), None
 
 
@@ -298,7 +307,7 @@ def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path, tide
         ax.fill_between(fh, [r["lower"] for r in forecast_rows],
                         [r["upper"] for r in forecast_rows],
                         color=pdp.AQUA, alpha=0.22, linewidth=0,
-                        label="Forecast 80% range")
+                        label=f"Forecast {forecast_rows[0]['band_label']} range")
         ax.plot(fh, [r["point"] for r in forecast_rows], color=pdp.AQUA,
                 linewidth=2.5, label="Forecast")
 
@@ -407,7 +416,9 @@ def hourly_table_html(forecast_rows, actuals):
             + "".join(f'<th style="padding:6px 10px;text-align:{a};border-bottom:2px solid #444;'
                       f'font-family:system-ui,sans-serif;font-size:13px;">{h}</th>'
                       for h, a in [("Hour", "left"), ("Counted", "right"), ("Forecast", "right"),
-                                   ("80% range", "right"), ("", "left")])
+                                   (f"{forecast_rows[0]['band_label']} range"
+                                    if forecast_rows else "range", "right"),
+                                   ("", "left")])
             + "</tr>")
 
     by_hour = {r["hour"].hour: r for r in forecast_rows} if forecast_rows else {}
@@ -512,7 +523,8 @@ def main():
                   "real recorded forecast.")
     headline = (f"Average miss {stats['mae']:.1f} surfers, bias {stats['bias']:+.1f} "
                 f"({'over' if stats['bias'] > 0 else 'under'}-forecast), "
-                f"{stats['inside']} of {stats['n']} hours inside the 80% range."
+                f"{stats['inside']} of {stats['n']} hours inside the "
+                f"{forecast_rows[0]['band_label']} range."
                 if stats else
                 (f"{len(actuals)} hours counted, {int(max(a[1] for a in actuals))} at the busiest. "
                  f"No forecast comparison available for this day." if actuals

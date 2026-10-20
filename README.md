@@ -27,17 +27,17 @@ This project collects images from a shoreline video camera and tries to answer t
 #### A Full Day of Surfer Detections: Monday, October 19, 2026
 
 Each green box below contains a surfer, according to the object detection model.  Look carefully and you may find additional surfers that the model missed or other objects which are misclassified as surfers - like the wind sock at the bottom center of the photo.  Birds, reflections, people on the beach and sun glare fool it too: [what isn't a surfer](docs/non_surfer_objects.md) catalogs each one, how to tell it apart, and what the pipeline does about it.  **Each hour is shown twice: first the bare frame, so you can hunt for the surfers yourself as small dark specks, then the same frame with the model's boxes drawn.**  Try it before the boxes appear - it shows how hard these are to see, which is the whole problem the model is solving.  Each frame shows the camera's full width, the same strip the pipeline counts, so the number printed is the whole count for that hour.
-![Detections through Monday, October 19, 2026](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_detection.gif?v=20261019)
+![Detections through Monday, October 19, 2026](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_detection.gif?v=20261020)
 
-#### The Surfer Crowd Forecast for: Tuesday, October 20, 2026
+#### The Surfer Crowd Forecast for: Wednesday, October 21, 2026
 
 Once enough hours and days were gathered along with weather and surf conditions, a surf count prediction model was built to forecast how many surfers would be present at each hour for the coming day.  This is useful for surfers to plan to avoid busy times or at least know what to expect.  The forecast still runs about one surfer low on average, and it misses by about five surfers in a typical hour - crowds depend on plenty of things the weather and surf data never see.  The detector underneath it used to undercount badly in fog and glare, which made the forecast worse; that was fixed in September 2026 by labeling those conditions and retraining, so what remains is the prediction model's own error.  The right-hand column rates each hour from 1 (near-empty) to 5 (packed), using the five equal slices of every hour the camera has counted so far.  [How to Read This Chart](#how-to-read-the-daily-chart)
-![Latest daily prediction chart](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest.png?v=20261019)
+![Latest daily prediction chart](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest.png?v=20261020)
 
-#### The Week Ahead: October 20 - October 26, 2026
+#### The Week Ahead: October 21 - October 27, 2026
 
 The same model, run out to a week. Every hour gets a crowd level from 1 (near-empty) to 5 (packed); the levels are the five equal slices of every hour the camera has counted so far, so level 3 is literally an average hour and level 5 is the busiest fifth of them. The number in each cell is the predicted count, and the colour is the level. The level is not read off that number: the forecast pulls toward the middle, so the middle of its range under-calls busy hours, and the level comes from a point higher up the range that was measured to catch them. Surf and weather data run the full seven days, but a forecast seven days out is still a forecast seven days out - read the far right of the grid as a shape, not a number.
-![Crowd outlook for the week ahead](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_week.png?v=20261019)
+![Crowd outlook for the week ahead](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_week.png?v=20261020)
 
 <!-- DAILY_CHART_END -->
 <!-- ====================================================================
@@ -63,7 +63,7 @@ model's own validation set. **220 frames across 16 days spanning a full year,
 | recall — of the surfers really there, how many it found | **91.9%** |
 | average count error | **1.5 surfers** per frame |
 
-![Detector count against a hand count, one point per reviewed frame](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/detector_accuracy.png?v=20261019)
+![Detector count against a hand count, one point per reviewed frame](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/detector_accuracy.png?v=20261020)
 
 > **Why the daily chart's caption shows lower numbers.** That caption reports
 > **88.5% precision / 81.3% recall**, measured by the training framework on its
@@ -99,21 +99,27 @@ forecast-hours.**
 |---|---|
 | average error, one day ahead | **4.4 surfers** |
 | average error, all lead times | **5.0 surfers** |
-| actual counts falling inside the 80% range | **80.3%** |
+| actual counts falling inside the prediction range | **80.3%** |
 
-![Forecast error and prediction-range coverage against lead time](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/forecast_accuracy.png?v=20261019)
+The coverage figure above was measured on the 80% band used until 2026-10-20.
+From that date the band is 75% central (q0.15–q0.90): the 10th percentile of
+hourly surfer count is now exactly zero, so the old lower edge sat on the floor
+and could not be missed from below, which handed the coverage number free
+credit on 44% of scored hours. A fresh figure needs a season of the new band.
+
+![Forecast error and prediction-range coverage against lead time](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/forecast_accuracy.png?v=20261020)
 
 *Error grows the further ahead the forecast is made, which is expected. The
-right-hand panel is the more useful caveat: the 80% prediction range holds up
+right-hand panel is the more useful caveat: the prediction range holds up
 a day or two out and stops holding by seven, where it catches 63% of actual
 counts instead of 80%. Treat a seven-day band as narrower than the uncertainty
 really is.*
 
-![Forecast vs. actual surfer counts for the most recently scored day, with tide](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_forecast_vs_actual.png?v=20261019)
+![Forecast vs. actual surfer counts for the most recently scored day, with tide](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_forecast_vs_actual.png?v=20261020)
 
 *The most recently scored day, rebuilt and overwritten each night — the blue
 line is what was forecast the evening before, the coral line is what the
-detector counted, the shaded band is the 80% prediction range, and the dashed
+detector counted, the shaded band is the prediction range, and the dashed
 green line is tide on the right-hand axis. This is the same chart that goes out
 in the nightly email.*
 
@@ -492,7 +498,7 @@ plotting/analysis scripts that investigation produced — see
 - **Shaded band + side table** — the model's
   [prediction interval](docs/HOW_IT_WORKS.md#term-prediction-interval): the
   range the real count is expected to fall in on most days, shown as a single
-  shaded 80% band around the line and repeated as plain numbers in the table,
+  shaded central band around the line and repeated as plain numbers in the table,
   where the "Predicted" column is that hour's single best guess and "Range" is
   the band. **It isn't perfectly calibrated** — see
   [forecast accuracy and calibration](docs/HOW_IT_WORKS.md#forecast-accuracy-and-calibration) for the real, measured accuracy
