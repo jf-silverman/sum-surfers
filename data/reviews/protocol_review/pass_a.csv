@@ -1,31 +1,31 @@
 image,my_count,my_ci_plusminus,notes
-A01.png,,,
-A02.png,,,
-A03.png,,,
-A04.png,,,
-A05.png,,,
-A06.png,,,
-A07.png,,,
-A08.png,,,
-A09.png,,,
-A10.png,,,
-A11.png,,,
-A12.png,,,
-A13.png,,,
-A14.png,,,
-A15.png,,,
-A16.png,,,
-A17.png,,,
-A18.png,,,
-A19.png,,,
-A20.png,,,
-A21.png,,,
-A22.png,,,
-A23.png,,,
-A24.png,,,
-A25.png,,,
-A26.png,,,
-A27.png,,,
-A28.png,,,
-A29.png,,,
-A30.png,,,
+A01.png,8,0,shore heads at bottom
+A02.png,29,0,
+A03.png,1,0,
+A04.png,5,0,shore head at bottom
+A05.png,12,0,
+A06.png,31,2,shore head at bottom
+A07.png,2,1,shore head at bottom.  There is also a bit of what may be a surfer head at bottom left 2(+1/-0)
+A08.png,45,2,shore heads at bottom
+A09.png,12,1,shore head at bottom
+A10.png,0,0,
+A11.png,34,1,Shore head at bottom. There is a bird flying near right edge. note for non-surfer differentiation.
+A12.png,34,0,
+A13.png,21,2,shore heads at bottom
+A14.png,49,2,
+A15.png,2,0,lot of shore heads at bottom.
+A16.png,2,0,shore heads at bottom
+A17.png,42,2,shore head at bottom
+A18.png,5,0,shore heads at bottom
+A19.png,22,2,foggier on left. Not sure this frame should be used. Shore head at bottom. Claude: you can assume shore head means shore head at bottom of frame.
+A20.png,35,3,"grainy, low horizon light"
+A21.png,47,4,there are some background objects (probably small waves plus kelp at surface)) that look almost the same as side-view prone surfers.  Telling them apart at this distance near top is very tricky.
+A22.png,71,4,"has kelp waves at top of frame, but easier to tell in this one, probably because more light / less grainy.  "
+A23.png,12,0,
+A24.png,7,2,There are shore heads - one of which is overlapping w/ a surfer.  Two objects further out are small blobs.  7 (+0/-2).
+A25.png,7,1,hazy image; some condensation on lens
+A26.png,57,3,shore heads
+A27.png,0,0,shore head
+A28.png,19,2,shore heads
+A29.png,36,3,shore heads
+A30.png,34,0,some condensation on lens
