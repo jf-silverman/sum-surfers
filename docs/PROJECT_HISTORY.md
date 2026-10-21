@@ -6076,3 +6076,78 @@ Two tests added: the band pair is read rather than repeated in all three
 fitting scripts (no `0.10, 0.90` literal left in any of them), and the shipped
 `release_metadata.json` quantiles match `BAND_LOWER_Q`/`BAND_UPPER_Q`, so the
 bundle and the chart cannot drift apart again. 36 tests pass.
+
+### 2026-10-20 — the counting-protocol review: the 11% does not reproduce
+
+Both passes of the paired review came back (30 frames, direct count then
+box-by-box, generated 2026-10-18 and 2026-10-19). The review was built to
+settle whether the direct count (`spotcheck`) reads about 11% low against
+box-assisted counting (`reviewdays`, CVAT), because that single bias was enough
+to flip `spotcheck` from rejecting the crowd-dependent detection rules to
+endorsing them.
+
+**It does not reproduce.** On the same frames counted both ways, the direct
+count did not read low. The `spotcheck` −3.27 was a property of that sitting or
+of its frames, not a protocol bias in the direction assumed, so the argument
+that was going to unblock `CROWD_THRESH_SCHEDULE` and
+`CONTAINMENT_DENSITY_SLOPE` is gone. **Both rules stay off.** This is the
+outcome the review doc listed as "the two agree — the rules stay off until there
+is a better reason."
+
+**What the review does not settle is the size or direction of any residual
+gap, and the numbers should not be quoted as if it did.** The paired difference
+ran the other way (box-by-box slightly *below* the direct count), but it is
+inside the noise:
+
+- 15 of 30 frames tied exactly, and seven frames carry the whole result.
+- All of the signal sits in the crowded strata (A≥20: Wilcoxon p=0.007; A<20:
+  p=0.26), where the reviewer's own stated ± averages 2.00 against a mean
+  absolute difference of 1.93 — the gap is the size of the declared
+  uncertainty.
+- 22 of 30 frames agree within that stated ±; 26 of 30 once the correction
+  below is applied, which takes the sign test to p=0.065.
+- Settling a 0.5-count gap at 80% power would need about 111 frames plus a
+  retest arm, for a quantity now bounded well below the 3.5-count swing that
+  made it matter.
+
+**Two flaws in the review design, both mine.** First, the sheet had no column
+for a box covering more than one surfer, so the reviewer recorded those in prose
+and — correctly, since there was nowhere to put them — left them out of the
+missed-surfer count. Fifteen boxes carry such a note: ten flat "2 surfers", two
+hedged, two speculative, and one "several". One box runs the other way
+(`B24`/27, the same surfer as box 25, both marked `y`). So the box-by-box total
+undercounts by at least 12 of 650, and restoring it is what moves the sign test
+to p=0.065. **`reviewdays` has the same hole** — its truth is `TP + missed`,
+with no slot for two surfers under one box — which biases the historical
+`reviewdays` +0.27 low by roughly the same mechanism, and `reviewdays` is the
+protocol that endorsed the rules.
+
+Second, nothing was counted twice in the same mode, so there is no intra-rater
+noise floor and the observed SD of 1.88 mixes protocol effect with the
+reviewer's own stochasticity. The blind-adjudication design called for 10%
+repeats for exactly this; passes A and B have none.
+
+**The detector numbers from pass B stand on their own**, since they do not
+depend on the A-vs-B comparison: box precision 97.9% (603 of 616 judged boxes),
+recall 92.6% against surfers with no box at all, 90.9% once in-box extras count
+as misses. The detector runs −1.13 per frame against box truth and −2.17
+against the direct count, bracketing the ~7.7% undercount already on record.
+A confidence sweep over the reviewer's verdicts puts the current
+`CONF_THRESH = 0.195` at the best F1 (0.952); 0.35 would trade 3 false
+positives for 33 extra misses.
+
+**Where the rules get judged instead.** `eval_detector.py` already scores
+count-level accuracy on whole frames through the production inference path
+against the held-out CVAT split (128 tiles / 612 boxes, with 176 / 1,131 on
+val). That is a careful, independent, already-annotated reference, so the two
+detection rules can be decided there without resolving which hand-count
+protocol is right and without more hand counting.
+
+**Items the review turned up for other threads**: two standing surfers flagged
+for the posture list (`B05`/22, `B22`/2); the lens flare in its usual spot twice
+(`B09`/1, `B17`/1), where `B17`'s only box *is* the flare, making that frame a
+pure false positive and strengthening the logged lens-flare item; and `B28`,
+11 missed surfers under high glare on small waves, the worst frame in the set.
+Before any future review: add a `surfers_in_box` integer column, include ~10%
+repeat frames, and make the drawn boxes more transparent with the clean crop
+alongside for comparison (all three requested from the review itself).

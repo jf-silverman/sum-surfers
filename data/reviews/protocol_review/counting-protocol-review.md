@@ -88,3 +88,50 @@ grows with the crowd (r = −0.08, p = 0.77, n = 15).
   manufacturing surfers it will show up as boxes you were unsure about rather
   than as a clean count difference, and that is the case for a third pass:
   blind adjudication of the disputed objects mixed with controls.
+
+---
+
+## Result (both passes returned, 2026-10-20)
+
+**Outcome: "the two agree."** The direct count did not read ~11% low against
+box-by-box on the same frames, so `spotcheck`'s −3.27 was not a protocol bias in
+the assumed direction, and `CROWD_THRESH_SCHEDULE` /
+`CONTAINMENT_DENSITY_SLOPE` **stay off**.
+
+The paired difference ran slightly the other way, but it is inside the noise and
+**should not be quoted as a measured protocol gap**: 15 of 30 frames tied, seven
+frames carry the result, all of the signal is in the crowded strata (A≥20
+p=0.007 vs A<20 p=0.26), and there the mean absolute difference (1.93) is the
+size of the reviewer's own stated ± (2.00). 22 of 30 frames agree within that ±,
+26 of 30 after the correction below, which takes the sign test to p=0.065.
+
+So the crowd-dependence question the strata were bought for is *suggestive*
+(r = −0.62 between crowd size and the gap) but confounded with the two design
+flaws below, and it is not worth more hand counting to resolve — see
+`PROJECT_HISTORY.md` for the power calculation and for where the detection rules
+get judged instead (`eval_detector.py` against the held-out CVAT split).
+
+### Two design flaws to fix before this is run again
+
+1. **No column for a box covering more than one surfer.** Fifteen boxes got a
+   prose note instead, and those surfers were — correctly, given nowhere to put
+   them — left out of `surfers_with_no_box`. Add a `surfers_in_box` integer
+   column. `reviewdays` has the same hole, which biases its historical +0.27 low.
+2. **No repeat frames**, so there is no intra-rater noise floor and the
+   observed SD mixes protocol effect with reviewer stochasticity. Include ~10%
+   repeats, as the blind-adjudication design called for.
+
+Also requested from the review itself: draw the boxes more transparently and
+ship the clean crop alongside, so a dense cluster can be compared with and
+without boxes.
+
+### What pass B measured about the detector (independent of the comparison)
+
+| | |
+|---|---|
+| box precision | **97.9%** (603 `y` of 616 judged; `B20` had no boxes) |
+| recall vs surfers with no box | **92.6%** (48 missed) |
+| recall counting in-box extras as misses | **90.9%** |
+| detector vs box truth | **−1.13** per frame (−5.2%) |
+| detector vs direct count | **−2.17** per frame (−9.5%) |
+| best F1 over a confidence sweep | **0.952 at 0.195**, the production threshold |

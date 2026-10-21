@@ -142,7 +142,20 @@ and off. What blocks adoption is no longer the instrument but the truth data: at
 matched crowd levels, box-level CVAT annotation and `reviewdays` agree on a ratio
 of 0.924 and 0.926 while `spotcheck` reads 1.021, and the only 2 frames in both
 count sets have the box-by-box protocol reading +2 and +1 above the direct count.
-Settling that needs ~30 frames hand-counted under one protocol.
+
+**That review has now run, and it did not settle it — the rules stay off.** 30
+fresh frames were counted twice by one reviewer, direct first and box-by-box
+second, blind-ordered and separated (`data/reviews/protocol_review/`). The
+direct count did not read low, so the `spotcheck` gap that would have endorsed
+these rules was a property of that sitting or its frames rather than a protocol
+bias. The paired difference ran slightly the other way, but it is inside the
+noise — 15 of 30 frames tied, and on the crowded frames where all of the signal
+sits the mean absolute difference (1.93) is the size of the reviewer's own
+stated uncertainty (2.00) — so no protocol gap is claimed in either direction.
+Pinning it to ±0.5 would take ~111 frames plus a test-retest arm. The review
+also exposed that both box-by-box protocols lack a slot for one box covering two
+surfers, which biases them low. These rules will instead be judged against the
+held-out CVAT split via `eval_detector.py`, which needs no new hand counting.
 
 The cheaper move is unblocked: **28 of the 95 spurious boxes sit in static zones** (18 tree bough on
 the right edge, 9 shore head at the bottom centre, 1 wind sock), and masking
