@@ -105,6 +105,18 @@ def build():
         merged[col] = (was if col not in merged.columns
                        else merged[col].fillna(was))
 
+    # The median before point recalibration, written from 2026-10-21 on. Every
+    # earlier file published the model's median uncorrected, so for those rows
+    # `predicted` IS the raw value and the identity map is what was applied --
+    # again a fact rather than a guess. plot_daily_prediction fits the
+    # recalibration on predicted_raw, never on predicted, so it cannot end up
+    # refitting a correction to its own output.
+    merged["predicted_raw"] = (merged["predicted"] if "predicted_raw" not in merged.columns
+                               else merged["predicted_raw"].fillna(merged["predicted"]))
+    for col, was in (("recal_a", 0.0), ("recal_b", 1.0)):
+        merged[col] = (was if col not in merged.columns
+                       else merged[col].fillna(was))
+
     # Week files record lead_days themselves; day-ahead files carry the time the
     # forecast was made, so derive it there and keep whatever is already present.
     existing_lead = merged["lead_days"] if "lead_days" in merged.columns else None
@@ -123,7 +135,7 @@ def build():
     merged["lead_days"] = lead
 
     front = ["date", "hour_local", "hour", "forecast_kind", "lead_days",
-             "predicted", "lower_q10", "upper_q90",
+             "predicted", "predicted_raw", "lower_q10", "upper_q90",
              "band_lower_q", "band_upper_q",
              "band_width", "actual", "actual_clips", "error", "abs_error",
              "inside_band"]

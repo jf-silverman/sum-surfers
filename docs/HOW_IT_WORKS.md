@@ -507,6 +507,47 @@ The limit now is the classifier: AUC 0.826 but it under-predicts emptiness
 tracks the rising autumn empty share — forward distribution shift rather than a
 calibration-method choice.
 
+**The median is corrected outside the model, nightly, since 2026-10-21.**
+`fit_point_recalibration` in `plot_daily_prediction.py` fits
+`actual ≈ a + b × predicted_raw` by least squares on every scored row of
+`forecast_log.csv`; `apply_point_recalibration` maps each hour's median through
+it and clamps the result into `[lower edge, upper edge]` and at zero. The first
+fit was a = −3.86, b = 1.147, on 2,451 scored rows over 28 target dates.
+
+It is a correction rather than a model change because in-model ideas had all
+come back flat, and the problem is one trees cannot fix. When the crowd level
+drifts below the training range, a tree's leaves cannot follow it. A line fitted
+on the recent record can. It chases a moving level, so it is refit every run
+rather than frozen.
+
+Measured forward in time on the live record, each target date corrected only
+from dates scored before it: lead-1 MAE 5.695 → 5.142, all-lead MAE 6.193 →
+5.510, bias +1.93 → +0.15, and better on 23 of 26 dates (sign test p = 0.0001).
+Clamping costs 0.008 MAE and guarantees lower ≤ median ≤ upper.
+
+Three design points matter more than the numbers:
+
+- **It fits on `predicted_raw`, never on `predicted`.** From 2026-10-21 on,
+  `predicted` is the corrected value. If the fit read that column, each night
+  would be fitting a correction to the previous night's correction, and it would
+  settle at "no change" whatever the model's real error was. Every row written
+  before that date was uncorrected, so `build_forecast_log.py` fills
+  `predicted_raw` from `predicted` for those rows. That is a fact about those
+  rows, not a guess.
+- **It turns itself off rather than failing.** Below 400 scored rows or 7
+  target dates, or if the fitted slope leaves 0.5–1.5, the map is the identity
+  and the chart says so in its output. A missing log never stops the chart.
+- **It is separable from the hurdle band.** MAE depends only on the median and
+  coverage only on the edges, so the two 2026-10-20/21 changes can be told apart
+  in the live record.
+
+It does not fix everything. By actual count, 0–5 goes +4.54 → +2.98 but 30+
+goes −13.27 → −14.54. A single line cannot correct both the over-forecast quiet
+hours and the under-forecast packed ones, because the packed hours are mostly
+forecast in the middle of the range. A median of 0 now appears on quiet hours
+and is earned: forward in time, 71.3% of the hours sent to 0 were empty, and
+their MAE fell from 0.89 to 0.39.
+
 Full investigation in `PROJECT_HISTORY.md`.
 
 ## Known limitations (short version)

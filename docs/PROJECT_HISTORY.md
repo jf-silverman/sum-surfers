@@ -6255,3 +6255,76 @@ the flat zeros of 10-13 through 10-19.
 
 42 tests pass. Six uses of "honest"/"honestly" removed from four files and this
 one's own earlier prose while passing through.
+
+### 2026-10-21 — the published median is recalibrated nightly
+
+The hurdle fixed the band's lower tail yesterday but, as recorded there, did not
+touch the median's over-forecast on quiet hours. The tool for that had been
+measured on 2026-10-03 and left unadopted: a post-hoc affine map fitted on the
+scored record (`analysis/forecast_recalibration/test_recalibration.py`), then
+−0.276 MAE on 625 rows over 10 target dates.
+
+**Re-measured before adopting, because two and a half weeks had passed.** The
+case had grown, not shrunk: on 2,410 rows over 26 target dates, each corrected
+only from dates scored before it, the global affine takes MAE 5.976 → 5.390
+(−0.586) and bias +1.84 → +0.34. Per-lead affine (−0.557) and every EWMA offset
+(−0.36 to −0.41) also help, and again the simplest helps most. Checked at the
+units that carry real independence rather than rows: better on 23 of 26 target
+dates (sign test p = 0.0001) and in 4 of 5 target weeks. The exception is the
+first partial week, when the fit had the least history. At lead 1, the horizon
+the evening email scores, MAE goes 5.438 → 5.022.
+
+By actual count it is a trade, not a fix: 0–5 bias +4.54 → +2.98, 5–15 +5.33 →
++3.77, 15–30 +0.30 → −1.14, 30+ −13.27 → −14.54. One line cannot correct both
+ends, because packed hours are mostly forecast mid-range. By predicted count —
+what a reader of the chart sees — the 0–5 and 15–30 buckets go to essentially
+zero bias (+1.26 → −0.07, +1.39 → −0.02).
+
+**Wired in as `fit_point_recalibration` / `apply_point_recalibration`** in
+`plot_daily_prediction.py`: fitted once per run on every scored row, applied to
+each hour's median, clamped into the hour's band and at zero. The corrected
+value becomes `quantiles[0.50]`, so the chart line, the side table, the crowd
+level and both CSVs all read the same number. With the guard thresholds in
+place (400 rows, 7 dates) and clamping, the forward test reads lead-1 MAE
+5.695 → 5.142 and all-lead 6.193 → 5.510, bias +1.93 → +0.15. Clamping costs
+0.008 MAE at lead 1 and binds on 5.8% of rows.
+
+**The design point that matters most is the feedback loop.** From tonight on,
+`predicted` is the corrected median. Had the nightly fit read that column, it
+would be fitting a correction to its own previous output. That would drift
+toward the identity whatever the model's actual error was, and the correction
+would quietly switch itself off. So each forecast row now also records
+`predicted_raw`, along with the `recal_a`/`recal_b` that were applied. The fit
+reads `predicted_raw`, and `build_forecast_log.py` fills it from `predicted` for
+every earlier row, where the two were the same thing. The analysis script was
+switched to `predicted_raw` for the same reason, so it keeps measuring the model
+rather than the corrected output. A test builds a log in which the published
+column is already perfectly calibrated and the raw one is off by a known map,
+and asserts the fit recovers the map.
+
+Guards, all falling back to the identity rather than raising, because a thin or
+missing log must not stop the chart: fewer than 400 scored rows or 7 target
+dates, a constant prediction column, or a fitted slope outside 0.5–1.5. The run
+prints which case applied, and the footer states the map in use.
+
+**One thing checked rather than assumed.** The map sends raw medians below about
+3.4 to zero: 28 of 89 hours on the 2026-10-21 week outlook. A least-squares
+line is not a median, so a zero median could have been an artifact of fitting
+a mean. It is not: in the record, hours with raw forecast 0–2 were 68.8% empty,
+with median actual 0.00, and forward in time the hours the map sent to 0 were
+71.3% empty, with MAE 0.89 → 0.39. The model's low end was simply too high.
+
+Verified end-to-end twice with `--no-cache` chart runs: first fit a = −3.86,
+b = 1.147 on 2,451 rows over 28 dates; lower ≤ median ≤ upper on every hour of
+both files; footer rendered and checked by eye. Both runs' artifacts were
+removed or restored afterwards. `forecast_2026-10-22.csv` is write-once, and
+tonight's real run has to be the one that writes it.
+
+Not in the released bundle, and `MODEL_CARD.md` now says so: the correction
+needs the scored record, which a bundle reproducible from the public splits
+does not have. The `reconstruct_forecast` fallback in `email_daily_report.py`,
+used only when no recorded forecast exists, still refits the plain model
+without the hurdle or this correction. It is labelled a reconstruction and is
+left as it was.
+
+15 tests added (`tests/test_point_recalibration.py`); 57 pass.

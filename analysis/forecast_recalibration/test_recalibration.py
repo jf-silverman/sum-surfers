@@ -31,8 +31,11 @@ is fitted on history while the level keeps moving -- the correction is always
 chasing. That is expected and is the argument for refitting it often rather than
 for a bigger correction.
 
-NOT wired into production. This measures the idea; adopting it changes every
-forecast the project publishes.
+Re-run 2026-10-21 on 2,410 rows over 26 target dates: global affine
+MAE 5.976 -> 5.390 (-0.586), better on 23 of 26 dates. ADOPTED that day for the
+published median -- see fit_point_recalibration in code/plot_daily_prediction.py.
+This script stays as the measurement, and reads `predicted_raw` so it keeps
+measuring the model rather than the corrected output.
 
 Usage:
     python analysis/forecast_recalibration/test_recalibration.py
@@ -43,6 +46,12 @@ from scipy import stats
 
 f = pd.read_csv("data/forecasts/forecast_log.csv")
 s = f[f.actual.notna() & f.lead_days.notna()].copy()
+# Production applies the global affine from 2026-10-21 (see
+# plot_daily_prediction.fit_point_recalibration), so `predicted` is the
+# CORRECTED median from then on. Test against the model's own median, or this
+# script would measure a correction of a correction.
+if "predicted_raw" in s.columns:
+    s["predicted"] = s["predicted_raw"].fillna(s["predicted"])
 s["lead_days"] = s.lead_days.astype(int)
 s["d"] = pd.to_datetime(s.date)
 s = s.sort_values(["d", "hour"]).reset_index(drop=True)

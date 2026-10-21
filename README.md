@@ -227,7 +227,42 @@ Across the four rolling windows the hurdle has the smaller below-band miss rate
 in **4 of 4** and lower pinball in only 1 of 4. So it is adopted for the edges,
 where it fixes the lower tail repeatably and costs nothing on pinball, and **not
 for the median**, whose roughly +4.5 bias on near-empty hours it does not touch.
-That bias is a point-prediction problem and belongs to recalibration instead.
+That bias is a point-prediction problem and belongs to recalibration instead —
+
+### The median is recalibrated nightly
+
+— which the chart has done since 2026-10-21. After the model predicts, its
+median goes through a straight-line correction, `a + b × median`, fitted each
+night on every forecast hour that has since been scored against what the camera
+actually saw, then kept inside that hour's band and never below zero. The line
+is currently about `−3.9 + 1.15 × median`: it pulls quiet-hour forecasts down
+and leaves busy ones roughly where they were. It crosses even at about 26
+surfers.
+
+Measured forward in time — each day corrected using only days scored before
+it, as it would have run live (`analysis/forecast_recalibration/`):
+
+| | before | after |
+|---|---:|---:|
+| MAE, day-ahead forecasts | 5.70 | **5.14** |
+| MAE, all lead times | 6.19 | **5.51** |
+| mean bias | +1.93 | **+0.15** |
+| target dates improved | | **23 of 26** (p = 0.0001) |
+
+It is the largest accuracy gain this forecast has had from any change. Every
+change tried inside the model (lagged counts, weekday effects, recency
+weighting, deeper trees and more) came back flat. A correction applied outside
+the model can follow a crowd level that has drifted below anything the trees
+were trained on; a tree cannot.
+
+What it trades: hours with 0–5 surfers go from +4.5 bias to +3.0, but the rare
+hours with 30 or more go from −13.3 to −14.5. It helps the common case at a
+small cost to the rare one. A median of 0 now appears on quiet hours, and it is
+earned: of the hours the correction sent to 0, 71% really were empty.
+
+The forecast record keeps the model's own median beside the published one, and
+the correction is fitted on the model's own median. Otherwise it would be
+fitting a correction to its own output.
 
 What remains is the empty-hour classifier: it ranks hours well (AUC 0.826) but
 under-predicts emptiness, 11.7% against an actual 16.5%, which is most of the

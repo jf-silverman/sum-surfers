@@ -234,7 +234,13 @@ two band edges were moved onto one, taking that 59.5% to 70.5% on these same
 rows. **The bundle released here was not**: it still fits one quantile model per
 level, so every number in this card describes that design. The released
 bundle and the live chart now differ in how the band is fitted, deliberately,
-because re-exporting is a separate decision from changing the chart. The target is
+because re-exporting is a separate decision from changing the chart. They also
+differ in the median. Since 2026-10-21 the live chart passes its median through
+a nightly affine correction fitted on the scored forecast record. Measured
+forward in time, that takes day-ahead MAE from 5.70 to 5.14 and bias from +1.93
+to +0.15, better on 23 of 26 target dates. That correction needs the scored
+record, so it cannot be part of a bundle that reproduces from the public
+splits alone, and **no figure in this card includes it.** The target is
 `round(frame_count_mean)` — the rounded mean of the three frames cut at
 1.0/2.5/4.0 s. The Poisson objective is load-bearing: squared
 error costs **+0.43 MAE** on 16 rolling origins (p < 0.05, better on only 3 of

@@ -2,8 +2,9 @@
 plot_daily_prediction.py
 --------------------------
 Generates the daily surfer-count prediction chart (point estimate = median
-GBT model, a shaded central prediction interval from the two fitted edge
-quantiles in FAN_LEVELS, a matching range side table, tide overlay, weather-coded markers,
+GBT model, recalibrated nightly by an affine map fitted on the scored record
+-- see fit_point_recalibration -- and a shaded central prediction interval
+whose two edges come from a hurdle fit, see fit_hurdle_band, a matching range side table, tide overlay, weather-coded markers,
 night-hour shading, model/detector info footer, per-hour 1-5 crowd level) to
 data/charts/surfer_count_YYYY-MM-DD.png, a 7-day crowd outlook
 (data/charts/latest_week.png — a day x hour grid of crowd levels, see
@@ -239,6 +240,87 @@ def save_model_cache(payload):
         print(f"  WARNING: could not write the model cache ({type(e).__name__}: {e})")
 
 
+# --- Point recalibration ---------------------------------------------------
+#
+# The median is corrected after the model, by an affine map fitted each night on
+# the scored record: corrected = a + b * raw, clamped inside the hour's band.
+# Adopted 2026-10-21. Measured forward in time on the live record -- each target
+# date corrected using only rows scored for EARLIER dates
+# (analysis/forecast_recalibration/test_recalibration.py):
+#
+#     all leads, 1,981 rows / 20 dates   MAE 6.193 -> 5.510, bias +1.93 -> +0.15
+#     lead 1 (what the email scores)     MAE 5.695 -> 5.142
+#     better on 23 of 26 target dates (sign test p = 0.0001), 4 of 5 weeks
+#
+# Why outside the model: every in-model idea tried (lags, weekday, recency
+# weighting, deeper trees, ...) came back flat, and a tree cannot extrapolate
+# past its training range when the crowd level drifts. An affine map can. It is
+# chasing a moving level, so it is refit every run rather than frozen.
+#
+# What it does and does not fix, by actual count: 0-5 bias +4.54 -> +2.98,
+# 5-15 +5.33 -> +3.77, but 30+ -13.27 -> -14.54. It trades a little on the
+# rare packed hours for a lot on the common quiet ones. Clamping into the band
+# keeps lower <= median <= upper and costs 0.008 MAE at lead 1.
+#
+# Separable from the 2026-10-20 hurdle band on purpose: MAE depends only on the
+# median and coverage only on the edges, so the live record can attribute each.
+# FORECASTS_DIR is defined further down with the record writers; same place.
+FORECAST_LOG_PATH = _PROJECT_ROOT / "data" / "forecasts" / "forecast_log.csv"
+RECAL_MIN_ROWS = 400        # the forward test only started helping past here
+RECAL_MIN_DATES = 7         # ...and a week of target dates, so one odd day can't set it
+RECAL_SLOPE_BOUNDS = (0.5, 1.5)   # outside this the fit is describing something broken
+
+
+def fit_point_recalibration(log_path=None):
+    """{a, b, n_rows, n_dates, applied, reason} from the scored forecast record.
+
+    Fits on `predicted_raw` where the log has it and `predicted` where it does
+    not. That distinction is the whole reason `predicted_raw` exists: once this
+    is live, `predicted` IS the corrected value, and fitting a correction to its
+    own output would converge on whatever it already does rather than on the
+    model's actual error. Rows before 2026-10-21 have no `predicted_raw`, and
+    for them `predicted` was raw.
+
+    Falls back to the identity (a=0, b=1, applied=False) rather than raising,
+    because a missing or thin log must not stop tonight's chart.
+    """
+    path = Path(log_path) if log_path else FORECAST_LOG_PATH
+    identity = dict(a=0.0, b=1.0, n_rows=0, n_dates=0, applied=False)
+    try:
+        log = pd.read_csv(path)
+    except (OSError, ValueError) as e:
+        return {**identity, "reason": f"no forecast log ({type(e).__name__})"}
+    if not {"predicted", "actual", "date"} <= set(log.columns):
+        return {**identity, "reason": "forecast log lacks predicted/actual/date"}
+    raw = (log["predicted_raw"].fillna(log["predicted"])
+           if "predicted_raw" in log.columns else log["predicted"])
+    m = log["actual"].notna() & raw.notna()
+    x = raw[m].to_numpy(float)
+    y = log.loc[m, "actual"].to_numpy(float)
+    n_rows, n_dates = int(m.sum()), int(log.loc[m, "date"].nunique())
+    base = dict(n_rows=n_rows, n_dates=n_dates)
+    if n_rows < RECAL_MIN_ROWS or n_dates < RECAL_MIN_DATES:
+        return {**identity, **base,
+                "reason": f"only {n_rows} scored rows over {n_dates} dates "
+                          f"(needs {RECAL_MIN_ROWS} and {RECAL_MIN_DATES})"}
+    if np.ptp(x) == 0:
+        return {**identity, **base, "reason": "every logged prediction is the same"}
+    b, a = np.polyfit(x, y, 1)
+    if not (RECAL_SLOPE_BOUNDS[0] <= b <= RECAL_SLOPE_BOUNDS[1]):
+        return {**identity, **base,
+                "reason": f"fitted slope {b:.3f} is outside {RECAL_SLOPE_BOUNDS}; not applied"}
+    return dict(a=float(a), b=float(b), applied=True, **base,
+                reason=f"fitted on {n_rows} scored rows over {n_dates} dates")
+
+
+def apply_point_recalibration(raw, lower, upper, recal):
+    """The corrected median, kept inside [lower, upper] and never negative."""
+    if not recal.get("applied"):
+        return float(raw)
+    corrected = recal["a"] + recal["b"] * float(raw)
+    return float(min(max(corrected, lower, 0.0), max(upper, lower)))
+
+
 def main():
     args = parse_args()
     if args.date:
@@ -321,6 +403,11 @@ def main():
     by_hour = add_tide_daylight_features(sp.build_predictor_map(days=FORECAST_DAYS + 1))
     local_tz = pytz.timezone(gc.LOCATION["timezone"])
 
+    recal = fit_point_recalibration()
+    print(f"  Point recalibration: "
+          + (f"median = {recal['a']:+.2f} + {recal['b']:.3f} x raw ({recal['reason']})"
+             if recal["applied"] else f"not applied -- {recal['reason']}"))
+
     def predict_for_hour(hk):
         """Runs the fitted quantile models for one by_hour key. Shared by the
         chart's day loop, the week chart, and the detection image's own-hour
@@ -340,6 +427,12 @@ def main():
             val = max(running_min, float(quantile_models[level].predict(feat_row)[0]))
             quantiles[level] = val
             running_min = val
+        # The model's own median, kept so the record can be refit on it (see
+        # fit_point_recalibration), then the corrected one, which is what every
+        # chart, table, crowd level and CSV downstream reads as "the median".
+        point_raw = quantiles[0.50]
+        quantiles[0.50] = apply_point_recalibration(
+            point_raw, quantiles[FAN_LEVELS[0]], quantiles[FAN_LEVELS[-1]], recal)
         point = quantiles[0.50]
         weather_simple, is_night = simplify_weather_condition(predictors.get("weather_condition", ""))
         tide_ft = float(predictors.get("tide_ft", 0) or 0)
@@ -364,7 +457,8 @@ def main():
         predictor_values = {c: (None if pd.isna(feat_row.iloc[0].get(c, np.nan))
                                 else round(float(feat_row.iloc[0][c]), 4))
                             for c in numeric_cols}
-        return dict(hour=hk, point=point, quantiles=quantiles,
+        return dict(hour=hk, point=point, point_raw=point_raw, quantiles=quantiles,
+                    recal_a=recal["a"], recal_b=recal["b"],
                     weather_simple=weather_simple, is_night=is_night,
                     tide_ft=tide_ft, in_training_range=in_training_range,
                     predictor_values=predictor_values,
@@ -464,7 +558,10 @@ def main():
     # particular snapshot and an odd-looking older chart can't be diagnosed
     # after the fact.
     info_text = (
-        f"Model: gradient-boosted trees (quantile regression), point estimate = median model  "
+        f"Model: gradient-boosted trees (quantile regression); median "
+        + (f"recalibrated nightly on the scored record ({recal['a']:+.1f} + {recal['b']:.2f}x), "
+           if recal["applied"] else "uncorrected (recalibration not applied), ")
+        + f"band edges from a hurdle fit  "
         f"|  Top predictors: {predictors_str}\n"
         f"Model fitted {fitted_at:%Y-%m-%d} on {trained_rows:,} detection-hours "
         f"({df['date'].min()} to {df['date'].max()}); reused since, refit weekly  "
@@ -805,6 +902,13 @@ def forecast_row(target_date, r):
         "date": target_date.isoformat(),
         "hour_local": r["hour"].strftime("%H:%M"),
         "predicted": round(r["point"], 2),
+        # The model's median before the 2026-10-21 point recalibration, and the
+        # map applied to it. `predicted` is what was published; `predicted_raw`
+        # is what fit_point_recalibration fits on, so the correction is never
+        # refit on its own output. Equal when recalibration was not applied.
+        "predicted_raw": round(r.get("point_raw", r["point"]), 2),
+        "recal_a": round(r.get("recal_a", 0.0), 4),
+        "recal_b": round(r.get("recal_b", 1.0), 4),
         # The column NAMES are frozen at the original q10/q90 because five
         # readers address them by name (email_daily_report, build_forecast_log,
         # plot_accuracy_charts, calibrate_lead_bands, plot_daily_prediction's
