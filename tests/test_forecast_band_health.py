@@ -122,15 +122,57 @@ def test_fires_when_every_lower_edge_is_pinned(isolated):
     fdir, _ = isolated
     write_forecast(fdir, "forecast_2026-11-01.csv", [0.0, 0.0, 0.0, 0.0])
     note = edr.band_health_note()
-    assert "pinned at zero on 4 of 4 hours" in note
+    assert "does not vary at all" in note and "every hour at 0.00" in note
 
 
-def test_fires_on_a_partial_pin(isolated):
-    # The 2026-09-30 episode pinned some hours and not others; a check that
-    # only noticed an all-zero day would have missed it.
+def test_fires_when_the_edge_is_flat_but_not_zero(isolated):
+    """A collapse need not settle on zero.
+
+    fit_quantile_model_robust reports the constant it actually reached, and the
+    conditional q0.05 on the positives collapses to ~1.00 rather than 0. An
+    edge flat at 1.00 is no more informative than one flat at 0, so the test is
+    variation, not the value.
+    """
+    fdir, _ = isolated
+    write_forecast(fdir, "forecast_2026-11-01.csv", [1.0, 1.0, 1.0, 1.0])
+    assert "does not vary at all" in edr.band_health_note()
+
+
+def test_quiet_on_a_partial_pin_because_a_hurdle_zero_is_informative(isolated):
+    """Deliberately the opposite of what this asserted before 2026-10-20.
+
+    The old rule fired on any zero, which caught the 2026-09-30 episode. Once
+    the edges came from a hurdle fit that rule became a nightly false alarm:
+    a hurdle returns zero exactly when P(no surfers) exceeds the band's lower
+    quantile, which on the 2026-10-21 outlook is 35 of 90 hours -- dawn and
+    dusk in late October, correctly. A varying edge is doing its job even with
+    zeros in it; only a near-total pin is a symptom.
+    """
     fdir, _ = isolated
     write_forecast(fdir, "forecast_2026-11-01.csv", [0.0, 2.5, 0.0, 9.0])
-    assert "pinned at zero on 2 of 4 hours" in edr.band_health_note()
+    assert edr.band_health_note() == ""
+
+
+def test_fires_on_a_near_total_pin(isolated):
+    fdir, _ = isolated
+    write_forecast(fdir, "forecast_2026-11-01.csv", [0.0, 0.0, 0.0, 0.0, 6.5])
+    note = edr.band_health_note()
+    assert "sits at zero on 4 of 5 hours" in note
+
+
+def test_the_pinned_share_trigger_is_inclusive(isolated):
+    fdir, _ = isolated
+    n_zero = int(round(10 * edr.LOWER_EDGE_PINNED_SHARE_TRIGGER))
+    edges = [0.0] * n_zero + [float(i + 1) for i in range(10 - n_zero)]
+    write_forecast(fdir, "forecast_2026-11-01.csv", edges)
+    assert f"sits at zero on {n_zero} of 10 hours" in edr.band_health_note()
+
+
+def test_a_single_hour_forecast_is_not_called_a_collapse(isolated):
+    """One hour trivially "does not vary"; that must not read as a constant."""
+    fdir, _ = isolated
+    write_forecast(fdir, "forecast_2026-11-01.csv", [7.4])
+    assert edr.band_health_note() == ""
 
 
 def test_reads_the_newest_forecast_not_the_oldest(isolated):

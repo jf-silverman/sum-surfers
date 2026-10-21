@@ -226,10 +226,15 @@ against its 80% target while the new q0.15/q0.90 band reaches only 59.5% against
 75%. The collapse is real on the full record the chart fits (every
 `min_samples_leaf` from 20 to 200 gives a training standard deviation of
 0.0000), so the chart had no choice, but the band is **not better calibrated for
-having moved** — it is more honestly labelled and worse covered. The reason is
+having moved** — it is more accurately labelled and worse covered. The reason is
 the +4.01 bias on near-empty hours below: raising the lower edge pushes it
 further above actuals that sit at or near zero. That points at the hurdle model,
-not at the edge level, as the actual fix. The target is
+not at the edge level, as the actual fix — and on 2026-10-20 the live chart's
+two band edges were moved onto one, taking that 59.5% to 70.5% on these same
+rows. **The bundle released here was not**: it still fits one quantile model per
+level, so every number in this card describes that design. The released
+bundle and the live chart now differ in how the band is fitted, deliberately,
+because re-exporting is a separate decision from changing the chart. The target is
 `round(frame_count_mean)` — the rounded mean of the three frames cut at
 1.0/2.5/4.0 s. The Poisson objective is load-bearing: squared
 error costs **+0.43 MAE** on 16 rolling origins (p < 0.05, better on only 3 of
@@ -377,10 +382,17 @@ for the current record.
   2025-12. Past roughly a tenth, the true 10th percentile is zero and the lowest
   quantile levels stop carrying information — which is why the live band's lower
   edge moved to q0.15. A hurdle model (P(anyone out) times the count quantiles
-  fit on non-empty hours only, `code/eval_hurdle_model.py`) scores better on
-  pinball loss on 5 of 5 splits but moves 80% coverage the wrong way on 3 of 5,
-  so it is measured and not adopted. An automatic check reports when empty hours
-  pass 30%, which is the point that trade is meant to be revisited.
+  fit on non-empty hours only, `code/eval_hurdle_model.py`) does represent it,
+  and **the live chart's band edges have been fitted that way since
+  2026-10-20**: on a forward day split it takes 75% band coverage from 59.0% to
+  70.5% and misses below the band from 33.3% to 22.5%, with the smaller miss
+  rate in 4 of 4 rolling windows and pinball loss a tie. An earlier reading that
+  said the reverse — better pinball, worse coverage — came from a random row
+  split that leaked each test day's own crowd level. **The model in this bundle
+  is the one-per-level design**, not the hurdle, so these numbers stand as
+  measured; the hurdle does not fix the near-empty bias either way, since the
+  median is still fitted the old way in both. An automatic check reports when
+  empty hours pass 30%.
 - **It is predictor-limited, not algorithm-limited.** Every model family and a
   72-combination hyperparameter grid landed within noise of each other.
   Measured and rejected on rolling origins: previous-day lags, lunar tide

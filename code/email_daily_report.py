@@ -154,6 +154,11 @@ FEATURES_CSV = _PROJECT_ROOT / "data" / "training_features.csv"
 # 5 of 5 seeds, left unadopted -- is worth the model-family swap. This note
 # exists so that decision is prompted by the data rather than remembered.
 EMPTY_SHARE_TRIGGER = 0.30
+# A hurdle lower edge is legitimately zero on quiet hours (35 of 90 on the
+# 2026-10-21 outlook), so only a near-total pin is a symptom. 0.80 sits above
+# the worst legitimate share seen and below a genuine collapse, which is 1.00.
+LOWER_EDGE_PINNED_SHARE_TRIGGER = 0.80
+FLAT_EDGE_TOLERANCE = 0.01   # an edge this flat across a day is a constant
 EMPTY_SHARE_WINDOW_DAYS = 30
 
 
@@ -168,11 +173,16 @@ def band_health_note():
 
     Two signals, strongest first:
 
-    1. The newest forecast's lower edges. A lower edge sitting at zero is the
-       symptom itself, not a proxy for it: counts are never negative, so such
-       a band cannot be missed from below and hands the coverage metric free
-       credit. This is what went unnoticed from 2026-10-12 to 2026-10-19,
-       which is the reason this check exists.
+    1. The newest forecast's lower edges, tested for being CONSTANT rather
+       than merely zero. A lower edge that cannot be missed from below hands
+       the coverage metric free credit, which is what went unnoticed from
+       2026-10-12 to 2026-10-19 and is the reason this check exists. But since
+       2026-10-20 the edges come from a hurdle fit, and a hurdle returns a
+       genuine zero whenever P(no surfers) exceeds the band's lower quantile --
+       an informative answer about a quiet dawn hour, not a collapse. On the
+       2026-10-21 outlook that is 35 of 90 hours. So a zero on its own is no
+       longer a symptom; what is, is an edge that does not VARY, or one that
+       is zero on nearly every hour.
     2. The share of empty hours, cumulative and over the trailing window. The
        leading indicator -- it is what drags the low quantiles onto the floor
        in the first place, and it moves seasonally, so it gives warning before
@@ -189,16 +199,25 @@ def band_health_note():
         try:
             fc = pd.read_csv(newest[-1])
             lo_q = float(fc["band_lower_q"].iloc[0]) if "band_lower_q" in fc else 0.10
-            pinned = int((fc["lower_q10"] <= 0).sum())
-            if pinned:
+            lower = pd.to_numeric(fc["lower_q10"], errors="coerce").dropna()
+            pinned = int((lower <= 0).sum())
+            share = pinned / len(lower) if len(lower) else 0.0
+            # A single hour cannot be "constant"; don't call one a collapse.
+            flat = len(lower) > 1 and float(lower.max() - lower.min()) <= FLAT_EDGE_TOLERANCE
+            if flat or share >= LOWER_EDGE_PINNED_SHARE_TRIGGER:
+                why = (f"does not vary at all across the day (every hour at "
+                       f"{lower.iloc[0]:.2f})" if flat else
+                       f"sits at zero on {pinned} of {len(lower)} hours")
                 lines.append(
-                    f"The forecast band's lower edge is pinned at zero on {pinned} of "
-                    f"{len(fc)} hours in {newest[-1].name} (nominal lower quantile "
-                    f"q{lo_q:g}). A band that cannot be missed from below inflates the "
-                    f"coverage figure instead of describing the uncertainty. The q{lo_q:g} "
-                    f"model has most likely collapsed to a constant again -- check for "
-                    f"'Degenerate quantile level(s)' in the chart step's output, and see "
-                    f"PROJECT_HISTORY 2026-10-20.")
+                    f"The forecast band's lower edge {why} in {newest[-1].name} "
+                    f"(nominal lower quantile q{lo_q:g}). A band that cannot be missed "
+                    f"from below inflates the coverage figure instead of describing the "
+                    f"uncertainty. Since 2026-10-20 these edges come from a hurdle fit, "
+                    f"whose zeros on quiet hours are informative -- so this is either the "
+                    f"empty-hour classifier predicting emptiness everywhere or the "
+                    f"conditional quantiles having collapsed. Check for 'Degenerate "
+                    f"quantile level(s)' and the 'Hurdle band:' line in the chart step's "
+                    f"output, and see PROJECT_HISTORY 2026-10-20.")
         except (OSError, ValueError, KeyError, IndexError) as e:
             lines.append(f"Could not read {newest[-1].name} to check the band "
                          f"({type(e).__name__}).")

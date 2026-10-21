@@ -57,7 +57,7 @@ import get_clips as gc  # noqa: E402 — needed for get_light_window() (real daw
 import get_surf_predictors as sp  # noqa: E402
 import detect_surfers as ds  # noqa: E402
 from fit_surfer_count_model import (  # noqa: E402
-    load_and_prepare, fit_quantile_model_robust, split_by_day,
+    load_and_prepare, fit_quantile_model_robust, fit_hurdle_band, split_by_day,
     BAND_LOWER_Q, BAND_UPPER_Q,
 )
 from predict_surf_count import build_feature_row, add_tide_daylight_features, MEAN_KWARGS  # noqa: E402
@@ -182,6 +182,10 @@ READABLE_NAMES = {
 MODEL_CACHE_PATH = _PROJECT_ROOT / "data" / "model_cache" / "chart_models.joblib"
 REFIT_AFTER_DAYS = 7          # refresh weekly...
 REFIT_AFTER_NEW_ROWS = 100    # ...or sooner if this much new data has arrived
+# Bumped whenever a change makes an existing cached fit the WRONG model rather
+# than merely an old one — otherwise the chart keeps drawing the previous design
+# for up to REFIT_AFTER_DAYS with nothing to show it. 2 = hurdle band edges.
+MODEL_CACHE_VERSION = 2
 
 
 def parse_args():
@@ -203,6 +207,9 @@ def cached_models_are_usable(cache, n_rows, feature_names):
     """
     if cache is None:
         return False, "no cache yet"
+    if cache.get("cache_version") != MODEL_CACHE_VERSION:
+        return False, (f"cache is version {cache.get('cache_version')}, "
+                       f"this build fits version {MODEL_CACHE_VERSION}")
     if list(cache.get("feature_names", [])) != list(feature_names):
         return False, "feature columns changed"
     age_days = (datetime.now() - datetime.fromisoformat(cache["fitted_at"])).days
@@ -270,21 +277,33 @@ def main():
                                         random_state=42, scoring="neg_mean_absolute_error")
         top_predictors = pd.Series(perm.importances_mean, index=Xi_test.columns).sort_values(ascending=False).head(5)
 
-    # Quantile models, one per level in FAN_LEVELS: the 80% interval's two
-    # edges drawn as a single shaded band (see the fill loop below), plus
-    # 0.50, the median / point estimate.
-    # allow_degenerate=True: with ~12% of hours at zero surfers the true 10th
-    # percentile is 0.00, so that level collapses to a flat zero by rights, not
-    # by mis-fitting (see fit_surfer_count_model.ConstantQuantileModel). Before
-    # 2026-09-16 that raised and killed the whole chart — the 09-15 run produced
-    # nothing at all. A display chart can draw a flat band honestly; calibration
-    # code still uses the default and still raises.
-        quantile_models = {level: fit_quantile_model_robust(X_std, y, level, allow_degenerate=True)[0]
-                           for level in FAN_LEVELS}
+        # Two different fits, on purpose.
+        #
+        # The MEDIAN is a plain quantile GBT on every row, as it always was.
+        # allow_degenerate=True: with ~12% of hours at zero surfers a low level
+        # can collapse to a flat zero by rights rather than by mis-fitting (see
+        # fit_surfer_count_model.ConstantQuantileModel). Before 2026-09-16 that
+        # raised and killed the whole chart — the 09-15 run produced nothing at
+        # all. A display chart can draw a flat band; calibration code keeps the
+        # default and still raises. The median has never collapsed, but it opts
+        # in for the same reason: this script must not be the thing that fails.
+        #
+        # The BAND EDGES come from a hurdle fit as of 2026-10-20 — P(any surfers)
+        # times the quantiles of count given any — because one model per level
+        # was describing two questions at once and the lower edge kept pinning
+        # to zero. It cut misses low from 33.3% to 22.5% against a 15% target in
+        # 4 of 4 rolling windows at no cost in pinball. It does NOT touch the
+        # median's bias on near-empty hours, which is why the median is not
+        # fitted this way. See fit_hurdle_band for the full measurement.
+        quantile_models = {0.50: fit_quantile_model_robust(
+            X_std, y, 0.50, allow_degenerate=True)[0]}
+        quantile_models.update(fit_hurdle_band(
+            X_std, y, [FAN_LEVELS[0], FAN_LEVELS[-1]]))
         fitted_at = datetime.now()
         trained_rows = len(X_std)
         if not args.no_cache:
-            save_model_cache({"quantile_models": quantile_models,
+            save_model_cache({"cache_version": MODEL_CACHE_VERSION,
+                              "quantile_models": quantile_models,
                               "top_predictors": top_predictors,
                               "feature_names": list(X_std.columns),
                               "n_rows": trained_rows,
@@ -1277,7 +1296,7 @@ def generate_detection_gif(detection_date):
         # for the dark specks themselves, then the same frame with the boxes
         # drawn. Joel's idea (2026-09-22) — it turns the animation from
         # something to watch into something to play along with, and it shows
-        # honestly how hard these are to see before the model marks them.
+        # plainly how hard these are to see before the model marks them.
         for is_boxed, image in ((False, clean), (True, boxed)):
             # Banner below the image, so the labels never cover water that might
             # contain a surfer the reader is trying to spot.

@@ -6151,3 +6151,107 @@ pure false positive and strengthening the logged lens-flare item; and `B28`,
 Before any future review: add a `surfers_in_box` integer column, include ~10%
 repeat frames, and make the drawn boxes more transparent with the clean crop
 alongside for comparison (all three requested from the review itself).
+
+### 2026-10-20 — the band's edges adopt a hurdle fit; the median does not
+
+The lower edge moved q0.10 → q0.15 earlier today, and the re-export showed that
+had bought a more accurate label and worse coverage: 33.6% of hours missed below
+a band whose lower edge is nominally the 15th percentile. The cause was visible
+in the error-by-count table — +4.01 bias on hours with 0–5 actual surfers
+against −14.74 on hours with 30 or more — so the edge level was never the lever.
+
+**The evaluation that existed could not answer this, for three reasons.**
+`eval_hurdle_model.py` had been written in September and split rows at random
+(`train_test_split`, `random_state=42`). That is the leak B21 documents: at
+about 13 rows per day a random 20% split puts hours from the same day on both
+sides, so both the baseline and the hurdle were told the test day's own crowd
+level. It also hardcoded q0.10/q0.90, so after the edge moved it was scoring a
+band nobody draws. And its conditional-quantile composition took the nearest
+grid level at or above the target rather than interpolating — despite a comment
+saying otherwise — biasing every row's lower edge high by up to a 0.05 step.
+
+Rebuilt onto a forward whole-day split, with 0.15 and the production pair read
+from `fit_surfer_count_model`, linear interpolation between bracketing grid
+levels, the conditional stack forced monotone before composition, and a
+rolling-origin mode over four successive ~15-day windows — because one forward
+split is one month of weather and the verdict turns on coverage, which is
+noisier than a mean.
+
+| on 417 held-out hours | one per level | hurdle |
+|---|---:|---:|
+| mean pinball loss | 2.2616 | 2.2512 (CI [−0.050, +0.030]) |
+| 75% band coverage | 59.0% | **70.5%** |
+| missed below (target 15%) | 33.3% | **22.5%** |
+| 80% band coverage | 72.4% | **82.3%** |
+| median bias, 0–5 actual | +4.67 | +4.49 |
+
+Smaller below-band miss rate in **4 of 4** rolling windows (mean 28.5% → 22.2%),
+lower pinball in **1 of 4** (2.4802 vs 2.4829).
+
+**So the earlier verdict inverts.** The September reading — better pinball on 5
+of 5, worse coverage on 3 of 5, therefore "a sharper model rather than a
+strictly better one" — was an artifact of the leak. On a split that matches how
+the model is used, pinball is a tie and coverage is a clear gain.
+
+**Adopted for the two band edges, not for the median.** This is the part worth
+stating plainly: the hurdle was proposed, including by me earlier today, as the
+fix for the quiet-hour over-prediction, and **it is not**. The median's bias on
+hours with 0–5 actual surfers goes +4.67 → +4.49, which is nothing. What the
+hurdle fixes is the lower tail. The near-empty bias is a point-prediction
+problem and belongs to the post-hoc affine recalibration already measured and
+unadopted (−0.276 MAE, p < 0.001), which is now the next thing in this thread.
+
+`fit_hurdle_band` returns one `HurdleQuantileModel` per level over a shared
+`_HurdleCore` holding the classifier and the 19 conditional fits. The sharing is
+not cosmetic: each edge otherwise re-ran the classifier and all 19 conditional
+models, 0.11 s a call, which across ~104 forecast hours is most of a minute of
+duplicate work. A one-entry memo on the core, excluded from the pickle via
+`__getstate__`, is exactly sized for the chart's access pattern — both edges
+called back to back on the same single-row frame — and took 100 hours × 2 edges
+from 22 s to 0.11 s.
+
+`MODEL_CACHE_VERSION` was added alongside, because the existing cached fit was
+not merely old but the wrong model: without a version key the chart would have
+kept drawing one-per-level bands for up to `REFIT_AFTER_DAYS` with nothing to
+show for it.
+
+**The nightly band check had to be inverted too, and this is the subtle part.**
+It fired on any lower edge at or below zero, which was right when a zero could
+only mean a collapsed constant. A hurdle returns zero exactly when P(no surfers)
+exceeds the band's lower quantile — a correct, informative answer about a dawn
+hour in late October, and on the 2026-10-21 outlook that is 35 of 90 hours. Left
+alone the check would have false-alarmed every night from tomorrow. It now fires
+when the lower edge does not **vary** across the day (tolerance 0.01, and a
+single-hour file is never called constant), or sits at zero on 80% or more of
+its hours. The flat test deliberately does not look at the value, because
+`fit_quantile_model_robust` reports whatever constant a collapse settles on and
+the conditional q0.05 on the positives collapses to ~1.00, not 0.
+
+Verified end-to-end rather than by unit test alone: a full `--no-cache` chart run
+reproduced `fit_hurdle_band`'s held-out numbers exactly (70.5% / 22.5% / 7.0%),
+and tonight's real artifacts were backed up and restored afterwards, since the
+run rewrites the week record and the charts. On the 90-hour week outlook the
+effect is a narrower, differently shaped band: mean width 18.99 → 17.39, lower
+edge mean 6.03 → 6.69 but zero on 35 hours against 23, upper edge mean
+25.03 → 24.08, the median unmoved (max change 0.36), and `crowd_level` different
+on 9 of 90 hours, since the rating interpolates between q0.50 and q0.90 and the
+upper edge moved.
+
+**What is left.** The remaining distance from 22.5% to the 15% target is mostly
+the empty-hour classifier: AUC 0.826, but it under-predicts emptiness at 11.7%
+against an actual 16.5%, and in nearly every probability bin. Isotonic
+calibration lifts AUC to 0.856 and Brier to 0.1133 → 0.1042 while moving that
+mean only to 12.5%, and the week-by-week shortfall tracks the rising autumn
+empty share — forward distribution shift, not a calibration-method choice.
+
+The released bundle was **not** re-exported: it still fits one quantile model per
+level, so every figure in `MODEL_CARD.md` still describes the model it ships.
+The card now says so explicitly rather than leaving the two to be conflated.
+
+Also confirmed tonight, closing the item left open this morning: with the q0.15
+edge in place the band check reads quiet against the real
+`forecast_2026-10-21.csv`, whose lower edges run 0.45, 1.34 and up rather than
+the flat zeros of 10-13 through 10-19.
+
+42 tests pass. Six uses of "honest"/"honestly" removed from four files and this
+one's own earlier prose while passing through.

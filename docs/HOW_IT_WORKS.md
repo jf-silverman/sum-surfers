@@ -280,7 +280,7 @@ YOLO modification for objects below ~16 px), small-object copy-paste
 augmentation (`copy_paste` is currently 0.0), and size-weighted loss. These are
 logged in the private ideas notes rather than attempted.
 
-The honest limit: at 61 px² the information is close to what the sensor and the
+The real limit: at 61 px² the information is close to what the sensor and the
 camera's H.264 encoder preserved. No architecture recovers detail that was
 never captured.
 
@@ -400,7 +400,8 @@ The collapse is real on the full record the chart fits, where every candidate
 from 20 to 200 returns a training standard deviation of 0.0000, so the chart had
 no alternative — but the band is not better calibrated for having moved, only
 more accurately labelled. The fix for the coverage itself is the hurdle model
-below, or recalibration, not another edge level.
+below, or recalibration, not another edge level — and the hurdle has since been
+adopted for the edges, taking 59.5% to 70.5% on the same rows.
 
 **A rule for reading any coverage number here**, learned twice the hard way:
 a coverage figure near its target is only good news once you have checked that
@@ -461,18 +462,50 @@ scored day:
 Both are two small table reads, about 11 ms, with no refitting: the check only
 decides whether the question needs looking at.
 
-If the 30% threshold is crossed, lowering the edge again stops being the right
-move, because the problem becomes the model's shape. One quantile model is being
+Lowering the edge again was never going to be the answer indefinitely, because
+past some point the problem is the model's shape. One quantile model was being
 asked to describe two things at once — whether anyone is out at all, and how
 many are out given somebody is. A **hurdle model** separates them: a classifier
 for `P(count > 0)`, quantile models fit on non-empty hours only, composed back
 so that a target quantile q predicts zero when `P(empty)` exceeds q and the
-conditional quantile at `(q - p_zero) / (1 - p_zero)` otherwise. Measured in
-`code/eval_hurdle_model.py`: better pinball loss on 5 of 5 splits (pinball being
-the proper scoring rule, which unlike coverage cannot be bought with a floor)
-and better MAE on 5 of 5, but 80% coverage moves the wrong way on 3 of 5. So it
-is a sharper model rather than a strictly better one, and it stays measured and
-unadopted until the data makes the trade worth taking.
+conditional quantile at `(q - p_zero) / (1 - p_zero)` otherwise.
+
+**The band's two edges have been fitted this way since 2026-10-20; the median
+has not.** The first measurement of this concluded the opposite — better pinball
+on 5 of 5, worse coverage on 3 of 5 — and was wrong, because it split rows at
+random and so leaked each test day's own crowd level into training (the same
+flaw as B21). Re-measured on a forward split by whole days, and on four
+successive ~15-day rolling windows, by `code/eval_hurdle_model.py`:
+
+| on 417 held-out hours | one model per level | hurdle |
+|---|---:|---:|
+| mean pinball loss | 2.2616 | **2.2512** (CI [−0.050, +0.030]) |
+| 75% band coverage | 59.0% | **70.5%** |
+| missed below the band (target 15%) | 33.3% | **22.5%** |
+| 80% band coverage | 72.4% | **82.3%** |
+| median bias, hours with 0–5 surfers | +4.67 | +4.49 |
+
+Smaller below-band miss rate in **4 of 4** rolling windows; lower pinball in
+1 of 4. So: adopted for the edges, where it fixes the lower tail repeatably at
+no cost on the proper scoring rule, and deliberately **not** for the median,
+whose +4.5 bias on near-empty hours it leaves where it was. That is a
+point-prediction problem for recalibration, not something a hurdle addresses —
+which is worth stating plainly, because the hurdle was originally proposed here
+as the fix for exactly that bias and it is not.
+
+One consequence for reading a forecast: a hurdle lower edge of 0.00 is now an
+answer rather than a failure. It means `P(no surfers)` exceeded the band's lower
+quantile for that hour — a dawn hour in late October, correctly — and on the
+2026-10-21 outlook that is 35 of 90 hours. The nightly check was changed to
+match: it fires when the lower edge does not **vary** across the day, or sits at
+zero on 80% or more of its hours, rather than on any zero at all.
+
+The limit now is the classifier: AUC 0.826 but it under-predicts emptiness
+(11.7% against an actual 16.5%), which accounts for most of the distance between
+22.5% and the 15% target. Isotonic calibration lifts AUC to 0.856 and Brier to
+0.1042 while moving that mean only to 12.5%, and the week-by-week shortfall
+tracks the rising autumn empty share — forward distribution shift rather than a
+calibration-method choice.
 
 Full investigation in `PROJECT_HISTORY.md`.
 

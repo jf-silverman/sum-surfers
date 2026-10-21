@@ -25,7 +25,7 @@ in a stat table; the chart budget goes where there is structure to see.
                           crossing point wherever the scaling happened to land.
                           Two panels, one scale each.
 
-The coverage panel is the honest half -- 80% nominal bands hold up at one day
+The coverage panel is the unflattering half -- 80% nominal bands hold up at one day
 out and fall apart by seven. That caveat is more use to a reader than the
 headline MAE.
 

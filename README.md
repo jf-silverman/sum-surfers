@@ -206,13 +206,35 @@ gives the right answer in both regimes — genuinely zero on hours where
 emptiness is likely, a real number on hours where it is not — instead of one
 flat answer for both.
 
-It is already built and measured (`code/eval_hurdle_model.py`): **better pinball
-loss on 5 of 5 random splits** (mean 3%; pinball is the proper scoring rule for
-quantiles and, unlike coverage, cannot be bought with a floor) and better MAE on
-5 of 5. It is **not adopted**, because it moved 80% coverage the wrong way on
-3 of 5 splits — a sharper model rather than a strictly better one, and swapping
-the model family means re-exporting the released bundle. The 30% alert exists so
-that trade is revisited when the data makes it worth revisiting.
+**This is how the band's two edges are fitted, as of 2026-10-20.** The median —
+the line the chart draws and the number the crowd level comes from — is still a
+plain quantile model on every row.
+
+The earlier measurement of this said the opposite, and was wrong because it
+split rows at random: at about 13 rows per day that puts hours from the same day
+on both sides of the split, so both models were told the test day's own crowd
+level. On a forward split by whole days, and on four successive ~15-day rolling
+windows (`code/eval_hurdle_model.py`):
+
+| on 417 held-out hours | one model per level | hurdle |
+|---|---:|---:|
+| mean pinball loss | 2.2616 | **2.2512** |
+| 75% band coverage | 59.0% | **70.5%** |
+| hours missed below the band (target 15%) | 33.3% | **22.5%** |
+| median bias on hours with 0–5 surfers | +4.67 | +4.49 |
+
+Across the four rolling windows the hurdle has the smaller below-band miss rate
+in **4 of 4** and lower pinball in only 1 of 4. So it is adopted for the edges,
+where it fixes the lower tail repeatably and costs nothing on pinball, and **not
+for the median**, whose roughly +4.5 bias on near-empty hours it does not touch.
+That bias is a point-prediction problem and belongs to recalibration instead.
+
+What remains is the empty-hour classifier: it ranks hours well (AUC 0.826) but
+under-predicts emptiness, 11.7% against an actual 16.5%, which is most of the
+gap still left between 22.5% and the 15% target. Isotonic calibration lifts its
+AUC to 0.856 and barely moves that mean, and the shortfall tracks the rising
+autumn empty share — so it is forward distribution shift, not a calibration
+method, and the 30% alert is still the thing watching it.
 
 ### What these numbers do not cover
 

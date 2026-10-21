@@ -3,7 +3,7 @@ fit_surfer_count_model.py
 --------------------------
 Phase 2 of the surfer-count modeling plan (see docs/PROJECT_HISTORY.md): fits
 Poisson and negative-binomial GLMs on data/training_features.csv (built by
-build_training_features.py) and reports which one fits better, plus honest
+build_training_features.py) and reports which one fits better, plus real
 out-of-sample accuracy via a held-out test split.
 
 Why Poisson/NegBin instead of linear regression: surfer_count is a
@@ -30,7 +30,7 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from statsmodels.discrete.discrete_model import NegativeBinomial
-from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from pathlib import Path
@@ -251,9 +251,8 @@ QUANTILE_DEGENERATE_STD_THRESHOLD = 0.5
 # numbers, which is how predict_surf_count.py came to raise and
 # demo_predictions.py came to print a floor of zero after the edge moved.
 #
-# code/export_model_release.py deliberately does NOT use these: it ships the
-# q0.10/q0.90 pair every figure in MODEL_CARD.md was measured on, and changing
-# the released bundle's band is a separate decision from changing the chart's.
+# code/export_model_release.py reads them too, as of the 2026-10-20 re-export
+# that put the public bundle and MODEL_CARD.md onto the same pair as the chart.
 BAND_LOWER_Q, BAND_UPPER_Q = 0.15, 0.90
 BAND_LABEL = f"{round((BAND_UPPER_Q - BAND_LOWER_Q) * 100)}%"
 
@@ -268,7 +267,7 @@ class ConstantQuantileModel:
     returns a flat zero except one fluke at 400 that tops out at 2 surfers.
     Callers that need a real, varying model (calibration, coverage reporting)
     must keep the default and let the error raise; only display code that can
-    honestly draw a flat band should opt in.
+    legitimately draw a flat band should opt in.
     """
 
     def __init__(self, value, quantile):
@@ -324,6 +323,161 @@ def fit_quantile_model_robust(X_train, y_train, quantile, base_kwargs=None,
         f"tail — see this function's docstring). Refusing to silently return a "
         f"trivial model."
     )
+
+
+# --- Hurdle band -----------------------------------------------------------
+#
+# The band's EDGES are fitted this way as of 2026-10-20; the median point
+# prediction is not. Measured on 417 held-out rows (forward day split) and on
+# four successive ~15-day rolling windows by code/eval_hurdle_model.py:
+#
+#                        one model per level      hurdle
+#     mean pinball              2.2616            2.2512   (CI [-0.050, +0.030])
+#     75% band coverage          59.0%             70.5%
+#     misses low (target 15%)    33.3%             22.5%
+#     median bias, 0-5 actual    +4.67             +4.49
+#
+# Across the four rolling windows the hurdle has the smaller low-miss rate in
+# 4/4 (28.5% -> 22.2%) and lower pinball in only 1/4. So it is adopted for the
+# edges, where it robustly fixes the lower tail at no cost in pinball, and NOT
+# for the median, whose +4.5 bias on near-empty hours it does not touch. That
+# bias is a point-prediction problem for recalibration, not for a hurdle.
+#
+# Why it works: one quantile model was being asked to describe two things at
+# once -- whether anyone is out at all, and how many are out when someone is.
+# The empty-hour share is strongly seasonal (8.0% in 2026-07, 19.5% in 2026-10,
+# 33.8% in 2025-11, 38.9% in 2025-12), which is what drove the low quantile to
+# collapse to a constant zero and forced the lower edge from 0.10 to 0.15.
+#
+# Known limit: the empty-hour classifier discriminates well (AUC 0.826) but
+# under-predicts emptiness (11.7% against an actual 16.5%), which is most of
+# the remaining 7 points of low-miss rate. Isotonic calibration lifts AUC to
+# 0.856 but moves the mean only to 12.5%, and the shortfall tracks the rising
+# autumn empty share -- forward distribution shift, not a calibration method.
+
+HURDLE_CLF_KWARGS = dict(max_iter=300, learning_rate=0.05, max_depth=3, random_state=42)
+# Conditional levels the positive-only quantiles are fitted at. The level that
+# composes back to an unconditional q differs per ROW, because p_zero does, so
+# no single conditional model serves every row; these are interpolated between.
+HURDLE_GRID = tuple(float(round(g, 2)) for g in np.arange(0.05, 1.0, 0.05))
+
+
+class _HurdleCore:
+    """The fitted hurdle itself: P(count>0) plus the conditional quantile grid.
+
+    Shared by every level of one band, and memoizes the last X it was asked
+    about. The chart calls the two edges back to back on the same single-row
+    frame, and each call otherwise re-runs the classifier and all 19 conditional
+    models — 0.11s a call, which at ~104 forecast hours is most of a minute of
+    pure duplicate work. A one-entry memo halves it and is exactly sized for
+    that access pattern.
+    """
+
+    def __init__(self, classifier, cond_models, grid):
+        self.classifier = classifier
+        self.cond_models = cond_models
+        self.grid = np.asarray(grid, dtype=float)
+        self._key = None
+        self._value = None
+
+    def prepare(self, X):
+        """(p_zero, conditional stack) for X, monotone in level."""
+        values = X.to_numpy() if hasattr(X, "to_numpy") else np.asarray(X)
+        key = (values.shape, values.tobytes())
+        if key == self._key:
+            return self._value
+        p_zero = 1.0 - self.classifier.predict_proba(X)[:, 1]
+        stack = np.maximum.accumulate(
+            np.vstack([np.asarray(self.cond_models[g].predict(X), dtype=float)
+                       for g in self.grid]), axis=0)
+        self._key, self._value = key, (p_zero, stack)
+        return self._value
+
+    def __getstate__(self):
+        # Never pickle the memo into the model cache.
+        return {"classifier": self.classifier, "cond_models": self.cond_models,
+                "grid": self.grid}
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._key = None
+        self._value = None
+
+
+class HurdleQuantileModel:
+    """One predictive quantile composed from P(count>0) x (count | count>0).
+
+    Exposes only `.predict(X)`, so it drops into any dict of per-level quantile
+    models (the chart's `quantile_models`, the model cache) in place of a plain
+    GBT. Levels of one band share a `_HurdleCore`, so fitting both edges costs
+    one classifier and one grid of conditional fits rather than two of each.
+
+    For a target quantile q: if the probability of an empty hour already
+    exceeds q the answer is 0, because the bottom q of the distribution is all
+    zeros; otherwise it is the conditional quantile at (q - p_zero)/(1 - p_zero).
+    """
+
+    degenerate = False   # a hurdle edge is never a ConstantQuantileModel floor
+
+    def __init__(self, quantile, core):
+        self.quantile = float(quantile)
+        self.core = core
+
+    @property
+    def grid(self):
+        return self.core.grid
+
+    @property
+    def classifier(self):
+        return self.core.classifier
+
+    def p_empty(self, X):
+        """P(no surfers this hour), per row."""
+        return self.core.prepare(X)[0]
+
+    def predict(self, X):
+        p_zero, stack = self.core.prepare(X)
+        grid = self.core.grid
+        adj = (self.quantile - p_zero) / np.maximum(1.0 - p_zero, 1e-9)
+        out = np.zeros(len(p_zero), dtype=float)
+        inside = adj > 0
+        if inside.any():
+            cols = np.where(inside)[0]
+            a = adj[inside]
+            lo = np.clip(np.searchsorted(grid, a, side="right") - 1, 0, len(grid) - 2)
+            # Clipping the weight holds the end model for a outside the grid.
+            w = np.clip((a - grid[lo]) / (grid[lo + 1] - grid[lo]), 0.0, 1.0)
+            out[inside] = (1.0 - w) * stack[lo, cols] + w * stack[lo + 1, cols]
+        return np.maximum(out, 0.0)
+
+
+def fit_hurdle_band(X, y, levels, grid=HURDLE_GRID, verbose=True):
+    """{level: HurdleQuantileModel} for `levels`, sharing one fitted hurdle.
+
+    `allow_degenerate=True` on the conditional fits: the positives exclude the
+    zeros that cause the collapse, so a collapse here would be a genuine
+    property of a conditional tail rather than the zero-inflation artifact, and
+    a display band should draw it rather than die. The band-health check in
+    code/email_daily_report.py remains the guard that a pinned edge is seen.
+    """
+    y = np.asarray(y, dtype=float)
+    is_pos = (y > 0).astype(int)
+    if is_pos.sum() < 50 or (len(y) - is_pos.sum()) < 10:
+        raise ValueError(
+            f"not enough of both classes to fit a hurdle: {int(is_pos.sum())} positive "
+            f"and {len(y) - int(is_pos.sum())} empty rows of {len(y)}")
+    classifier = HistGradientBoostingClassifier(**HURDLE_CLF_KWARGS).fit(X, is_pos)
+    pos = y > 0
+    X_pos = X.iloc[pos] if hasattr(X, "iloc") else X[pos]
+    cond_models = {g: fit_quantile_model_robust(X_pos, y[pos], float(g),
+                                                allow_degenerate=True)[0]
+                   for g in grid}
+    if verbose:
+        print(f"  Hurdle band: {int(is_pos.sum())} positive of {len(y)} rows "
+              f"({1 - is_pos.mean():.1%} empty); {len(grid)} conditional levels "
+              f"fitted on the positives.")
+    core = _HurdleCore(classifier, cond_models, grid)
+    return {lv: HurdleQuantileModel(lv, core) for lv in levels}
 
 
 def fit_quantile_intervals(X_train, y_train, X_test, y_test, lower_q=0.1, upper_q=0.9):
