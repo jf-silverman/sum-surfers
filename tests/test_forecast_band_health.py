@@ -186,3 +186,34 @@ def test_an_unreadable_forecast_is_reported_not_raised(isolated):
     fdir, _ = isolated
     (fdir / "forecast_2026-11-01.csv").write_text("not,a,forecast\n1,2,3\n")
     assert "Could not read" in edr.band_health_note()
+
+
+# --- the hurdle evaluation reads the band from the same place ---------------
+
+def test_hurdle_eval_scores_the_band_production_draws():
+    """eval_hurdle_model must score the edges production actually uses.
+
+    It was written when the band was q0.10/q0.90 and hardcoded those, so after
+    the move to q0.15 it would have compared a band nobody draws.
+    """
+    import importlib
+    import fit_surfer_count_model as fit
+    hurdle = importlib.import_module("eval_hurdle_model")
+
+    assert fit.BAND_LOWER_Q in hurdle.QUANTILES, (
+        f"q={fit.BAND_LOWER_Q} is the production lower edge but is not in "
+        f"eval_hurdle_model.QUANTILES {hurdle.QUANTILES}")
+    assert fit.BAND_UPPER_Q in hurdle.QUANTILES
+    pairs = [(lo, hi) for lo, hi, _label in hurdle.INTERVALS]
+    assert (fit.BAND_LOWER_Q, fit.BAND_UPPER_Q) in pairs, (
+        "the production band pair is not among the scored intervals")
+    assert hurdle.QUANTILES == tuple(sorted(hurdle.QUANTILES))
+
+
+def test_hurdle_eval_uses_a_forward_day_split():
+    """Not train_test_split: a random row split leaks the day's own level (B21)."""
+    src = (Path(__file__).resolve().parents[1]
+           / "code" / "eval_hurdle_model.py").read_text()
+    assert "train_test_split" not in src, (
+        "eval_hurdle_model is back on a random row split, which leaks (B21)")
+    assert 'scheme="forward"' in src
