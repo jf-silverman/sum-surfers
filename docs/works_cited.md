@@ -41,6 +41,26 @@ Two findings bear on this project:
 access, so the summary above rests on the abstract and indexed excerpts, not a
 full-text read. Worth reading properly before leaning on it.
 
+## Non-academic crowd predictors (checked 2026-10-22)
+
+**crowdfactor.** https://github.com/craigmulligan/crowdfactor
+
+An open-source project that streams a minute from a Surfline camera (its
+examples use Venice Breakwater, Los Angeles) every 10 minutes, counts the
+surfers with a computer-vision model, stores each count with Surfline's surf
+rating, and predicts from day of week, time, weather and rating, retraining
+daily. The idea closest to this project's. Its page reports no accuracy figures
+and does not name the model.
+
+**SurfMap.** https://surf-map.com/
+
+A forecast app whose FAQ says each spot comes with "crowd info, hour by hour",
+described as how crowded it usually is. It does not say how that is derived.
+
+Neither changes the academic picture above, but the README's novelty claim is
+worded to match: crowd forecasting for surf exists informally; what is missing
+is a published, scored record of one.
+
 ## Surf crowding: why it is studied, but not predicted
 
 **The institutional foundations of surf break governance in Atlantic Europe.**

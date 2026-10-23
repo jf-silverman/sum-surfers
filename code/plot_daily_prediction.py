@@ -171,6 +171,7 @@ READABLE_NAMES = {
     "consistency_wave_count": "Wave consistency", "primary_swell_height_ft": "Swell height",
     "is_night": "Night", "pressure_mb": "Pressure", "wind_speed_mph": "Wind speed",
     "wind_gust_mph": "Wind gust", "rating_value": "Surf rating",
+    "wind_dir_sin": "Wind direction", "wind_dir_cos": "Wind direction",
 }
 
 
@@ -457,7 +458,16 @@ def main():
         predictor_values = {c: (None if pd.isna(feat_row.iloc[0].get(c, np.nan))
                                 else round(float(feat_row.iloc[0][c]), 4))
                             for c in numeric_cols}
+        # Surfline's own rating for the hour, raw (1 Poor .. 4 Fair to good),
+        # for the week chart's good-session outline. The copy in
+        # predictor_values is standardized for the model and can't be
+        # compared against a rating threshold.
+        try:
+            rating_raw = float(predictors.get("rating_value"))
+        except (TypeError, ValueError):
+            rating_raw = None
         return dict(hour=hk, point=point, point_raw=point_raw, quantiles=quantiles,
+                    rating_value=rating_raw,
                     recal_a=recal["a"], recal_b=recal["b"],
                     weather_simple=weather_simple, is_night=is_night,
                     tide_ft=tide_ft, in_training_range=in_training_range,
@@ -489,15 +499,21 @@ def main():
     d = pd.DataFrame(records)
     save_forecast_record(target_date, records)
 
-    fig = plt.figure(figsize=(14, 6.5), facecolor=BG_COLOR)
-    # The table panel carries four columns since the crowd level joined it
-    # (2026-09-23) — at the old 3.2:1 it clipped its own right-hand column.
-    gs = fig.add_gridspec(1, 2, width_ratios=[2.9, 1.1], wspace=0.11)
+    fig = plt.figure(figsize=(14, 7.6), facecolor=BG_COLOR)
+    # Margins are set here, explicitly, rather than by tight_layout, which
+    # ignores its rect on this figure (twinx and table axes are incompatible
+    # with it). The bottom margin holds, top to bottom: the tick labels, the
+    # "Time" label, the legend (moved below the plot 2026-10-22, after the
+    # tide line kept running into it) and the footer.
+    gs = fig.add_gridspec(1, 2, width_ratios=[3.0, 1.0], wspace=0.24,
+                          left=0.055, right=0.975, top=0.89)
     ax = fig.add_subplot(gs[0], facecolor=AXES_BG)
     ax_table = fig.add_subplot(gs[1], facecolor=AXES_BG)
 
     y_top = d["quantiles"].apply(lambda q: q[FAN_LEVELS[-1]]).max() * 1.18
-    ax.set_ylim(bottom=0, top=y_top)
+    # A little room below zero: an empty hour's marker sits ON zero, and with
+    # the axis floor at exactly 0 the bottom half of it was clipped away.
+    ax.set_ylim(bottom=-0.05 * y_top, top=y_top)
 
     for _, row in d.iterrows():
         if row["is_night"]:
@@ -557,18 +573,14 @@ def main():
     # without this stamp a published chart is not attributable to any
     # particular snapshot and an odd-looking older chart can't be diagnosed
     # after the fact.
+    # Kept to two lines for the README (2026-10-22); the model's recalibration
+    # terms and the detector's own scores are in docs/HOW_IT_WORKS.md instead.
+    # Every value here is still read from this run, so it refreshes nightly.
     info_text = (
-        f"Model: gradient-boosted trees (quantile regression); median "
-        + (f"recalibrated nightly on the scored record ({recal['a']:+.1f} + {recal['b']:.2f}x), "
-           if recal["applied"] else "uncorrected (recalibration not applied), ")
-        + f"band edges from a hurdle fit  "
-        f"|  Top predictors: {predictors_str}\n"
-        f"Model fitted {fitted_at:%Y-%m-%d} on {trained_rows:,} detection-hours "
-        f"({df['date'].min()} to {df['date'].max()}); reused since, refit weekly  "
-        f"|  Surfer detector (YOLOv8s, Sept 2026 fog retrain — actual training log): "
-        f"precision {DETECTOR_PRECISION:.1%}, recall {DETECTOR_RECALL:.1%}"
+        f"Model fitted {fitted_at:%Y-%m-%d} on {trained_rows:,} counted hours "
+        f"({df['date'].min()} to {df['date'].max()}).  Top predictors: {predictors_str}.\n"
+        + crowd_key_text(short=True)
     )
-    info_text += "\n" + crowd_key_text()
     incomplete = [r for r in records if r["missing_predictors"]]
     if incomplete:
         # Never silent: an hour the model scored on fewer inputs than it was
@@ -585,7 +597,8 @@ def main():
             f"\n{', '.join(f'{lv:.0%}' for lv in degenerate_levels)} band flat: "
             f"{zero_pct:.0%} of recorded hours had no surfers, so that percentile is 0"
         )
-    fig.text(0.5, 0.01, info_text, fontsize=8, ha="center", va="bottom", color=MUTED_TEXT)
+    fig.text(0.055, 0.02, info_text, fontsize=9, ha="left", va="bottom",
+             color=MUTED_TEXT, linespacing=1.5)
 
     ax2 = ax.twinx()
     ax2.set_facecolor(AXES_BG)
@@ -598,7 +611,8 @@ def main():
     for spine in ax2.spines.values():
         spine.set_color(GRID_COLOR)
 
-    ax.set_title(f"Predicted surfer count — {target_date.strftime('%A, %B %d, %Y')}", color=TEXT_COLOR)
+    ax.set_title(f"Predicted surfer count — {target_date.strftime('%A, %B %d, %Y')}",
+                 color=TEXT_COLOR, pad=18)
     ax.set_xlabel("Time", color=TEXT_COLOR)
     ax.set_ylabel("Predicted surfer count", color=TEXT_COLOR)
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%-I %p"))
@@ -614,7 +628,8 @@ def main():
     handles1, labels1 = ax.get_legend_handles_labels()
     handles2, labels2 = ax2.get_legend_handles_labels()
     legend = ax.legend(handles1 + handles2 + [fan_patch, night_patch], labels1 + labels2 + [fan_patch.get_label(), "Night hours"],
-                        loc="upper left", ncol=2, fontsize=8, facecolor=AXES_BG, edgecolor=GRID_COLOR)
+                        loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=4,
+                        fontsize=8.5, facecolor=BG_COLOR, edgecolor=GRID_COLOR)
     for text in legend.get_texts():
         text.set_color(TEXT_COLOR)
     ax.grid(alpha=0.25, color=GRID_COLOR)
@@ -625,24 +640,25 @@ def main():
     # before that the table showed only the range, which left the reader no
     # single number to act on.
     ax_table.axis("off")
-    ax_table.set_title(f"Predicted count, {BAND_LABEL} range, crowd level",
-                       fontsize=10, pad=10, color=TEXT_COLOR)
+    ax_table.set_title(f"Likely range ({BAND_LABEL}) and crowd level",
+                       fontsize=10, pad=18, color=TEXT_COLOR)
     # The Crowd column is read off the RATING_QUANTILE reading of the same
     # fitted quantiles, not off the Predicted column beside it — see
     # code/crowd_rating.py for why, and code/eval_crowd_rating.py for the
     # held-out numbers. The two can therefore disagree by a level, which is
     # the point: the median under-reports crowded hours.
-    cell_text = [[row["hour"].strftime("%-I:%M %p"),
-                  f"{row['point']:.0f}",
+    # The point count column was dropped 2026-10-22: the line on the chart
+    # already carries the median, and the table reads faster as range + level.
+    cell_text = [[row["hour"].strftime("%-I %p"),
                   f"{row['quantiles'][FAN_LEVELS[0]]:.0f}–{row['quantiles'][FAN_LEVELS[-1]]:.0f}",
                   f"{row['crowd_level']} {level_info(row['crowd_level'])['name']}"]
                  for _, row in d.iterrows()]
     table_h = min(0.95, 0.062 * (len(cell_text) + 1))
-    tbl = ax_table.table(cellText=cell_text, colLabels=["Time", "Count", f"{BAND_LABEL} range", "Crowd"],
-                          cellLoc="center", bbox=[0.0, 0.96 - table_h, 1.0, table_h])
+    tbl = ax_table.table(cellText=cell_text, colLabels=["Hour", "Range", "Level"],
+                          cellLoc="center", bbox=[0.0, 1.0 - table_h, 1.0, table_h])
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(8.5)
-    crowd_col = 3
+    crowd_col = 2
     for (r, c), cell in tbl.get_celld().items():
         cell.set_edgecolor(GRID_COLOR)
         if r == 0:
@@ -663,8 +679,7 @@ def main():
     # table axes are incompatible), so the bottom margin is set explicitly
     # afterwards. Needed once the degenerate-band note added a third footer
     # line, which ran straight into the "Time" axis label.
-    fig.tight_layout(rect=[0, 0.06, 1, 1])
-    fig.subplots_adjust(bottom=0.10 + 0.03 * (info_text.count("\n") - 1))
+    fig.subplots_adjust(bottom=0.225 + 0.022 * (info_text.count("\n") - 1))
 
     CHARTS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = DAILY_DIR / f"surfer_count_{target_date.isoformat()}.png"
@@ -880,10 +895,12 @@ def render_detection_frame(img_path, model, draw_boxes=True, boxes=None):
 FORECASTS_DIR = _PROJECT_ROOT / "data" / "forecasts"
 
 
-def crowd_key_text(n_rows=None):
+def crowd_key_text(n_rows=None, short=False):
     """One footer line defining what each crowd level means in surfers."""
     parts = "  ".join(f"{b['level']} {b['name']} {band_text(b['level'], units=False)}"
                       for b in CROWD_LEVELS)
+    if short:
+        return f"Crowd level (surfers): {parts}"
     basis = f" of {n_rows:,} recorded hours" if n_rows else ""
     return (f"Crowd level (surfers): {parts}  —  equal fifths{basis}, read off the forecast's "
             f"{RATING_QUANTILE:.0%} percentile, not its median (code/crowd_rating.py)")
@@ -1081,6 +1098,17 @@ GOOD_TIDE_RING_WIDTH = 2.6
 GOOD_TIDE_MAX_FT = 3.0          # what counts as a good tide for this highlight
 GOOD_TIDE_MIN_FRAC = 0.5        # a cell is highlighted above this share of the hour
 
+# A second, thin PURPLE line just inside the green one marks a good-tide hour
+# whose Surfline rating is also fair or better: low tide AND decent surf. It
+# sits inside the green ring rather than replacing it so the tide reading is
+# never lost, and it is inset so it stays clear of the gutter between cells.
+# The purple is mid-lightness so it holds against both the darkest and the
+# lightest crowd fill.
+GOOD_SURF_RING = "#a66bff"
+GOOD_SURF_RING_WIDTH = 1.6
+GOOD_SURF_MIN_RATING = 3        # Surfline: 1 Poor, 2 Poor to fair, 3 Fair, 4 Fair to good
+GOOD_SURF_INSET = 0.07
+
 
 def low_tide_fraction(records):
     """{hour: share of that hour spent under GOOD_TIDE_MAX_FT}.
@@ -1148,7 +1176,7 @@ def generate_week_chart(made_date, day_records, n_train_rows):
     ax = fig.add_subplot(gs[0], facecolor=AXES_BG)
     ax_table = fig.add_subplot(gs[1], facecolor=AXES_BG)
 
-    flagged = good_tide_cells = 0
+    flagged = good_tide_cells = good_surf_cells = 0
     for row_i, (day, records) in enumerate(day_records):
         by_hour_num = {r["hour"].hour: r for r in records}
         low_frac = low_tide_fraction(records)
@@ -1167,6 +1195,14 @@ def generate_week_chart(made_date, day_records, n_train_rows):
                                        edgecolor=GOOD_TIDE_RING if good_tide else AXES_BG,
                                        linewidth=GOOD_TIDE_RING_WIDTH if good_tide else 1.5,
                                        zorder=3 if good_tide else 2))
+            rating = r.get("rating_value")
+            if good_tide and rating is not None and rating >= GOOD_SURF_MIN_RATING:
+                good_surf_cells += 1
+                ax.add_patch(plt.Rectangle(
+                    (col_i + 0.03 + GOOD_SURF_INSET, row_i + 0.05 + GOOD_SURF_INSET),
+                    0.94 - 2 * GOOD_SURF_INSET, 0.90 - 2 * GOOD_SURF_INSET,
+                    facecolor="none", edgecolor=GOOD_SURF_RING,
+                    linewidth=GOOD_SURF_RING_WIDTH, zorder=3.5))
             low_confidence = (not r["in_training_range"]) or r["missing_predictors"]
             if low_confidence:
                 flagged += 1
@@ -1199,10 +1235,13 @@ def generate_week_chart(made_date, day_records, n_train_rows):
                for b in CROWD_LEVELS]
     handles.append(Patch(facecolor=CROWD_COLORS[3], edgecolor=GOOD_TIDE_RING, linewidth=2.2,
                          label=f"green outline = mostly under {GOOD_TIDE_MAX_FT:.0f} ft tide"))
+    handles.append(Patch(facecolor=CROWD_COLORS[3], edgecolor=GOOD_SURF_RING,
+                         linewidth=GOOD_SURF_RING_WIDTH,
+                         label="purple inner outline = low tide and surf rated fair or better"))
     handles.append(Patch(facecolor="none", hatch="xx", edgecolor=CORAL,
                          label="lower confidence (see footer)"))
     legend = ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.11),
-                       ncol=7, fontsize=8, facecolor=AXES_BG, edgecolor=GRID_COLOR)
+                       ncol=4, fontsize=8, facecolor=AXES_BG, edgecolor=GRID_COLOR)
     for text in legend.get_texts():
         text.set_color(TEXT_COLOR)
 
@@ -1246,6 +1285,9 @@ def generate_week_chart(made_date, day_records, n_train_rows):
         notes.append(f"{good_tide_cells} hour(s) are outlined in green: more than half the hour "
                      f"sits under {GOOD_TIDE_MAX_FT:.0f} ft of tide, which is when this spot is "
                      f"busiest. The fill still reads the crowd level")
+    if good_surf_cells:
+        notes.append(f"{good_surf_cells} of those also have a purple inner outline: "
+                     f"Surfline rates the surf fair or better that hour")
     short = FORECAST_DAYS - len(day_records)
     if short:
         notes.append(f"{short} of the {FORECAST_DAYS} requested days had no forecast data "
@@ -1265,9 +1307,12 @@ def generate_week_chart(made_date, day_records, n_train_rows):
         f"Each cell is the predicted surfer count for that hour; its colour is the crowd level.  "
         f"Numbers this far out move — day 7 is the same model on a week-old view of the weather.\n"
         f"{crowd_key_text(n_train_rows)}\n"
-        + "  |  ".join(notes)
+        + "\n".join(notes)
     )
-    fig.text(0.5, 0.045, footer, fontsize=7.5, ha="center", va="bottom", color=MUTED_TEXT)
+    # One note per line, left-justified: joined on one line with "|" they ran
+    # off both edges of the figure once the purple-outline note was added.
+    fig.text(0.075, 0.02, footer, fontsize=7.5, ha="left", va="bottom", color=MUTED_TEXT,
+             linespacing=1.4)
     # Explicit margins, not tight_layout: the table axes makes tight_layout warn
     # and then lay the footer over the x-axis label and the legend.
     fig.subplots_adjust(left=0.075, right=0.985, top=0.91, bottom=0.26)
@@ -1475,43 +1520,24 @@ def update_readme(target_date, detection_capture=None, week_days=0, week_start=N
               f"Add {README_START_MARKER} / {README_END_MARKER} to enable this.")
         return
 
-    # Static caption text, rewritten into the README on every run. Kept
-    # verbatim from what's currently in README.md so the daily automation
-    # preserves it instead of overwriting it.
+    # Static caption text, rewritten into the README on every run, so these
+    # strings ARE the README's captions: edit here, not in README.md. Cut to
+    # one or two sentences each in the 2026-10-22 README overhaul; the detail
+    # they used to carry lives in docs/HOW_IT_WORKS.md.
     DETECTION_CAPTION = (
-        "Each green box below contains a surfer, according to the object "
-        "detection model.  Look carefully and you may find "
-        "additional surfers that the model missed or other objects which are "
-        "misclassified as surfers - like the wind sock at the bottom center "
-        "of the photo.  Birds, reflections, people on the beach and sun glare "
-        "fool it too: [what isn't a surfer](docs/non_surfer_objects.md) "
-        "catalogs each one, how to tell it apart, and what the pipeline does "
-        "about it.  **Each hour is shown twice: first the bare frame, so you "
-        "can hunt for the surfers yourself as small dark specks, then the same "
-        "frame with the model's boxes drawn.**  Try it before the boxes appear - "
-        "it shows how hard these are to see, which is the whole problem the "
-        "model is solving.  Each frame shows the camera's full width, the same "
-        "strip the pipeline counts, so the number printed is the whole count "
-        "for that hour.\n"
+        "Each green box is a surfer, according to the detection model. Each "
+        "hour is shown twice, first bare and then with the boxes, so you can "
+        "try spotting the surfers yourself first. It still misses some surfers "
+        "and occasionally boxes something else: [what isn't a "
+        "surfer](docs/non_surfer_objects.md)."
+        "\n"
     )
     FORECAST_CAPTION = (
-        "Once enough hours and days were gathered along with weather and surf "
-        "conditions, a surf count prediction model was built to forecast how "
-        "many surfers would be present at each hour for the coming day.  This "
-        "is useful for surfers to plan to avoid busy times or at least know "
-        "what to expect.  The forecast still runs about one surfer low on "
-        "average, and it misses by about five surfers in a typical hour - "
-        "crowds depend on plenty of things the weather and surf data never "
-        "see.  The detector underneath it used to undercount badly in fog and "
-        "glare, which made the forecast worse; that was fixed in September "
-        "2026 by labeling those conditions and retraining, so what remains is "
-        "the prediction model's own error.  The right-hand column rates each "
-        "hour from 1 (near-empty) to 5 (packed), using the five equal slices "
-        "of every hour the camera has counted so far."
-        # Points at the reference section, which lives at the foot of the
-        # README. Kept here rather than in README.md because this caption is
-        # rewritten from this string on every run.
-        "  [How to Read This Chart](#how-to-read-the-daily-chart)\n"
+        "The forecast for each hour of the coming day, made the evening before."
+        " The aqua line is the best guess, the shaded band is the likely range,"
+        " the dashed green line is the tide, and the right-hand column rates "
+        "each hour from 1 (near-empty) to 5 (packed)."
+        "\n"
     )
 
     detection_block = ""
@@ -1525,17 +1551,12 @@ def update_readme(target_date, detection_capture=None, week_days=0, week_start=N
         )
 
     WEEK_CAPTION = (
-        "The same model, run out to a week. Every hour gets a crowd level from "
-        "1 (near-empty) to 5 (packed); the levels are the five equal slices of "
-        "every hour the camera has counted so far, so level 3 is literally an "
-        "average hour and level 5 is the busiest fifth of them. The number in "
-        "each cell is the predicted count, and the colour is the level. The "
-        "level is not read off that number: the forecast pulls toward the "
-        "middle, so the middle of its range under-calls busy hours, and the "
-        "level comes from a point higher up the range that was measured to "
-        "catch them. Surf and weather data run the full seven days, but a "
-        "forecast seven days out is still a forecast seven days out - read the "
-        "far right of the grid as a shape, not a number.\n"
+        "The same forecast run out a week, with each hour's crowd level from 1 "
+        "(near-empty) to 5 (packed). A green outline marks an hour mostly under"
+        " 3 ft of tide, and a purple line inside it means Surfline also rates "
+        "the surf fair or better. The further right, the less certain: read the"
+        " end of the week as a shape, not a number."
+        "\n"
     )
 
     week_block = ""

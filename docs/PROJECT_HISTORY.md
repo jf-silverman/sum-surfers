@@ -6328,3 +6328,112 @@ without the hurdle or this correction. It is labelled a reconstruction and is
 left as it was.
 
 15 tests added (`tests/test_point_recalibration.py`); 57 pass.
+
+---
+
+## 2026-10-22 — README overhaul drafted, and six walk-through figures
+
+The README had grown by accretion: accuracy sections written as changes landed,
+the forecast's October model work explained in full on the front page, and no
+order a newcomer could follow. Joel marked up an outline (why → today's
+forecast → how it works → findings → accuracy → limits → next → try it) and the
+new page is drafted as `README_draft.md`. It is not swapped in yet: the nightly
+job stages and pushes `README.md`, so a draft edited in place would have been
+published that night.
+
+Technical material moved rather than cut. `HOW_IT_WORKS.md` gained "Against a
+human count" (the hand-review table, why it differs from validation precision
+and recall, the breakdown of misses) and "The live record" (scored forecast
+error and coverage by lead); setup, environment variables, data locations and
+the schedule moved to the new `docs/SETUP.md`.
+
+**Stale claims found on the way, all fixed or rewritten from fresh runs.**
+- The forecast caption said the forecast "runs about one surfer low". The log
+  says the opposite: actual − predicted averages −1.16 over 367 day-ahead hours,
+  so it runs about 1.2 *high*.
+- The accuracy section said the range "stops holding by seven" days, catching
+  63%. True in September; on the record through 2026-10-21 the 80% band caught
+  80–85% at every lead. `forecast_accuracy.png`'s title said the same thing in
+  a hardcoded string. It now follows the data, and the coverage panel scores
+  only 10th–90th band rows rather than pooling them with the 15th–90th rows
+  made since 2026-10-20.
+- `HOW_IT_WORKS.md` still described the band check as firing on any zero edge,
+  the rule replaced on 2026-10-20.
+- The README called no published work or website a surfer-crowd forecaster.
+  The academic half holds; the website half does not. crowdfactor (open source,
+  Venice Breakwater) counts and predicts much as this project does, and SurfMap
+  lists typical hourly crowds. Both are now in `works_cited.md`, and the
+  README claims a published, scored record rather than novelty of the idea.
+
+**Figures** (`analysis/readme_figures/make_readme_figures.py`): a pipeline
+diagram following one real hour (2026-10-17 11:14, 19 surfers, chosen because
+that day's forecast error was close to typical); a standing / sitting / lying
+comparison from hand labels; a when-to-go heatmap of median count by hour and
+weekday (1,930 hours, 150 days); a seasons chart of monthly median count and
+empty share with unrecorded months shaded; the share of forecast hours within
+N surfers (59% within 5 the night before); and count by Surfline rating at
+0–3 ft tide (medians 18 / 23 / 26 for poor / poor-to-fair / fair; fair-to-good
+left out at 3 hours on 2 days). The seasons chart carries its own caveat:
+counts before 2026-09-21 come from the October 2025 detector, which missed more
+surfers in fog, so the winter-2025 empty share may run high.
+
+### Review round one (same day)
+
+Joel's first read of the draft brought a second pass:
+
+- **The daily forecast chart's layout.** An empty hour's weather marker sits on
+  zero, and with the axis floor at exactly zero its bottom half was clipped
+  away, so the morning markers were only partly visible. The floor now sits
+  just below zero. The legend moved below the plot after the tide line kept
+  running into it. The footer is cut to two left-justified lines (fit date,
+  rows, date span and top predictors; the crowd-level key), still computed on
+  every run; the recalibration terms and the detector's validation scores
+  left it for HOW_IT_WORKS. The table lost its point-count column (the line
+  already carries the median) and is now hour, range and level. `wind_dir_sin`
+  had been printing raw among the top predictors and now reads "Wind
+  direction". Checked with a test render whose every write was stubbed out,
+  so no forecast file, README or published chart was touched.
+- **Step 1 of the walk-through was wrong about the crop.** It showed the
+  stored strip and called it "the whole strip the project counts", which
+  implied a centre crop. The crop keeps the camera's full 1280 px width and
+  cuts rows 420 to 600 of 720, removing the sky above and the near water
+  below. Step 1 now shows the full frame from the saved clip with that band
+  outlined.
+- **One hour, five images.** The single pipeline diagram is split into one
+  image per step so each step's sentence sits directly above its picture.
+  The followed hour moved from 2026-10-17 11:14 to 2026-09-25 16:20: a
+  high-contrast frame with three riders up, plus sitting and lying-down
+  surfers, on a day whose forecast range sits off zero (10-13 to 10-20 had the
+  lower edge pinned at zero all day, which the hurdle band since fixed). That
+  hour was forecast at 26 (12 to 37) and counted at 36; the day's average
+  miss was 3.9. Step 4's conditions got small drawn icons.
+- **The poses figure's "standing" example was a paddleboarder** (largest
+  standing box in the old frame, paddle in hand). It now uses a rider on a
+  wave from 2025-10-15 11:50, picked by its box rather than by size.
+- **Tide shown as bars.** Median count per one-foot tide bin replaces the
+  scatter, whose hour-to-hour spread buried the relationship: 22, 25 and 23
+  surfers in the 0-1, 1-2 and 2-3 ft bins, 3 at 4-5 ft, 0 above 5.
+- **When-is-it-busy restricted to tide below 3 ft**, so a low-tide weekday
+  doesn't read as a weekday pattern. At low tide between 8am and 5pm the
+  typical weekend hour had 34 surfers against 22 on a weekday.
+- **The weekend chart was stale.** It stopped at 10-08 and its title still
+  said "n=91 days, Oct 2025 - Aug 2026". Redrawn on the full record, October
+  2026 is 1.2x weekend over weekday, not the 0.81x the README quoted; the
+  range across months is 1.1x (March, May 2026) to 2.4x (November 2025). The
+  old analysis script's title is now computed from its data.
+- **Seasons** shows month labels under both panels; **the detector chart**
+  has more room between title and subtitle and says "object detector".
+
+### Week chart: a purple outline for low tide plus decent surf (2026-10-23)
+
+A week-chart cell already outlined in green (more than half the hour under
+3 ft of tide) now gets a thin purple line just inside the green when Surfline
+also rates that hour fair or better (rating 3+ of 1 Poor .. 4 Fair to good).
+It is inset rather than a replacement so the tide reading is never lost. The
+raw rating is now carried on each hour's forecast record; the copy the model
+sees is standardized and can't be compared to a rating. In the first preview
+(Oct 24 to 30), 10 of the 31 green hours also got the purple line. The
+week chart's footer notes moved to one per line, left-justified, after the
+new note pushed the single "|"-joined line off both edges. Step 1 of the
+README walk-through now dims the area outside the counted band to 65%
+brightness instead of 35%.

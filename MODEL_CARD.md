@@ -440,7 +440,7 @@ for the current record.
 ## Reproducing these numbers
 
 The detector weights and a held-out evaluation set are committed; see
-[Run It Yourself](README.md#run-it-yourself). `data/model_release/` ships the
+[Run it yourself](docs/SETUP.md#run-it-yourself). `data/model_release/` ships the
 fitted forecast model, the 417 held-out rows it never saw, and the metadata
 above, so the reported accuracy can be recomputed rather than taken on trust.
 

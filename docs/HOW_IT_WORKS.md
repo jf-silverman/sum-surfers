@@ -330,6 +330,38 @@ area relative to the larger one. Suppressing nested boxes brought clear-day
 counts to **102%** of the human count and cut average error there by 38%, with
 hand-counted frames landing at exactly 100%.
 
+### Against a human count
+
+The validation figures above score boxes against labelled boxes. The question
+the forecast depends on is simpler: is each box on a surfer, and is every surfer
+boxed? That was checked by hand on production frames — **220 frames across 16
+days spanning a year, 3,880 real surfers**:
+
+| | |
+|---|---|
+| precision — of the boxes it drew, how many were on a surfer | **98.7%** |
+| recall — of the surfers really there, how many it found | **91.9%** |
+| average count error | **1.5 surfers** per frame |
+
+These run higher than the validation set's 88.5% / 81.3% because they ask a
+more forgiving question: a box on the right surfer counts even if it does not
+hug the outline closely enough to pass an overlap test. Neither is wrong; they
+measure different things, and both are kept.
+
+![Detector count against a hand count, one point per reviewed frame](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/detector_accuracy.png)
+
+Overall the detector counts about 7% low (fitted slope 0.94), and the gap
+widens in a crowded lineup. **It misses far more than it invents.** Of 316
+missed surfers, 286 had no box at all and 30 were inside a box drawn around
+several people; of 46 false positives, 35 were on something that is not a
+surfer — a bird, a wind sock, a head on the beach — and 11 were a second box on
+a surfer already counted. Two in three misses were lying on their boards, and
+only 10 were standing: a rider is an unmistakable shape, a prone surfer a dark
+smudge a few pixels across. Hand counting is itself imperfect, and 8 boxes and
+45 possible misses were flagged as judgement calls the reviewer would not
+defend either way. The raw record is
+[`data/reviews/review_all.csv`](../data/reviews/review_all.csv).
+
 ## Predictors: weather, tide, swell, wind, energy, consistency
 
 Separate from detection, `code/get_surf_predictors.py` pulls conditions
@@ -365,6 +397,23 @@ costs about another 0.8, because the model then also has to cope with a genuine
 seasonal level shift. The published figure is now the forward-in-time one: fit on
 the past, scored on days that had not happened yet, which is the only version
 that matches how the forecast is used.
+
+### The live record
+
+Held-out rows test the model; the live record tests the forecast as published.
+Every forecast is written to `data/forecasts/forecast_log.csv` before its day
+and scored against the detector's count afterwards, so the record cannot be
+revised after the fact. From 2026-09-23 to 2026-10-21, **2,555 scored hours**:
+the forecast made the evening before missed by **5.4 surfers** on average (367
+hours) and ran about 1.2 high; at seven days out the average miss was 6.4. The
+80% range held at every lead, catching 80–85% of actual counts. In September it
+had fallen to 63% at seven days out, before lead-dependent widening was added.
+
+![Forecast error and prediction-range coverage against lead time](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/forecast_accuracy.png)
+
+The record so far covers autumn only. Neither the hurdle-fitted band edges nor
+the nightly recalibration of the median, both adopted 2026-10-20/21 and
+described below, is in these figures yet.
 
 Empirical coverage of the GBT quantile [prediction intervals](#term-prediction-interval)
 is checked directly against a held-out split by
@@ -452,9 +501,12 @@ nothing failed — the band was computed, drawn and recorded as designed, and a
 band with its floor on zero looks like a band. Two checks now run with every
 scored day:
 
-- **The lower edges of the newest forecast.** Any edge at zero is reported. The
-  symptom itself, not a proxy, and it fires on a partial collapse as well as a
-  total one — an earlier four-day episode affected only some hours per day.
+- **The lower edges of the newest forecast.** Reported when the edge does not
+  vary at all across the forecast hours, or sits at zero on at least 80% of
+  them. Until 2026-10-20 any zero was reported, which caught an earlier
+  four-day partial episode; once the edges came from a hurdle fit (below), a
+  zero on a dawn or dusk hour became an informative answer rather than a
+  symptom, and that rule would have fired every night.
 - **The share of empty hours**, cumulative and trailing 30 days, against a **30%
   threshold**. The leading indicator, and because it moves seasonally it warns
   before a band collapses rather than after.

@@ -25,9 +25,12 @@ in a stat table; the chart budget goes where there is structure to see.
                           crossing point wherever the scaling happened to land.
                           Two panels, one scale each.
 
-The coverage panel is the unflattering half -- 80% nominal bands hold up at one day
-out and fall apart by seven. That caveat is more use to a reader than the
-headline MAE.
+The coverage panel is the unflattering half when it fails, so it is kept even
+while it holds: in September 2026 the 80% band fell to 63% at seven days out,
+and the lead-dependent widening added afterwards brought every lead back to
+about 80-85% by late October. It scores only rows made with the 10th-90th
+percentile band, since the band moved to 15th-90th on 2026-10-20 and pooling
+the two would describe neither.
 
 Usage:
     python code/plot_accuracy_charts.py
@@ -106,16 +109,16 @@ def detector_chart(s):
     lx = hi * 0.56
     ax.text(lx, lx + hi * 0.055, "perfect agreement", color=INK_DIM, fontsize=10,
             rotation=38, rotation_mode="anchor", va="bottom", ha="left")
-    ax.text(lx, sl * lx + ic - hi * 0.075, f"detector = {sl:.2f} x actual",
+    ax.text(lx, sl * lx + ic - hi * 0.075, f"object detector = {sl:.2f} x actual",
             color=LIME, fontsize=10, rotation=36, rotation_mode="anchor",
             va="top", ha="left")
 
     ax.set_xlim(-2, hi); ax.set_ylim(-2, hi)
     ax.set_xlabel("surfers actually there (counted by hand)", color=INK, fontsize=10.5)
-    ax.set_ylabel("surfers the detector counted", color=INK, fontsize=10.5)
-    ax.set_title("The detector against a human count", color=INK, fontsize=13.5,
-                 fontweight="bold", loc="left", pad=14)
-    ax.text(0, 1.015,
+    ax.set_ylabel("surfers the object detector counted", color=INK, fontsize=10.5)
+    ax.set_title("The object detector against a human count", color=INK, fontsize=13.5,
+                 fontweight="bold", loc="left", pad=28)
+    ax.text(0, 1.025,
             f"{len(s)} frames hand-counted across {s.date.nunique()} days  ·  "
             f"{int(s.truth.sum()):,} real surfers  ·  r = {r:.3f}",
             transform=ax.transAxes, color=INK_DIM, fontsize=9.5)
@@ -130,10 +133,12 @@ def forecast_chart():
     f = pd.read_csv(FLOG)
     s = f[f.actual.notna()].copy()
     s["hit"] = (s.actual >= s.lower_q10) & (s.actual <= s.upper_q90)
+    s["band80"] = (s.band_lower_q == 0.10) & (s.band_upper_q == 0.90)
     g = s.groupby("lead_days").apply(
         lambda d: pd.Series({"n": len(d),
                              "mae": (d.predicted - d.actual).abs().mean(),
-                             "cover": 100 * d.hit.mean()}), include_groups=False)
+                             "cover": 100 * d.hit[d.band80].mean()}),
+        include_groups=False)
     g = g.loc[g.n >= 30]
 
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(11.2, 4.6), facecolor=BG)
@@ -157,7 +162,12 @@ def forecast_chart():
             markersize=8, markeredgecolor=BG, markeredgewidth=1.2, zorder=3)
     a2.set_ylim(50, 100)
     a2.set_ylabel("actual counts inside the 80% range, %", color=INK, fontsize=10.5)
-    a2.set_title("...and the prediction range stops holding", color=INK, fontsize=12,
+    # Worded from the data, not typed: a fixed "stops holding" outlived the
+    # problem it described by a month.
+    holds = g.cover.min() >= 75
+    a2.set_title("...while the prediction range holds" if holds
+                 else "...and the prediction range stops holding",
+                 color=INK, fontsize=12,
                  fontweight="bold", loc="left", pad=10)
     # Reference label parked at the left, away from the lead-6/7 markers.
     a2.annotate("80% promised", xy=(g.index[0], 80), xytext=(2, -14),

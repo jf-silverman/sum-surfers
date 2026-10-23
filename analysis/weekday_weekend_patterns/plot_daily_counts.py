@@ -54,7 +54,12 @@ sns.barplot(
 )
 ax1.set_xlabel("Month")
 ax1.set_ylabel("Mean surfer count (per day)")
-ax1.set_title("Mean surfer count by month — weekday vs weekend — Jack's / 38th St (n=91 days, spans Oct 2025 - Aug 2026)", color="white")
+# Worded from the data: a typed "n=91 days, Oct 2025 - Aug 2026" outlived
+# the data it described. The README uses docs/images/weekend_by_month.png
+# (analysis/readme_figures) as of 2026-10-22.
+ax1.set_title(f"Mean surfer count by month — weekday vs weekend — Jack's "
+              f"(n={len(daily)} days, {daily['date'].min():%b %Y} - {daily['date'].max():%b %Y})",
+              color="white")
 legend1 = ax1.legend(title=None, facecolor="#111111", edgecolor="#444444")
 for text in legend1.get_texts():
     text.set_color("white")

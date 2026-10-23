@@ -1,14 +1,36 @@
-# Sum Surfers - An Automated Surfer Crowd Size Forecasting Tool
+# The Sum Surfers Project
 
-## Project Summary
+**An automated tool for counting surfers and crowd size.**
 
-![Two surfers riding a wave at Jack's, Pleasure Point — a frame from the camera this project counts](docs/images/hero_two_surfers.png)
+<p align="center">
+  <img src="docs/images/hero_two_surfers_wide.png" width="75%" alt="Two surfers riding a wave at Jack's, Pleasure Point — a frame from the camera this project counts">
+</p>
 
-This project collects images from a shoreline video camera and tries to answer two questions:
-- **_How many surfers were out there each hour of each day in the past?_**
-- **_How many will there be at each hour of the day in the upcoming days?_**
+**Contents:**
+[Why count surfers?](#why-count-surfers) ·
+[Yesterday's counts and the forecast](#yesterdays-surfer-counts-and-the-near-term-surf-crowd-forecast) ·
+[How it works](#how-it-works) ·
+[What the data shows](#what-the-data-shows-so-far) ·
+[How accurate is this tool?](#how-accurate-is-this-tool) ·
+[Limits](#limits-and-missing-data) ·
+[What's next](#whats-next) ·
+[Try it yourself](#try-it-yourself) ·
+[Learn more](#learn-more)
 
-**_Why does this matter? As the crowd size grows, so does the competition for each wave.  It becomes difficult to avoid "dropping in" on others and having others "drop-in" on you.  Forecasting surfer crowd size can help surfers avoid peak crowding - or at least be ready for it._**
+**TLDR:**
+- **What it does:** a computer-vision model counts the surfers on a public surf video camera every daylight hour, and a second model forecasts future surf crowd levels.
+- **Where:** Jack's, near Pleasure Point in Santa Cruz, California.
+- **How long:** Collecting data since fall of 2025 (more than 1,950 hours across 152 days).
+
+## Why count surfers?
+
+***Online surf sites forecast the conditions, but they don't forecast how many people will be there.*** As the crowd grows, so does the competition for each wave, and it gets harder to avoid dropping in on someone or being dropped in on.
+
+As a local surfer in the area, I always want to pick a time with both good conditions and the smallest crowd, or at least know how crowded it will be. As a data scientist, I also thought it would be an interesting project to hone my skills in computer vision, machine learning predictions, and LLM prompt engineering.  ***In short, it's me training an Ai to tell me how crowded my surf break will be each day.***
+
+Crowd forecasting for surf is rare. I haven't found a published study that forecasts hourly surfer counts at a break from surf and weather conditions; the closest work forecasts general beach attendance from camera counts. A few apps show how crowded a spot usually is, and one open-source project, [crowdfactor](https://github.com/craigmulligan/crowdfactor), counts surfers on a Surfline camera in Los Angeles and predicts from the day, time, weather and surf rating. What this project adds is a measured record: the object detector is checked against hand counts, and every forecast is written down before the day and scored afterwards. Sources are in [works cited](docs/works_cited.md).
+
+## Yesterday's surfer counts and the near-term surf crowd forecast
 
 <!-- ====================================================================
      AUTO-GENERATED BLOCK - DO NOT EDIT BETWEEN THE MARKERS BELOW.
@@ -26,18 +48,18 @@ This project collects images from a shoreline video camera and tries to answer t
 <!-- DAILY_CHART_START -->
 #### A Full Day of Surfer Detections: Tuesday, October 20, 2026
 
-Each green box below contains a surfer, according to the object detection model.  Look carefully and you may find additional surfers that the model missed or other objects which are misclassified as surfers - like the wind sock at the bottom center of the photo.  Birds, reflections, people on the beach and sun glare fool it too: [what isn't a surfer](docs/non_surfer_objects.md) catalogs each one, how to tell it apart, and what the pipeline does about it.  **Each hour is shown twice: first the bare frame, so you can hunt for the surfers yourself as small dark specks, then the same frame with the model's boxes drawn.**  Try it before the boxes appear - it shows how hard these are to see, which is the whole problem the model is solving.  Each frame shows the camera's full width, the same strip the pipeline counts, so the number printed is the whole count for that hour.
-![Detections through Tuesday, October 20, 2026](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_detection.gif?v=20261022)
+Each green box is a surfer, according to the detection model. Each hour is shown twice, first bare and then with the boxes, so you can try spotting the surfers yourself first. It still misses some surfers and occasionally boxes something else: [what isn't a surfer](docs/non_surfer_objects.md).
+![Detections through Tuesday, October 20, 2026](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_detection.gif?v=20261023)
 
 #### The Surfer Crowd Forecast for: Friday, October 23, 2026
 
-Once enough hours and days were gathered along with weather and surf conditions, a surf count prediction model was built to forecast how many surfers would be present at each hour for the coming day.  This is useful for surfers to plan to avoid busy times or at least know what to expect.  The forecast still runs about one surfer low on average, and it misses by about five surfers in a typical hour - crowds depend on plenty of things the weather and surf data never see.  The detector underneath it used to undercount badly in fog and glare, which made the forecast worse; that was fixed in September 2026 by labeling those conditions and retraining, so what remains is the prediction model's own error.  The right-hand column rates each hour from 1 (near-empty) to 5 (packed), using the five equal slices of every hour the camera has counted so far.  [How to Read This Chart](#how-to-read-the-daily-chart)
-![Latest daily prediction chart](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest.png?v=20261022)
+The forecast for each hour of the coming day, made the evening before. The aqua line is the best guess, the shaded band is the likely range, the dashed green line is the tide, and the right-hand column rates each hour from 1 (near-empty) to 5 (packed).
+![Latest daily prediction chart](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest.png?v=20261023)
 
 #### The Week Ahead: October 23 - October 29, 2026
 
-The same model, run out to a week. Every hour gets a crowd level from 1 (near-empty) to 5 (packed); the levels are the five equal slices of every hour the camera has counted so far, so level 3 is literally an average hour and level 5 is the busiest fifth of them. The number in each cell is the predicted count, and the colour is the level. The level is not read off that number: the forecast pulls toward the middle, so the middle of its range under-calls busy hours, and the level comes from a point higher up the range that was measured to catch them. Surf and weather data run the full seven days, but a forecast seven days out is still a forecast seven days out - read the far right of the grid as a shape, not a number.
-![Crowd outlook for the week ahead](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_week.png?v=20261022)
+The same forecast run out a week, with each hour's crowd level from 1 (near-empty) to 5 (packed). A green outline marks an hour mostly under 3 ft of tide, and a purple line inside it means Surfline also rates the surf fair or better. The further right, the less certain: read the end of the week as a shape, not a number.
+![Crowd outlook for the week ahead](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_week.png?v=20261023)
 
 <!-- DAILY_CHART_END -->
 <!-- ====================================================================
@@ -45,625 +67,122 @@ The same model, run out to a week. Every hour gets a crowd level from 1 (near-em
      never touched by the nightly run.
      ==================================================================== -->
 
-## How Accurate Is It Right Now?
+## How it works
 
-Two models run in sequence, so there are two accuracy questions: can the
-detector count the surfers in a frame, and can the forecast predict how many
-will be out tomorrow. The detector is the stronger of the two by a wide margin.
+**A camera, two models, and a nightly job.** The images follow one real hour, 4:20 pm on Friday, September 25, 2026, through each step.
 
-### The detector, against a human count
+1. **Watch.** Every daylight hour, the project saves a short clip from a public surf camera pointed at the break, and keeps a full-width strip of the water where the surfers sit. → [The pipeline, end to end](docs/HOW_IT_WORKS.md#the-pipeline-end-to-end)
 
-Every figure here comes from counting by hand, box by box, not from the
-model's own validation set. **220 frames across 16 days spanning a full year,
-3,880 real surfers.**
+   ![The full camera frame, with the strip kept for counting outlined](docs/images/pipeline_1_watch.png)
+
+2. **Spot.** A detection model, trained on thousands of surfers labeled by hand, draws a box around every surfer it can find. → [The model](docs/HOW_IT_WORKS.md#the-model-yolov8)
+
+   ![The right half of the strip, enlarged, with a box on each surfer found](docs/images/pipeline_2_spot.png)
+
+3. **Count.** The boxes become one number per hour, averaged over three frames. Frames too dark, foggy or blurry to count are thrown out rather than guessed at. → [Image-quality gate](docs/HOW_IT_WORKS.md#image-quality-gate)
+
+   ![36 surfers at 4:20 pm on Friday, September 25, 2026](docs/images/pipeline_3_count.png)
+
+4. **Match.** Tide, swell, wind and weather for that hour are stored next to each count. → [Predictors](docs/HOW_IT_WORKS.md#predictors-weather-tide-swell-wind-energy-consistency)
+
+   ![Tide 1.3 ft, surf 1-2 ft, swell 5.8 ft at 10 s, wind 0.4 mph, 81 °F and clear, a Friday](docs/images/pipeline_4_match.png)
+
+5. **Forecast.** A second model learns which conditions bring people out, then predicts each hour of the coming days with a likely range around each number. The whole thing runs and republishes itself every night. → [Forecast accuracy](docs/HOW_IT_WORKS.md#forecast-accuracy-and-calibration)
+
+   ![That day's forecast, made the evening before, with the likely range and the counts](docs/images/pipeline_5_forecast.png)
+
+## What the data shows so far
+
+**Tide is by far the biggest driver of the crowd.** The lineup is busiest with the tide between 0 and 3 feet (a typical 22 to 25 surfers), and nearly empty above 4 feet (3 or fewer).
+
+![Typical surfer count by tide height](docs/images/tide_vs_count.png)
+
+**At low tide, weekends are busier all day.** Between 8am and 5pm, a typical weekend hour has 34 surfers out, against 22 on a weekday. Each cell is the typical count for that hour and day, using only hours with the tide below 3 feet, so the tide doesn't hide the weekly pattern.
+
+![Typical surfers in the water, by hour and day of week](docs/images/when_to_go.png)
+
+**The weekend effect is stronger in some months than others.** Counting only hours with the tide below 3 feet, weekends ran from about 1.1x as busy as weekdays (October 2025) to 2.0x and 2.7x (November and December 2025, the late-autumn months, when weekday crowds drop off most). October 2026 so far is 1.3x. Several months rest on only two to four low-tide weekend days, so treat single months loosely.
+
+![Average surfer count by month, weekday vs weekend](docs/images/weekend_by_month.png)
+
+**Crowds thin and empty hours climb into winter.** Four calendar months have never been recorded yet, and the winter 2025 counts came from an earlier version of the object detector.
+
+![Typical count and share of empty hours, by month](docs/images/seasons.png)
+
+## How accurate is this tool?
+
+### The object detector
+
+**It finds about 9 in 10 surfers, and almost never boxes something that isn't one.** Checked by hand, box by box, on 220 frames from 16 days across a year, holding 3,880 surfers:
 
 | | |
 |---|---|
-| precision — of the boxes it drew, how many were on a surfer | **98.7%** |
-| recall — of the surfers really there, how many it found | **91.9%** |
+| of the boxes it drew, how many were on a surfer | **98.7%** |
+| of the surfers really there, how many it found | **91.9%** |
 | average count error | **1.5 surfers** per frame |
 
-![Detector count against a hand count, one point per reviewed frame](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/detector_accuracy.png?v=20261022)
-
-> **Why the daily chart's caption shows lower numbers.** That caption reports
-> **88.5% precision / 81.3% recall**, measured by the training framework on its
-> own held-out validation tiles, where a box only counts if it overlaps the
-> labelled box closely enough. The figures above are from a human looking at
-> production frames and asking whether each box is on a surfer. The second is
-> the question this project actually cares about, and it is the more forgiving
-> of the two — a box can be on the right surfer without hugging its outline.
-> Neither is wrong; they measure different things, and both are kept.
-
-*Each dot is one frame. The dashed line is perfect agreement; the orange line
-is what the detector actually does. It is close to the truth on a quiet
-lineup and slightly low on a crowded one — about 6% low overall — because
-surfers lying flat on their boards in a packed lineup are the ones it loses.*
-
-**It misses far more than it invents.** Of 316 missed surfers, **286 had no box
-at all and 30 were inside a box drawn around several people**; of 46 false
-positives, 35 were on something that is not a surfer — a bird, a wind sock, a
-head on the beach — and 11 were a second box on a surfer already counted.
-
-**Lying down is what defeats it.** 223 of the misses were prone and 40
-sitting, against 10 standing. A surfer up and riding is an unmistakable shape;
-one lying flat is a dark smudge a few pixels across.
-
-### The forecast, against what the detector later counted
-
-Surfer counts swing hard across a day — from an empty lineup to more than 70 in
-one hour. Every forecast is written down before the day happens and scored
-afterwards, so the record cannot be rewritten after the fact. **1,155 scored
-forecast-hours.**
-
-| | |
-|---|---|
-| average error, one day ahead | **4.4 surfers** |
-| average error, all lead times | **5.0 surfers** |
-| actual counts falling inside the prediction range | **80.3%** |
-
-*The coverage figure is for the 80% band in use until 2026-10-20. The range is
-now 75% — see below.*
-
-![Forecast error and prediction-range coverage against lead time](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/forecast_accuracy.png?v=20261022)
-
-*Error grows the further ahead the forecast is made, which is expected. The
-right-hand panel is the more useful caveat: the prediction range holds up
-a day or two out and stops holding by seven, where it catches 63% of actual
-counts instead of 80%. Treat a seven-day band as narrower than the uncertainty
-really is.*
-
-![Forecast vs. actual surfer counts for the most recently scored day, with tide](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_forecast_vs_actual.png?v=20261022)
-
-*The most recently scored day, rebuilt and overwritten each night — the blue
-line is what was forecast the evening before, the coral line is what the
-detector counted, the shaded band is the prediction range, and the dashed
-green line is tide on the right-hand axis.*
-
-### Why the prediction range is 75% and not 80%
-
-Until 2026-10-20 the range was an 80% central interval — the 10th to 90th
-percentile of the predicted count. It is now **75%, the 15th to 90th
-percentile**, because the 10th percentile stopped carrying information.
-
-The count distribution is zero-inflated: a share of recorded hours have nobody
-out at all, and that share is **seasonal**, climbing through autumn into winter.
-
-| | 2026-07 | 2026-08 | 2026-09 | 2026-10 | 2025-11 | 2025-12 |
-|---|---:|---:|---:|---:|---:|---:|
-| hours with zero surfers | 8.0% | 7.6% | 13.0% | 19.5% | 33.8% | 38.9% |
-
-Once more than a tenth of hours are empty, the true 10th percentile of the count
-**is zero**, and a model fit to that level correctly learns to predict zero for
-every hour. The empirical quantiles say so plainly:
-
-| quantile | 0.05 | 0.10 | 0.15 | 0.20 | 0.25 |
-|---|---:|---:|---:|---:|---:|
-| surfers | 0.0 | **0.0** | 1.0 | 1.0 | 2.0 |
-
-A lower edge at zero is not merely uninformative, it is misleading about
-accuracy. **Counts are never negative, so a band floored at zero cannot be
-missed from below** — every hour scores as "inside the range" from that side for
-free. Splitting the scored record at the time of the change shows what that
-credit was worth:
-
-| | hours | coverage | missed low | missed high |
-|---|---:|---:|---:|---:|
-| lower edge pinned at zero | 1,024 (44%) | 96.6% | **0.0%** | 3.4% |
-| lower edge above zero | 1,323 | 69.3% | 22.3% | 8.4% |
-
-The headline 80.3% was a blend of a real 69% and a structurally free 97%. The
-15th percentile is the first level that still varies with the predictors, so
-that is where the lower edge moved. The published range is narrower now, and the
-coverage figure it earns will be lower — both because it is describing
-uncertainty rather than reporting a floor.
-
-**A coverage number means nothing until both edges can be missed.** This is the
-third time that lesson has cost this project a restated figure — the other two
-were a swell-data correction and a review of frames recorded outside the light
-window, both of which also moved the lower bound off zero and dropped coverage.
-
-### The collapse is now detected automatically
-
-The condition above went unnoticed for eight days in October 2026. Nothing
-failed: the band was computed, drawn and recorded exactly as designed, and a
-band with its floor on zero looks like a band. The only trace was a single line
-in a log.
-
-Two checks now run with every scored day and report when either trips:
-
-- **The lower edges of the newest forecast.** Any edge sitting at zero is
-  reported directly. This is the symptom itself rather than a proxy for it, and
-  it fires on a partial collapse as well as a total one — an earlier four-day
-  episode affected only some hours of each day.
-- **The share of empty hours**, cumulative and over the trailing 30 days,
-  against a **30% threshold**. This is the leading indicator: the share is what
-  drags the low quantiles onto the floor, and because it moves with the season
-  it gives warning before a band actually collapses.
-
-Both are deliberately cheap — two small table reads, about 11 ms, and no model
-is refitted. The check only has to decide whether the question needs looking at,
-not answer it.
-
-### What happens if the 30% threshold is crossed this winter
-
-Last winter reached 33.8% and 38.9% empty hours, so it is likely. Lowering the
-band's edge again is not the answer indefinitely; past some point the problem is
-the model's shape rather than the level being asked of it.
-
-A single quantile model is being asked to describe two different things at once:
-**whether anyone is out at all**, and **how many are out given that somebody
-is**. A **hurdle model** separates them:
-
-```
-P(count > 0)                      ->  a classifier
-quantiles of count | count > 0    ->  quantile models fit on non-empty hours only
-```
-
-and composes them back into a predictive quantile. For a target quantile q, if
-the probability of an empty hour already exceeds q the prediction is zero;
-otherwise it is the conditional quantile at `(q - p_zero) / (1 - p_zero)`. That
-gives the right answer in both regimes — genuinely zero on hours where
-emptiness is likely, a real number on hours where it is not — instead of one
-flat answer for both.
-
-**This is how the band's two edges are fitted, as of 2026-10-20.** The median —
-the line the chart draws and the number the crowd level comes from — is still a
-plain quantile model on every row.
-
-The earlier measurement of this said the opposite, and was wrong because it
-split rows at random: at about 13 rows per day that puts hours from the same day
-on both sides of the split, so both models were told the test day's own crowd
-level. On a forward split by whole days, and on four successive ~15-day rolling
-windows (`code/eval_hurdle_model.py`):
-
-| on 417 held-out hours | one model per level | hurdle |
-|---|---:|---:|
-| mean pinball loss | 2.2616 | **2.2512** |
-| 75% band coverage | 59.0% | **70.5%** |
-| hours missed below the band (target 15%) | 33.3% | **22.5%** |
-| median bias on hours with 0–5 surfers | +4.67 | +4.49 |
-
-Across the four rolling windows the hurdle has the smaller below-band miss rate
-in **4 of 4** and lower pinball in only 1 of 4. So it is adopted for the edges,
-where it fixes the lower tail repeatably and costs nothing on pinball, and **not
-for the median**, whose roughly +4.5 bias on near-empty hours it does not touch.
-That bias is a point-prediction problem and belongs to recalibration instead —
-
-### The median is recalibrated nightly
-
-— which the chart has done since 2026-10-21. After the model predicts, its
-median goes through a straight-line correction, `a + b × median`, fitted each
-night on every forecast hour that has since been scored against what the camera
-actually saw, then kept inside that hour's band and never below zero. The line
-is currently about `−3.9 + 1.15 × median`: it pulls quiet-hour forecasts down
-and leaves busy ones roughly where they were. It crosses even at about 26
-surfers.
-
-Measured forward in time — each day corrected using only days scored before
-it, as it would have run live (`analysis/forecast_recalibration/`):
-
-| | before | after |
-|---|---:|---:|
-| MAE, day-ahead forecasts | 5.70 | **5.14** |
-| MAE, all lead times | 6.19 | **5.51** |
-| mean bias | +1.93 | **+0.15** |
-| target dates improved | | **23 of 26** (p = 0.0001) |
-
-It is the largest accuracy gain this forecast has had from any change. Every
-change tried inside the model (lagged counts, weekday effects, recency
-weighting, deeper trees and more) came back flat. A correction applied outside
-the model can follow a crowd level that has drifted below anything the trees
-were trained on; a tree cannot.
-
-What it trades: hours with 0–5 surfers go from +4.5 bias to +3.0, but the rare
-hours with 30 or more go from −13.3 to −14.5. It helps the common case at a
-small cost to the rare one. A median of 0 now appears on quiet hours, and it is
-earned: of the hours the correction sent to 0, 71% really were empty.
-
-The forecast record keeps the model's own median beside the published one, and
-the correction is fitted on the model's own median. Otherwise it would be
-fitting a correction to its own output.
-
-What remains is the empty-hour classifier: it ranks hours well (AUC 0.826) but
-under-predicts emptiness, 11.7% against an actual 16.5%, which is most of the
-gap still left between 22.5% and the 15% target. Isotonic calibration lifts its
-AUC to 0.856 and barely moves that mean, and the shortfall tracks the rising
-autumn empty share — so it is forward distribution shift, not a calibration
-method, and the 30% alert is still the thing watching it.
-
-### What these numbers do not cover
-
-The forecast record runs from 2026-09-23, so its accuracy is measured in
-autumn only. Skill in other seasons has been estimated by rebuilding forecasts
-for past dates using only data available before each one — see
-[forecast accuracy and calibration](docs/HOW_IT_WORKS.md#forecast-accuracy-and-calibration).
-The detector figures carry their own caveat: hand counting is itself
-imperfect, and 8 boxes and 45 possible misses were flagged as judgement calls
-the reviewer would not defend either way.
-
-For the fuller picture — per-hour error spread, calibration, and why the
-prediction bands are overconfident — see
-[`MODEL_CARD.md`](MODEL_CARD.md) and [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md).
-The raw records are
-[`data/forecasts/forecast_log.csv`](data/forecasts/forecast_log.csv) and
-[`data/reviews/review_all.csv`](data/reviews/review_all.csv).
-
-
-## How This Project Works
-
-Each step below starts with the plain-language version, then the technical
-detail and a link to the in-depth write-up.
-
-1. **Gather video clips.**
-   ***Every hour of daylight, the project downloads a short video clip from a camera pointed at the surf spot.***
-   Clip collection runs from first light to last light for that date — the
-   same first/last light times the surf forecast provider shows, about 30
-   minutes before sunrise and after sunset — rather than fixed clock times, so
-   it follows the seasons instead of wasting requests on darkness. Clips land in a dated folder and are deleted once
-   frames have been pulled from them.
-   → [The pipeline, end to end](docs/HOW_IT_WORKS.md#the-pipeline-end-to-end)
-
-2. **Pull out still frames.**
-   ***From each clip it saves three snapshots taken a few seconds apart, cropped down to just the patch of water where surfers sit.***
-   The three frames sit at 1.0s, 2.5s and 4.0s into the clip, and each is
-   cropped to the same fixed [region of interest](docs/HOW_IT_WORKS.md#term-roi)
-   — a 1280×180 strip. Three frames rather than one because counts on the same
-   stretch of water swing by several surfers within seconds as waves pass and
-   people duck under; averaging cuts that noise — though by less than it looks,
-   **20% rather than the 42% three independent samples would give**, because
-   frames 1.5s apart are nearly the same observation. Measured 2026-10-14 on
-   three hours sampled once per second.
-   → [Multi-frame count averaging](docs/HOW_IT_WORKS.md#multi-frame-count-averaging)
-
-3. **Screen out unusable pictures.**
-   ***Frames too dark or too blurry to count are thrown away rather than guessed at.***
-   Each primary frame is checked for brightness and for
-   [Laplacian variance](docs/HOW_IT_WORKS.md#term-laplacian-variance), a
-   standard measure of how much fine detail an image holds. Fog, fading evening light and
-   a wet lens all fail it. Rejected frames are still logged with their scores,
-   just never counted — a wrong number is worse than a missing one.
-   → [Image-quality gate](docs/HOW_IT_WORKS.md#image-quality-gate)
-
-4. **Find the surfers.**
-   ***A model trained on thousands of hand-labeled examples draws a box around every surfer it can find.***
-   Each frame is split into four overlapping horizontal tiles and
-   [YOLOv8](docs/HOW_IT_WORKS.md#term-yolo) runs on each one. Tiling matters
-   because a surfer is a handful of pixels in a 1280-pixel-wide strip; within a
-   tile, the same surfer is proportionally much larger. This is the same family
-   of technology behind pedestrian detection in self-driving cars.
-   → [The model: YOLOv8](docs/HOW_IT_WORKS.md#the-model-yolov8)
-   · [How it was trained](docs/HOW_IT_WORKS.md#the-training-data-cvat)
-   · [How accurate the detector is](docs/HOW_IT_WORKS.md#detector-accuracy-the-deployed-checkpoint)
-
-5. **Merge the overlaps.**
-   ***A surfer sitting on the seam between two tiles would be counted twice, so overlapping boxes are merged back into one.***
-   Detections below a confidence threshold of 0.195 are dropped, then
-   [non-maximum suppression](docs/HOW_IT_WORKS.md#term-nms) merges boxes that
-   overlap across tile boundaries. Two zones that reliably produce false
-   positives — a tree branch and a wind sock — are filtered by position.
-   → [Confidence threshold and NMS, concretely](docs/HOW_IT_WORKS.md#confidence-threshold-and-nms-concretely)
-
-6. **Keep score over time.**
-   ***Each clip's three counts become one number, saved with its date and time.***
-   The mean of the three frames is stored as that hour's count, along with all
-   three raw values and their spread, so later analysis can tell a genuinely
-   busy hour from a noisy one. This growing history is what the forecast model
-   learns from — currently over 1,500 counted hours.
-   → [The pipeline, end to end](docs/HOW_IT_WORKS.md#the-pipeline-end-to-end)
-
-7. **Record the conditions.**
-   ***Tide, swell, wind, weather and wave energy for that hour are stored next to every count.***
-   Predictors come from the surf forecast provider's hourly endpoints, plus
-   observed weather from Open-Meteo's archive and tide heights from NOAA, each
-   matched to the nearest local hour of an existing count. Nearshore wave
-   energy turns out to be the second most useful predictor after tide.
-   → [Predictors: weather, tide, swell, wind, energy, consistency](docs/HOW_IT_WORKS.md#predictors-weather-tide-swell-wind-energy-consistency)
-
-8. **Forecast the crowd.**
-   ***A second model learns which conditions bring people out, then predicts tomorrow hour by hour with a likely range around each number.***
-   Gradient-boosted trees fit the counts against those conditions: one model
-   for the expected count, two more for the edges of a 75%
-   [prediction interval](docs/HOW_IT_WORKS.md#term-prediction-interval). It is
-   a forecast, not a guarantee — see [forecast accuracy and calibration](docs/HOW_IT_WORKS.md#forecast-accuracy-and-calibration)
-   for how often that range actually holds, measured rather than claimed.
-   → [Known limitations](docs/HOW_IT_WORKS.md#known-limitations-short-version)
-
-9. **Publish it automatically.**
-   ***Every night the animation and chart above are rebuilt and posted here on their own.***
-   A scheduled job runs the whole pipeline after last light, rebuilds both images
-   from the day's fresh data, and commits them to this repository. Nobody runs
-   anything by hand, which is why the two images above are never more than a
-   day old.
-   → [The pipeline, end to end](docs/HOW_IT_WORKS.md#the-pipeline-end-to-end)
-
-## Exploratory Findings
-
-Tide and weekend/weekday are the two strongest predictors of surfer count
-at this spot (see [`PROJECT_HISTORY.md`](docs/PROJECT_HISTORY.md) for the full
-GBT permutation-importance breakdown). A closer look at the weekend effect:
-
-### Weekday vs. Weekend
-
-1. The weekend-to-weekday ratio varies noticeably by month — from about
-   1.08-1.16x in March, May, and July 2026 up to **2.4x in November
-   2025**, with October and December 2025 also elevated at 1.6-1.7x. Some
-   months show a much more pronounced weekend effect than others. We'll
-   have to see if the trend holds once we have data from every month —
-   several calendar months are still completely unrepresented.
-2. **October 2026 runs the other way, at 0.81x** — the first month where
-   weekends are quieter than weekdays. It is also the thinnest month in the
-   record, so treat it as one month of data rather than a reversal.
-3. Weekends are also more variable day-to-day than weekdays: standard
-   deviation 8.1 vs 6.6 surfers.
-
-![Mean surfer count by month, weekday vs weekend](analysis/weekday_weekend_patterns/weekday_weekend_by_month_2026-10-08.png)
-
-### Daily Mean Count Kernel Density Estimate (KDE)
-
-1. Each curve is normalized to its own group (n=93 weekdays, n=45
-   weekends) — the taller weekday peak isn't a sample-size artifact.
-2. Weekday counts cluster closer to their mean (std 6.6 vs 8.1), giving
-   it a taller, narrower peak.
-3. Weekends span a wider range (0.0 to 37.1 against the weekday's 0.2 to
-   29.6).
-
-![Distribution of daily mean surfer counts, weekday vs weekend KDE](analysis/weekday_weekend_patterns/weekday_weekend_kde_2026-10-08.png)
-
-## Schedule
-
-`local_pipeline.sh` (clip collection + detection) and
-`daily_chart.sh` (the daily prediction chart) each run automatically on
-their own recurring schedule on the machine hosting the pipeline —
-`local_pipeline.sh` a couple times a week, `daily_chart.sh` once a day.
-Both are safe to run manually any time; see each script for details.
-
-## Run It Yourself
-
-**You can build a dataset like this one yourself, starting today.** Everything
-the forecast runs on is publicly reachable: the camera's live stream is open,
-and all eight Surfline forecast endpoints this project reads — weather, rating,
-tides, surf, swells, wind, energy, consistency — answer anonymous requests
-seven days forward at one row per hour (re-verified 2026-09-26), as does the
-observed-weather backfill from Open-Meteo.
-
-That means a machine which stays awake can run this entire pipeline end to end:
-watch the stream, count the surfers, collect the matching conditions, build the
-feature table, fit the model, draw the charts. Nobody can reconstruct a history
-for a spot they were not already watching — the camera only reaches back five
-days, today included — so a record like this one is not downloaded, it is
-accumulated. For scale, this repo's stands at roughly 1,835 counted hours across
-138 days as of 2026-10-08, gathered since October 2025.
-
-### Collect live data
-
-`watch_live.py` needs no account, no token, and no environment variables.
-
-While it is running, it records a few seconds off the camera's public live
-stream once every few minutes during daylight, cuts three frames from that
-clip the same way the scheduled pipeline does, crops each to the region the
-detector was trained on, counts surfers with the [trained model weights
-committed to this repo](data/model_out/20260921_fog/train/weights),
-and appends the averaged count to its own file — `data/live_watch/live_predictions.csv`,
-with the same columns as the main predictions file, kept separate so a demo
-run can never mix into the real dataset.
+![Object detector count against a hand count, one point per reviewed frame](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/detector_accuracy.png?v=20261023)
+
+Overall it counts about 7% low: about 4% low with fewer than 10 surfers out, and 8 to 9% low with 10 to 40. **Surfers lying flat on their boards (paddling) are the hardest for the object detector to spot**: two out of three misses were surfers in a flat position, and only 10 of 316 were standing.
+
+![Standing, sitting and lying-down surfers, enlarged from one frame](docs/images/surfer_poses.png)
+
+### The forecast
+
+**The night before, it typically misses by about 5 surfers in an hour.** Over 380 scored hours, the average miss was 5.4 surfers, and 59% of hours were within 5. The 80% likely range held the actual count 83% of the time. A forecast a week out is a little worse.
+
+![How often the forecast lands within N surfers](docs/images/forecast_within_n.png)
+
+![Forecast vs. actual surfer counts for the most recently scored day, with tide](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_forecast_vs_actual.png?v=20261023)
+
+*Above is the most recently scored day (rebuilt each night): the blue line is what was forecast the evening before, the coral line is what the object detector counted, and the dashed green line is the tide.*
+
+**Recent improvements (October 2026).** The likely range now handles quiet hours better, using a model that first asks whether anyone will be out at all. The forecast also corrects itself each night against its own scored record. Both started on October 21 and 22, so the numbers above include only a day or two of them. Details are in [how it works](docs/HOW_IT_WORKS.md#forecast-accuracy-and-calibration).
+
+## Limits and missing data
+
+- **One season of forecasts scored.** The forecast uses data starting in fall of 2025, but has only been scored starting in autumn of 2026, and four calendar months (January, February, April and June) have never been recorded at all, but new counts are being added daily, so every month should be represented by June of 2027.
+- **The forecast is scored against the object detector, not a person.** Since the object detector runs about 7% low, so does the yardstick.
+- **One camera.** It sees just one break in Santa Cruz of many.
+- **Missing predictors.** Holidays, school calendars, local events and contests all bring people out, and none are in the model yet.
+- **What would help most:** more hand-labeled frames of crowded lineups and lying-down surfers, and better forecasts of empty hours as winter arrives.
+
+## What's next
+
+- **Surf-quality metrics that include the crowd.** For example, the number of waves per surfer, or a "worth it" score that combines the surf rating with the crowd level. Surfline's rating alone barely separates the crowd at this break:
+
+  ![Surfer counts by Surfline surf rating](docs/images/crowd_vs_rating.png)
+
+- **Standing surfers per hour, as a measure of rides.** This needs a small second model that tells standing surfers from sitting and lying ones. The poses are already in the hand labels, but the current object detector finds only "surfer."
+- **Other spots.** Try the object detector on other cameras, and measure how much relabeling each one needs.
+- **Share it with surfers.** Is this useful to you? [Open an issue](https://github.com/jf-silverman/sum-surfers/issues) and tell me.
+
+## Try it yourself
+
+None of these needs an account or a token. Set up once:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r docs/requirements.txt
-
-python code/watch_live.py --once   # grab one frame and count it
-python code/watch_live.py          # keep collecting until you stop it
 ```
 
-Run it after dark and it will say so and ask whether to wait for first light,
-rather than collecting frames it cannot count. Answer no and it exits; add
-`--ignore-daylight` to grab a night frame anyway and watch the quality gate
-reject it.
+- **Count surfers on the live camera:** `python code/watch_live.py --once` (needs [ffmpeg](https://ffmpeg.org/))
+- **Run the object detector on 20 hand-labeled test frames:** `python code/eval_detector.py --coco-dir data/demo --split test --skip-tile-metrics`
+- **Check the forecast model on days it never saw:** `python code/eval_surf_count_model.py`
 
-It needs [ffmpeg](https://ffmpeg.org/) on your path to read the stream
-(`brew install ffmpeg` or `apt install ffmpeg`).
+The full setup, including the scheduled pipeline, environment variables and where the data lives, is in [SETUP.md](docs/SETUP.md).
 
-The one real constraint is uptime: a live stream has no rewind, so this collects
-only while your computer is awake and the script is running. On an always-on
-desktop that costs nothing. On a laptop that travels and gets closed, every hour
-the lid is down is an hour missed.
+## Learn more
 
-### Try the detector on a demo set
+- [How it works](docs/HOW_IT_WORKS.md): the pipeline step by step, both models, accuracy in depth, and a glossary
+- [Model card](MODEL_CARD.md): intended use, measured performance and failure modes for both models
+- [Project history](docs/PROJECT_HISTORY.md): how it was built, tested and tuned, in order
+- [What isn't a surfer](docs/non_surfer_objects.md): the birds, glare and wind socks that fool the object detector
+- [Works cited](docs/works_cited.md): the research this project draws on
+- [Project files](docs/PROJECT_FILES.md): what every script and folder is for
 
-`data/demo/` holds **20 labeled frames chosen to cover the conditions that
-matter here**: fog, sun glare with and without surfers in it, winter,
-empty water, crowds from 0 to 56 surfers, and light from early morning to
-evening, across May to December. None of them was used to train the
-detector, so this is a fair test rather than a replay of its training data.
+## License and acknowledgements
 
-```bash
-python code/eval_detector.py --coco-dir data/demo --split test --skip-tile-metrics
-```
+The **code** is [GNU AGPL v3.0](LICENSE), and the **data and model weights** are [CC BY-SA 4.0](LICENSE-DATA). The camera footage belongs to Surfline and is not redistributed here. See [LICENSE-DATA](LICENSE-DATA) for the full breakdown.
 
-It runs the real production inference path — tiling, cross-tile
-[NMS](docs/HOW_IT_WORKS.md#term-nms), false-positive filtering — on each
-frame and compares the surfer count with the number of hand-drawn boxes,
-frame by frame and broken out by crowd size. On the demo set it finds
-**491 surfers against 498 labeled**, an average error of 0.85 surfers per
-frame. That count is the number the forecast actually uses; a detector can
-look fine box-by-box while still undercounting crowded frames.
-
-The weights in this repo are the production detector, retrained in September
-2026 on labeled fog, glare and pose data. The evaluator will also run on the
-older labeled splits in `data/cvat_out_coco/splits/`, but those predate the
-retrain and the new model trained on some of their frames, so it skips those
-frames automatically (they are listed in
-`data/model_out/20260921_fog/train_filenames.txt`). Per-box precision and
-recall from Ultralytics' own validator can't skip them, so treat those as
-optimistic. The demo set is the clean check.
-
-### Check the forecast model against held-out data
-
-`data/model_release/` holds the fitted forecast model, the **417 rows it was
-never trained on** (the most recent days, held out as a block), and the metadata to reproduce the split:
-
-```bash
-python code/eval_surf_count_model.py
-```
-
-This ships the fitted model rather than only a table of predictions on
-purpose. A predictions-versus-actuals file is self-reported — you can
-recompute the error from it, but not check that the model was not fit on
-those same rows. With the model included you can run it yourself on rows it
-never saw; the script re-predicts from the raw predictor values and verifies
-it reproduces the shipped numbers before reporting anything. The 1,242
-training rows stay unpublished.
-
-It reports MAE, RMSE and bias (broken out by how crowded the day actually
-was, which is where the model's weakness shows), and
-[prediction-interval](docs/HOW_IT_WORKS.md#term-prediction-interval) coverage
-with the two tail-miss rates kept separate.
-
-## Local Setup
-
-1. Create and activate a virtual environment.
-2. Install dependencies.
-3. Add secrets to `.env`.
-4. Run the pipeline.
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r docs/requirements.txt
-cp .env.example .env
-bash code/local_pipeline.sh
-```
-
-## Environment Variables
-
-**Nothing here is needed to try the project.** Collecting from the live stream,
-running the detector on the demo frames and checking the forecast model against
-the held-out set all read no environment variables at all — no `.env`, no
-account, no token. See [Run It Yourself](#run-it-yourself).
-
-Variables only matter once you want more than that. Copy `.env.example` to
-`.env` and fill in whichever apply:
-
-**Optional, everywhere:**
-
-- `MODEL_PATH` (override the default YOLO weights path)
-- `CLIPS_DIR_LIMIT_GB` (local clip storage warning threshold, default 2.0)
-- `DETECT_MODE` / `DETECT_RECENT_DAYS` / `DETECT_START_DATE` (detection scope)
-- `SURFLINE_HISTORICAL_TOKEN` (optional override for
-  `backfill_historical_predictors.py`, never read by the scheduled pipeline.
-  There is no separate historical credential — that script falls back to
-  `SURFLINE_ACCESS_TOKEN`, which is the same token, so this only exists to
-  point one manual backfill at a different session)
-
-**For the clip-download path only** (`get_clips.py`, and therefore
-`local_pipeline.sh`):
-
-- `SURFLINE_CAMERA_ID`
-- `SURFLINE_ACCESS_TOKEN`
-
-This pair is what buys the *recent past*. The live stream is public and free, but
-it only gives you the moment you are watching — close your laptop and those
-hours are gone. Reaching back to pull the clips you missed uses Surfline's
-recorded-clip endpoint, and that **needs a paid subscription**. Even then the
-window is short: the camera keeps five days including today, so the furthest
-back anyone can reach is four days, subscription or not.
-
-Leave both empty and everything else still works; the clip step raises a message
-naming what is missing, and only when it actually runs — the check is inside
-`clip_api_url()`, not at import, so nothing else in the project is blocked by
-their absence.
-
-## Data Locations
-
-- Clips: `data/not_needed_in_repo/surf_clips`
-- Crops: `data/j_shore_cam/surf_crops`
-- Predictions: `data/predictions/predictions.csv` — one row per clip:
-  `date, time_local, filename, surfer_count, confidence_avg, quality_ok,
-  quality_reason, brightness, lap_var, human_count, frame_count_1,
-  frame_count_2, frame_count_3, frame_count_mean, frame_count_stdev`.
-  `surfer_count`/`confidence_avg` are left blank when `quality_ok` is
-  `False` (detection was skipped). `human_count` is filled in manually
-  over time. `frame_count_*` are the 3 raw per-frame counts and their
-  mean/stdev that `surfer_count` is averaged from.
-- Predictor variables (weather/rating/tide/swell/wind/energy/consistency
-  for Jack's, plus observed Open-Meteo weather): `data/predictor_vars/`
-- Human-review datasets (image batches + a `review_counts.csv` to fill
-  in), one subfolder per dataset: `data/reviews/`
-- Model weights default (the September 2026 retrain):
-  `data/model_out/20260921_fog/train/weights/best.pt`. The October 2025
-  model it replaced is at `data/model_out/20251013/train/runs/detect/train13/weights/best.pt`.
-
-## Model Card
-
-Intended use, architecture, measured performance and known failure modes for
-both models — the detector and the forecast — are in
-[`MODEL_CARD.md`](MODEL_CARD.md), including the failure modes and the
-measurement caveats behind each headline number.
-
-## Works Cited
-
-Academic literature consulted for this project, and what each piece actually
-contributes, is in [`works_cited.md`](docs/works_cited.md). The short version:
-no published work forecasts surfer counts at a break from conditions — the
-closest analogue is beach-attendance forecasting from camera counts, which is
-where the day-level-aggregate idea in the backlog comes from.
-
-## License
-
-Two licenses, because code and data are different things:
-
-- **Code** (`code/`, `analysis/`) — [GNU AGPL v3.0](LICENSE). You may use,
-  modify and run it, including commercially, but derivatives and **hosted
-  services built on it must publish their source** under the same terms. The
-  network clause is deliberate: this is a pipeline someone could run as a
-  service without ever distributing a file.
-- **Data and model weights** — [CC BY-SA 4.0](LICENSE-DATA). Share and adapt
-  with attribution, under the same license.
-
-Neither license reaches the camera footage — that is Surfline's and is not
-mine to license, so it is not redistributed here. What is licensed above is
-this project's own work derived from watching it: the counts, the labels, the
-measurements and the charts. Third-party predictor data keeps its own terms
-too: Surfline's API values are Surfline's, and Open-Meteo's observed weather is
-CC BY 4.0 licensed by Open-Meteo. See [LICENSE-DATA](LICENSE-DATA) for the
-full breakdown.
-
-## Analysis
-
-One-off analyses (not part of the scheduled pipeline) each get their own
-folder under `analysis/`, holding whatever mix of CSVs, charts, and
-plotting/analysis scripts that investigation produced — see
-[`PROJECT_FILES.md`](docs/PROJECT_FILES.md) for what's in each one.
-
-## How to Read the Daily Chart
-
-- **Aqua line** — the model's single best-guess ("median") count for each
-  hour.
-- **Shaded band + side table** — the model's
-  [prediction interval](docs/HOW_IT_WORKS.md#term-prediction-interval): the
-  range the real count is expected to fall in on most days, shown as a single
-  shaded central band around the line and repeated as plain numbers in the table,
-  where the "Predicted" column is that hour's single best guess and "Range" is
-  the band. **It isn't perfectly calibrated** — see
-  [forecast accuracy and calibration](docs/HOW_IT_WORKS.md#forecast-accuracy-and-calibration) for the real, measured accuracy
-  of this range, not just the claimed one.
-- **Weather markers** (circle/square/triangle/diamond) — the model's
-  predicted weather condition for that hour, plotted at the median
-  count.
-- **Green dashed line (right-hand axis)** — predicted tide height, in
-  feet.
-- **Hatched band / "no training data" label** — flags hours with little
-  or no real training data behind them (night hours, or hours outside
-  the model's normal range) — treat those points as a rough
-  extrapolation, not a confident prediction.
-- **Caption** — the conditions driving that day's forecast, plus the
-  detector's actual [precision](docs/HOW_IT_WORKS.md#term-precision) and
-  [recall](docs/HOW_IT_WORKS.md#term-recall), measured on held-out images
-  for the checkpoint actually deployed (not estimated).
-
-See [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for a deeper walkthrough of
-the detection pipeline and a glossary of every term used on this page,
-and [PROJECT_HISTORY.md](docs/PROJECT_HISTORY.md) for the full history
-of how the forecast model was built, tested, and tuned.
+Thanks to [Surfline](https://www.surfline.com/) for the camera and forecast data, [Open-Meteo](https://open-meteo.com/) for observed weather, [NOAA](https://tidesandcurrents.noaa.gov/) for tides, [Ultralytics](https://github.com/ultralytics/ultralytics) for YOLOv8, and [CVAT](https://www.cvat.ai/) for the labeling tool.
