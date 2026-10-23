@@ -381,16 +381,37 @@ def weekend_by_month(min_days=2, tide_max=3.0):
 def surfer_poses():
     j = json.load(open(CVAT / POSE_SET / "annotations" / "instances_default.json"))
     iid = next(i["id"] for i in j["images"] if i["file_name"].endswith(POSE_FRAME))
-    best = {}
-    for a in j["annotations"]:
-        p = a["attributes"].get("pose")
-        if a["image_id"] == iid and p in ("standing", "sitting", "prone"):
-            if p == "standing" and round(a["bbox"][0]) != POSE_STANDING_X:
-                continue
-            area = a["bbox"][2] * a["bbox"][3]
-            if area > best.get(p, (0, None))[0]:
-                best[p] = (area, a["bbox"])
     img = _rgb(CROPS / POSE_FRAME)
+    frame = [a for a in j["annotations"] if a["image_id"] == iid]
+
+    def window(b):
+        """The fixed 64x40 close-up window centred on a box, clamped to the frame."""
+        cx, cy = b[0] + b[2] / 2, b[1] + b[3] / 2
+        x0 = int(np.clip(cx - 32, 0, img.shape[1] - 64))
+        y0 = int(np.clip(cy - 20, 0, img.shape[0] - 40))
+        return x0, y0
+
+    def alone(a):
+        """True when no other labeled surfer reaches into a's close-up window. A
+        second surfer in the panel (the 10-22 lying-down pick had a sitter
+        beside it) makes the panel read as the wrong pose."""
+        x0, y0 = window(a["bbox"])
+        return not any(o is not a and o["bbox"][0] < x0 + 64 and o["bbox"][0] + o["bbox"][2] > x0
+                       and o["bbox"][1] < y0 + 40 and o["bbox"][1] + o["bbox"][3] > y0
+                       for o in frame)
+
+    best = {}
+    for a in frame:
+        p = a["attributes"].get("pose")
+        if p not in ("standing", "sitting", "prone"):
+            continue
+        if p == "standing" and round(a["bbox"][0]) != POSE_STANDING_X:
+            continue
+        if p != "standing" and not alone(a):
+            continue
+        area = a["bbox"][2] * a["bbox"][3]
+        if area > best.get(p, (0, None))[0]:
+            best[p] = (area, a["bbox"])
 
     # Laid out in inches rather than with a gridspec, so the strip spans exactly
     # the width of the three panels and their gaps: an equal-aspect image in a
@@ -424,9 +445,7 @@ def surfer_poses():
         top.text(x + w / 2, y + h + 6 if below else y - 6, name.split()[0].lower(),
                  color=LIME, fontsize=8, ha="center", va="top" if below else "bottom")
         # a fixed 64x40 window centred on the box, so every panel is to scale
-        cx, cy = x + w / 2, y + h / 2
-        x0 = int(np.clip(cx - 32, 0, img.shape[1] - 64))
-        y0 = int(np.clip(cy - 20, 0, img.shape[0] - 40))
+        x0, y0 = window((x, y, w, h))
         patch = cv2.resize(img[y0:y0 + 40, x0:x0 + 64], (384, 240),
                            interpolation=cv2.INTER_LANCZOS4)
         ax = fig.add_axes([(MARGIN + k * (pw + GAP)) / FW, foot / FH, pw / FW, ph / FH])
