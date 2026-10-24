@@ -34,6 +34,11 @@ jobs:
                       torch==2.8.0 torchvision==0.23.0
           pip install numpy==2.2.6 opencv-python-headless==4.12.0.88 \
                       pytz==2025.2 astral==3.2 pytest
+          # The forecast tests (band health, point recalibration) import the
+          # forecast modules, which pull in the modelling stack. Pinned to the
+          # versions the nightly run uses.
+          pip install pandas==2.3.3 matplotlib==3.10.6 joblib==1.5.3 \
+                      scikit-learn==1.9.0 statsmodels==0.15.0 requests==2.32.5
 
-      - name: Run geometry tests
+      - name: Run tests
         run: python -m pytest tests/ -q
