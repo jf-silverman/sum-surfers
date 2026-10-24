@@ -89,12 +89,18 @@ fi
 # Non-fatal: a git/network failure here must never be treated as the whole daily
 # chart job failing (the chart itself already generated fine above).
 # Images go to the orphan `assets` branch, not main -- one force-pushed commit
-# that never accumulates history. Only the README text (which carries the day's
-# dates and the cache-busting ?v= stamps) is committed here.
+# that never accumulates history. Committed here: the README text (which carries
+# the day's dates and the cache-busting ?v= stamps) and the forecast record --
+# each night's forecast_<date>.csv / week_<date>.csv and the rebuilt
+# forecast_log.csv, the scored history behind the README's accuracy numbers.
+# Added 2026-10-24, after the record had gone uncommitted for three weeks.
+# A directory pathspec, not a glob, so a night with no new file can't make
+# `git add` fail and take the README with it.
 bash "$PROJECT_ROOT/code/publish_assets.sh" 2>&1 || true
 git add README.md 2>&1 || true
+git add -- data/forecasts 2>&1 || true
 if git diff --cached --quiet; then
-    log "No changes to commit (chart/table/README identical to last run)."
+    log "No changes to commit (README and forecast record identical to last run)."
 else
     if git commit -m "Automated: update daily surfer count chart ($(date '+%Y-%m-%d'))" 2>&1; then
         if git push origin main 2>&1; then

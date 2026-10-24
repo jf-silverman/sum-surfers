@@ -6484,3 +6484,21 @@ measurement part of the forecast's scored error, but that noise is symmetric:
 it cannot cause the under-forecast at the top. A rough variance split puts
 lead-1 RMSE at 7.47 → about 6.95 from the cleaner target alone, most of it in
 how the forecast is scored rather than in what it predicts.
+
+### The forecast record is committed nightly (2026-10-24)
+
+The nightly job had only ever run `git add README.md`, so the forecast record
+never reached git on its own: `forecast_log.csv` was last committed on
+2026-10-20 by hand, and every `forecast_<date>.csv` / `week_<date>.csv` from
+Oct 1-2 on was untracked. Committed in one catch-up commit, and
+`daily_chart.sh` now also runs `git add -- data/forecasts`. A directory
+pathspec rather than a glob, so a night with nothing new can't fail the add.
+
+One file in the catch-up changed rather than appeared: `week_2026-09-30.csv`.
+The committed copy was a 14:08 run; the nightly 20:41 run replaced it that
+evening, before the write-once guard existed. The nightly version is the one
+that was published and is kept.
+
+The same morning CI was fixed: it had failed on every push since 2026-10-20,
+because the two forecast test files import the modelling stack and the
+workflow installed only the detection packages.

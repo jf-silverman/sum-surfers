@@ -187,6 +187,6 @@ The whole pipeline runs as one job every night after last light
 (`code/local_pipeline.sh`): it downloads the day's clips, counts the surfers,
 pulls the conditions, rebuilds the training table, refits the forecast where
 needed and republishes the README's charts. Its last step,
-`code/daily_chart.sh`, builds the charts and commits the README. Both are safe
-to run by hand at any time.
+`code/daily_chart.sh`, builds the charts and commits the README and the forecast
+record. Both are safe to run by hand at any time.
 
