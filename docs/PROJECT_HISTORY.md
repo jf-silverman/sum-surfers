@@ -6502,3 +6502,64 @@ that was published and is kept.
 The same morning CI was fixed: it had failed on every push since 2026-10-20,
 because the two forecast test files import the modelling stack and the
 workflow installed only the detection packages.
+
+## 2026-10-24 — The packed hours, local calendars, and a top-end correction
+
+**Packed hours** (`analysis/packed_hours/`). Week-grouped out-of-fold
+hindcasts for all 1,956 daylight hours (2025-10-11 to 2026-10-23) put the 317
+hours with 30+ surfers at 27.3 against 39.5 actual. The missed ones are half
+weekend and mostly August to October, but on the recorded conditions they look
+like the well-forecast packed hours; no input separates them. Most of the
+shortfall is within the day: 31% of residual variance is whole-day level, and
+3.6 of the 12.2-surfer shortfall on packed hours is the day running high. The
+rest is peak hours rising above the day's shape. The two worst days on record
+are holidays, 2026-07-03 (Independence Day observed) and Labor Day 2026-09-07.
+
+**Local calendar and inland heat, tested and not adopted.** Official school
+calendars for Live Oak SD and Santa Cruz City Schools (2025-26 and 2026-27,
+via the County Office of Education), California days off from `holidays`, and
+San Jose's daily maximum from Open-Meteo. Holidays and long weekends move MAE
+6.330 → 6.278 and long-weekend MAE 10.46 → 10.00, better in 17 of 29 weeks
+(p = 0.18), on only 7 long-weekend days. School-out days and inland heat make
+it slightly worse. None moves the packed-hour shortfall (−12.2 throughout).
+School breaks outside summer are nearly absent from the record (27 weekdays),
+and summer is already carried by month.
+
+**Top-end correction** (`analysis/forecast_recalibration/test_top_end_correction.py`),
+forward in time under production's guards, 2,293 rows over 23 target dates.
+Against the production affine (MAE 5.605, −4.35 when it forecasts 25+): a
+hinge with a second slope above 20 surfers reaches MAE 5.359 and is within
+one surfer of unbiased in every forecast bin; quantile mapping reaches 5.332
+and cuts the packed-hour shortfall from −15.2 to −8.8, but over-forecasts by
+3.7 whenever it says 25+. Neither is significant yet (15/23 dates, p = 0.27;
+13/23, p = 0.75). Isotonic and hour-of-day offsets add nothing over the hinge.
+Not adopted.
+
+**High-school dismissal and Cabrillo, tested the same day and not adopted.**
+The closest high school is Cypress (1.5 km), which ends classes at 1:25 pm
+(1:10 Wednesday); Harbor and Soquel (about 4 km) let out at 3:35 pm (2:10 pm
+Wednesday), and Delta, on the Cabrillo campus, releases its morning group at
+12:10 pm. Santa Cruz City Schools
+started 2026-08-06 and Cabrillo 2026-08-24. On weekdays, excluding holidays,
+the school-day crowd builds through the afternoon while summer weekdays peak
+mid-morning, but month and hour already carry that, and flags for
+high-school day, after-dismissal at each school and Cabrillo class day all
+leave MAE slightly worse (6.330 → 6.37-6.41). Two hints worth rechecking as the record
+grows: across the 2026-08-06 school start, weekday midday crowds fell (15.4 →
+9.9) and 4-6pm rose (13.0 → 16.3), and in school weeks the Wednesday 3pm hour
+runs 3.3 above other weekdays (p = 0.15, 14 Wednesdays), consistent with the
+early release. Details in `analysis/packed_hours/packed_hours_notes.md`.
+
+**Local events and Columbus Day, the same day.** The local papers (Lookout,
+Good Times, the Sentinel) publish event listings as articles, but Visit Santa
+Cruz County's site has a public events API with listings back to July 2025.
+Pulled into `visit_sc_events.csv` (3,616 events), a count of one-off
+festivals, special and sporting events near the coast does not track the
+misses (weekend days with an event +1.5, without +2.2; p = 0.59). Contest days
+at Pleasure Point itself need a County Parks permit (at most two a month), a
+calendar that would have to be requested. Columbus Day (Mon 2026-10-12) does
+not explain the big Saturday 2026-10-10: it is federal only, schools were in
+session, and the weekend's residuals (+2.8, +1.3, +1.0) match an ordinary
+weekend. That Saturday was a tide day: zero surfers through a 5.5 ft midday
+high, then 38-64 on the afternoon low, which the hindcast shaped right but
+sized about 12 short.
