@@ -6437,3 +6437,50 @@ week chart's footer notes moved to one per line, left-justified, after the
 new note pushed the single "|"-joined line off both edges. Step 1 of the
 README walk-through now dims the area outside the counted band to 65%
 brightness instead of 35%.
+
+## 2026-10-24 — Label coverage, where the forecast misses, and sampling twice an hour
+
+**The hand-boxed set against the live camera** (`analysis/label_coverage/`).
+The six raw CVAT exports hold 172 frames and 3,426 boxes, matching `splits_v2`.
+30 frames are empty; the rest have a median of 21 surfers and a maximum of 57.
+As a share of frames the labeled set tracks the 2,047 quality-ok live frames
+(2025-10-11 to 2026-10-23) except at 1–5 surfers: 19% of live frames, 6% of
+labeled ones (10 frames). Above 30 surfers the labeled set has about twice its
+live share. Both charts carry a footer with the date made and both date ranges.
+
+**Where the forecast misses** (`analysis/forecast_miss_patterns/`), on the
+2,763 scored hours from 2026-09-23 to 2026-10-23 (31 days, 8 weekend days),
+scoring the model's own output (`predicted_raw`):
+
+- Overall it runs **high**, not low: +2.3 surfers. Cut by the actual count it is
+  +4 to +6 for every bin up to 20 surfers, −2.2 at 21–30, −10.8 (−29%) at
+  31–40 and −20.0 (−42%) at 41+.
+- Cut by the actual count, that shape is guaranteed for any forecast that is
+  less than perfect (regression to the mean), so it does not by itself show a
+  fault. Cut by the forecast, the bias is +1.5 to +4.6 from 1 to 20 surfers
+  (what the nightly affine correction now removes), +1.0 at 21–30, and
+  **−8.6 (−21%) when it forecasts 31–40** (74 hours). That top bin is the real
+  under-forecast. The model never forecast above 36.5 against actual counts up
+  to 64; the forecasts' standard deviation is 9.3 against 12.9 for the actual
+  counts.
+- By hour (lead 1): too high from 6am to noon on weekdays and weekends alike
+  (+2 to +5), and too low on weekend afternoons, 2pm to 5pm (−3 to −5). Misses
+  of 14+ surfers are 0–5% of hours before 11am and 9–19% from 1pm on, where the
+  crowds are. Weekend points rest on about 16 hours each, so they are noisy.
+- This agrees with the 2026-09-11 model-family comparison, where every
+  algorithm and loss under-forecast 30+ hours by 10–13 surfers: the limit is the
+  predictors, not the model family.
+
+**Sampling twice an hour** (`analysis/count_variability/sampling_schedule/`).
+Replaying schedules on the three dense hours against each hour's full mean:
+one clip with three frames (production) misses by **2.89** surfers on average,
+three frames spread across one clip by 2.43, two clips 30 minutes apart by
+**1.54**, the same with frames spread by 1.39, and four clips 15 minutes apart
+by 1.09. Same ordering on each of the three hours. The 1.5-surfer floor from
+2026-10-14 measured a frame against its own clip; against the hour, the
+clip-to-clip drift (5-minute clip means have a standard deviation of about
+2.8 within an hour) is the larger part. Two clips an hour would cut the
+measurement part of the forecast's scored error, but that noise is symmetric:
+it cannot cause the under-forecast at the top. A rough variance split puts
+lead-1 RMSE at 7.47 → about 6.95 from the cleaner target alone, most of it in
+how the forecast is scored rather than in what it predicts.
