@@ -1,0 +1,6 @@
+arm,MAE,MAE lunch hours,bias lunch hours,weeks better,p
+production,6.401,6.802,0.175,,
++ lunch,6.41,6.829,0.084,13/29,0.522
++ hour,6.396,6.764,0.1,14/29,0.412
++ minutes,6.346,6.825,0.12,17/29,0.256
+"+ lunch, minutes",6.359,6.812,-0.043,13/29,0.717

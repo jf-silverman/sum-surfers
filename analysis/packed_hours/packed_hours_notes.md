@@ -350,3 +350,19 @@ Cabrillo held regular classes that week (semester; finals May 18-23, no
 entries for Mar 16-20 on its Spring 2026 dates page). The
 record has no counted days between 2026-03-17 and 2026-04-20, so the college
 and high-school spring breaks themselves cannot be tested on this year's data.
+
+## Lunchtime dip (`lunch_dip_results.csv`, `lunch_dip_profile.csv`, 2026-10-26)
+
+Joel saw peaks around 10am and 2pm in the hourly averages with tides over 3 ft
+removed. On weekdays at 3 ft or under the dip is there: 26.0 at 10am, 22.2 at
+noon, 20.2 at 1pm, back to 23.6 at 2pm. The hindcast already follows it
+(24.0, 22.7, 22.0, 23.7), and its residuals at noon and 1pm are −0.5 and −1.8,
+so the model, if anything, puts slightly too many surfers at lunch. The model's
+clock is hour_sin/hour_cos, and the GBT splits on both to carve out the dip.
+Weekend low-tide hours from 9am to 1pm have under 15 rows each, so the weekend
+shape cannot be read at this tide.
+
+As inputs (MAE 6.401 production): a lunch flag for clip times 12:00-13:29
+6.410 (13/29 weeks, p = 0.52); hour as an integer 6.396 (p = 0.41); minutes
+after midnight 6.346 (17/29, p = 0.26). Lunch hours' bias is +0.18 in
+production. Not a cause of the misses; not adopted.
