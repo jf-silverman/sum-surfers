@@ -1,0 +1,15 @@
+model,MAE,bias,bias actual 30+,spread ratio,weeks better than GBT,p
+GBT (production),6.401,-0.644,-11.978,0.797,,
+"Ridge, raw",8.184,0.45,-16.263,0.623,4/29,0.0
+"Lasso, raw",8.335,0.391,-17.003,0.594,2/29,0.0
+"ElasticNet, raw",8.342,0.325,-17.068,0.588,3/29,0.0
+"Poisson GLM, raw",8.779,-0.039,-16.678,0.704,3/29,0.0
+"Ridge on log count, raw",9.347,-2.369,-17.845,0.987,3/29,0.0
+"Lasso on log count, raw",9.512,-2.921,-19.792,0.903,3/29,0.0
+"Ridge, shaped",7.026,0.706,-12.984,0.725,9/29,0.051
+"Lasso, shaped",7.317,0.502,-14.501,0.671,8/29,0.004
+"ElasticNet, shaped",7.246,0.554,-14.282,0.675,9/29,0.009
+"Poisson GLM, shaped",6.544,0.389,-9.648,0.875,12/29,0.522
+"Ridge on log count, shaped",6.776,-1.84,-13.944,0.795,9/29,0.006
+"Lasso on log count, shaped",7.265,-2.743,-17.911,0.672,7/29,0.0
+"Blend: GBT + Poisson GLM, shaped",6.179,-0.128,-10.813,0.813,20/29,0.012

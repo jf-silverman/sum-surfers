@@ -6635,3 +6635,13 @@ but the packed shortfall is −11.5 against −12.0. Separately, first fair days
 after poorer days run about 1 surfer further above the forecast than a second
 fair day in a row (p = 0.4-0.6, only 2 on weekends), and a flag for them adds
 nothing. Neither adopted. Details in `analysis/packed_hours/packed_hours_notes.md`.
+
+**Linear models revisited, and a GBT + Poisson GLM blend (2026-10-26).** The
+September comparison gave Ridge and a Poisson GLM only the raw features. With
+a tide spline and one-hot hour, hour × weekend, month and rating, the Poisson
+GLM reaches 6.54 against the GBT's 6.40 on week-held-out folds, with the
+smallest packed-hour shortfall of any single model (−9.6). Averaging it with
+the GBT gives 6.18-6.20, better in 20-23 of 29 weeks (p = 0.012 at half and
+half, p < 0.001 at 0.7 GBT). Lasso, ElasticNet and log-count regressions do
+not help. Not adopted; a forward-in-time check comes first. Details in
+`analysis/surf_count_model_selection/results.md`.

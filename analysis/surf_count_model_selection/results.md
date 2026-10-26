@@ -61,3 +61,39 @@ spent on model class, tuning, or target transforms will not move this.
 Effort spent on new predictors might — the swell re-backfill is the
 precedent: correcting one feature moved period's correlation with count from
 r=+0.015 to +0.158 and lifted nearshore energy to the #2 feature.
+
+## Regularized linear models and a blend, week-held-out (2026-10-26)
+
+`test_linear_models.py` (kept local; `linear_models_results.csv`). Same 10
+week-grouped folds as the packed-hours tests, daylight rows, production GBT
+6.401. Each linear model is fitted on the raw features and on "shaped" ones:
+raw plus a tide spline and one-hot hour, hour × weekend, month and rating,
+which a linear model needs to bend where the crowd does.
+
+| Model | MAE | Bias at actual 30+ | Weeks better than GBT |
+|---|---|---|---|
+| Ridge / Lasso / ElasticNet, raw | 8.18 / 8.34 / 8.34 | −16 to −17 | 2-4 of 29 |
+| Poisson GLM, raw | 8.78 | −16.7 | 3/29 |
+| Ridge on log count, raw | 9.35 | −17.8 | 3/29 |
+| Ridge / Lasso / ElasticNet, shaped | 7.03 / 7.32 / 7.25 | −13 to −14.5 | 8-9/29 |
+| Ridge / Lasso on log count, shaped | 6.78 / 7.27 | −13.9 / −17.9 | 9 and 7/29 |
+| **Poisson GLM, shaped** | **6.54** | **−9.65** | 12/29 (p = 0.52) |
+| GBT given the shaped inputs | 6.30 | −11.8 | 18/29 (p = 0.051) |
+| **0.5 GBT + 0.5 Poisson GLM, shaped** | **6.18** | −10.8 | **20/29 (p = 0.012)** |
+| 0.7 GBT + 0.3 Poisson GLM, shaped | 6.20 | −11.3 | **23/29 (p < 0.001)** |
+| 0.3 GBT + 0.7 Poisson GLM, shaped | 6.26 | −10.4 | 19/29 (p = 0.27) |
+| 0.5 GBT + 0.5 Ridge, shaped | 6.39 | −12.5 | 16/29 (p = 0.51) |
+
+Lasso does no better than Ridge, and fitting the log count is worse than
+fitting the count. The Poisson GLM on shaped inputs is the best linear model
+and has the smallest packed-hour shortfall of any single model tested so far.
+On its own it trails the GBT, but averaged with it, it beats the GBT
+week by week, at every weight from 0.5 to 0.7 GBT. Its errors are different
+from the GBT's in a useful way; Ridge's are not. The blend
+is better in 6 of the 9 months on record (worse in December, March and July).
+
+Caveats: the pairing was chosen after seeing the single-model results (the
+weight sweep and the Ridge partners are the check on that); the scores are
+hindcasts on recorded conditions; and the packed-hour shortfall narrows only
+from −12.0 to about −11. A forward-in-time check (fit only on earlier dates)
+would come before any production change.
