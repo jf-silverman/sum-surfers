@@ -1,0 +1,6 @@
+arm,MAE all hours,"weeks better, all hours",p all hours,MAE clean hours,"weeks better, clean hours",p clean hours,bias actual 30+
+train all (production),6.401,,,6.03,,,-11.978
+train low raw sd 50%,6.821,6/29,0.002,6.521,7/29,0.002,-15.481
+train low relative sd 50%,6.675,13/29,0.076,6.119,16/29,0.686,-12.682
+"all, weight 1/(1+sd^2)",6.455,14/29,0.536,6.061,14/29,0.782,-12.579
+"all, weight 1/(1+rel^2)",6.388,17/29,0.915,5.997,14/29,0.565,-12.061

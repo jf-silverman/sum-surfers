@@ -392,3 +392,27 @@ clean the swell is: 6.322 (19/29 weeks, p = 0.18; beats all 8 placebos,
 −3.7 sd). That is the same size as Steamer Lane's rating and the low-tide
 window. None of these moves the packed-hour shortfall (−11.8 to −12.2). Not
 adopted.
+
+## Training only on hours whose frames agree (`frame_agreement_results.csv`, 2026-10-26)
+
+Joel's idea: train on the half of hours with the lowest spread across the
+three frames, as cleaner labels. Every arm is scored on all daylight hours of
+the held-out weeks, and on the held-out hours in the low-relative-spread half.
+
+| Trained on | MAE, all hours | MAE, clean hours | Bias at actual 30+ |
+|---|---|---|---|
+| All hours (production) | 6.401 | 6.030 | −12.0 |
+| Lowest 50% raw sd | 6.821 (worse, p = 0.002) | 6.521 (worse) | −15.5 |
+| Lowest 50% sd / √(mean+1) | 6.675 (p = 0.08) | 6.119 | −12.7 |
+| All, weight 1/(1+sd²) | 6.455 | 6.061 | −12.6 |
+| All, weight 1/(1+relative sd²) | 6.388 (p = 0.92) | 5.997 (p = 0.57) | −12.1 |
+
+Raw spread grows with the crowd, so the low-sd half keeps a mean of 9.2
+surfers and 77 of the 329 packed hours; the model trained on it under-forecasts
+crowds more. Scaled by crowd size the half is representative (mean 14.5, 169
+packed hours), but halving the data costs more than the cleaner labels gain,
+even on the clean hours. Weighting is a wash. The three frames are 1.5 s apart
+and correlate at about 0.8, so their spread mostly reflects detection
+difficulty (occlusion, chop), not how well the frames sample the hour, and
+that part of the label noise is small next to the forecast's error. Not
+adopted.
