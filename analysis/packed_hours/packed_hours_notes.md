@@ -315,3 +315,33 @@ crowds). A cut at 31 leaves 6-30 undercounted. The cut was picked on the same
 215 frames it is scored on. As training targets the hybrids change little:
 cut 6 gives a 30+ shortfall of −11.0 (−27.3%) and MAE vs hand counts 6.27,
 against −11.5 (−29.0%) and 6.50 for production.
+
+## Spring 2026 breaks, and the frame-pair review (2026-10-26)
+
+`frame_pairs_review.md` shows crowded hours the hindcast got right next to ones
+it forecast 10+ low: five pairs from consecutive hours of one day, and five
+from different days matched on the forecast, hour, weekday/weekend and
+conditions. Holidays, long weekends and school or college break days appear
+only in the same-day pairs. The tables carry a "Holiday / school break" column.
+
+Spring 2026 breaks, from official calendars except where noted:
+
+| School | Dates | Source |
+|---|---|---|
+| Santa Cruz City Schools (Harbor, Soquel, Cypress) | spring break Apr 6-10; non-student day Fri Mar 13 | district calendar via the County Office of Education (`local_school_calendar.csv`) |
+| Live Oak School District | spring break Apr 6-10; non-school day Mon Mar 16 | same |
+| Delta Charter (Cabrillo campus) | not found | |
+| Cabrillo College | spring break Mar 23-28; campus closed Mar 31 | cabrillo.edu, Spring 2026 dates and deadlines |
+| UCSC | instruction ended Mar 13; finals Mar 16-20; spring quarter began Mar 30; César Chávez Day Mar 27 | registrar.ucsc.edu, 2025-26 calendar PDF |
+| UC Berkeley | spring recess Mar 23-26, holiday Mar 27 | registrar.berkeley.edu, 2025-26 calendar |
+| Stanford | winter quarter ended Mar 20, spring began Mar 30 | approaching.stanford.edu |
+| SJSU | spring recess Mar 30-Apr 3 | sjsu.edu registrar |
+| Palo Alto USD | Apr 6-10 | aggregators only |
+| Scotts Valley USD | Apr 6-10 | aggregator only |
+| Fremont Union HSD | Apr 12-16 per two aggregators, Mar 16-20 per one; unresolved | aggregators only |
+
+Mon 2026-03-16, the same-day pair with the biggest miss (48 counted against a
+16 hindcast at 12:44), was a Live Oak non-school day and the first day of UCSC
+finals, three days after a Santa Cruz City Schools non-student Friday. The
+record has no counted days between 2026-03-17 and 2026-04-20, so the college
+and high-school spring breaks themselves cannot be tested on this year's data.
