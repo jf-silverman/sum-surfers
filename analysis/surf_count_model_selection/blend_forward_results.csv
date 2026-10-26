@@ -1,0 +1,5 @@
+model,MAE,bias,bias actual 30+,spread ratio,weeks better,p weeks,days better,p days
+GBT (production),6.968,-1.181,-14.903,0.731,,,,
+"Poisson GLM, shaped",7.625,0.514,-11.182,0.873,8/24,0.053,51/129,0.012
+0.5 GBT + 0.5 Poisson GLM,6.953,-0.333,-13.042,0.763,14/24,0.726,67/129,0.795
+0.7 GBT + 0.3 Poisson GLM,6.872,-0.672,-13.787,0.74,15/24,0.188,71/129,0.147

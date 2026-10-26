@@ -97,3 +97,24 @@ weight sweep and the Ridge partners are the check on that); the scores are
 hindcasts on recorded conditions; and the packed-hour shortfall narrows only
 from −12.0 to about −11. A forward-in-time check (fit only on earlier dates)
 would come before any production change.
+
+### Forward in time (`blend_forward_results.csv`, `blend_forward_by_month.csv`)
+
+`test_blend_forward.py` (kept local) predicts each calendar week only from
+models fitted on dates before it, refitting weekly, once 20 counted days are
+available (24 weeks, 129 days, from 2025-11-10):
+
+| Model | MAE | Bias at actual 30+ | Weeks better than GBT | Days better |
+|---|---|---|---|---|
+| GBT (production) | 6.97 | −14.9 | | |
+| Poisson GLM, shaped | 7.63 | −11.2 | 8/24 (p = 0.053, worse) | 51/129 |
+| 0.5 GBT + 0.5 Poisson GLM | 6.95 | −13.0 | 14/24 (p = 0.73) | 67/129 |
+| 0.7 GBT + 0.3 Poisson GLM | 6.87 | −13.8 | 15/24 (p = 0.19) | 71/129 |
+
+Most of the week-held-out gain does not survive. The GLM is poor while
+history is short (December 9.58 against the GBT's 4.00): its one-hot month and
+hour × weekend terms have little or nothing to learn from early on. Restricted
+to the 15 weeks with 60+ training days (from 2026-07-16), the 0.7/0.3 blend is
+6.79 against 6.94, better in 11 of 15 weeks, p = 0.095; half and half 6.81,
+p = 0.30. A small gain that may firm up as the record grows, not yet a case
+for changing production.

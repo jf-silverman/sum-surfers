@@ -6645,3 +6645,7 @@ the GBT gives 6.18-6.20, better in 20-23 of 29 weeks (p = 0.012 at half and
 half, p < 0.001 at 0.7 GBT). Lasso, ElasticNet and log-count regressions do
 not help. Not adopted; a forward-in-time check comes first. Details in
 `analysis/surf_count_model_selection/results.md`.
+Forward in time, refitting weekly on earlier dates only, the blend's gain
+mostly disappears: 6.87 against 6.97 at 0.7/0.3 (15/24 weeks, p = 0.19). With
+60+ days of history (from 2026-07-16) it is 6.79 against 6.94, 11 of 15
+weeks, p = 0.095. Not adopted.
