@@ -12,8 +12,11 @@ Precision and recall are two numbers. A bar chart of 0.987 and 0.919 says less
 than a two-row table does, and spends the reader's attention on chrome. They go
 in a stat table; the chart budget goes where there is structure to see.
 
-  detector_accuracy.png   hand count vs detector count, one point per reviewed
-                          frame, with a 1:1 reference and the fitted line. The
+  detector_accuracy.png   hand count vs the hour's count, one point per reviewed
+                          frame. Since 2026-10-26 the hour's count is the
+                          median of five frames one second apart below 6
+                          surfers and their max from 6 up; the hand count is
+                          of the 2.5 s frame, with a 1:1 reference and the fitted line. The
                           gap between those two lines IS the undercount. A
                           precision bar hides it completely; this chart lets a
                           reader see the scatter widen at the busy end instead
@@ -109,14 +112,14 @@ def detector_chart(s):
     lx = hi * 0.56
     ax.text(lx, lx + hi * 0.055, "perfect agreement", color=INK_DIM, fontsize=10,
             rotation=38, rotation_mode="anchor", va="bottom", ha="left")
-    ax.text(lx, sl * lx + ic - hi * 0.075, f"object detector = {sl:.2f} x actual",
+    ax.text(lx, sl * lx + ic - hi * 0.075, f"hourly count = {sl:.2f} x actual",
             color=LIME, fontsize=10, rotation=36, rotation_mode="anchor",
             va="top", ha="left")
 
     ax.set_xlim(-2, hi); ax.set_ylim(-2, hi)
     ax.set_xlabel("surfers actually there (counted by hand)", color=INK, fontsize=10.5)
-    ax.set_ylabel("surfers the object detector counted", color=INK, fontsize=10.5)
-    ax.set_title("The object detector against a human count", color=INK, fontsize=13.5,
+    ax.set_ylabel("hourly count (median/max of 5 frames)", color=INK, fontsize=10.5)
+    ax.set_title("The hourly count against a human count", color=INK, fontsize=13.5,
                  fontweight="bold", loc="left", pad=28)
     ax.text(0, 1.025,
             f"{len(s)} frames hand-counted across {s.date.nunique()} days  ·  "
