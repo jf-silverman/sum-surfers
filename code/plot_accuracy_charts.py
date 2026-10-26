@@ -102,14 +102,14 @@ def detector_chart(s):
     hi = max(s.truth.max(), s.det.max()) * 1.06
 
     # Layers, back to front: the truth line (solid, widest, dark gray so it
-    # reads as a reference rather than data), the fitted line (dashed, slightly
-    # transparent, so the truth line shows through its gaps where the two
-    # nearly coincide), then the points.
-    ax.plot([0, hi], [0, hi], color=TRUTH, linewidth=3.0, solid_capstyle="butt",
+    # reads as a reference rather than data), the fitted line (dashed and
+    # opaque, so the truth line shows through its gaps where the two nearly
+    # coincide), then the points.
+    ax.plot([0, hi], [0, hi], color=TRUTH, linewidth=5.0, solid_capstyle="butt",
             zorder=2, label="perfect agreement")
     xs = np.array([0, hi])
     ax.plot(xs, sl * xs + ic, color=LIME, linewidth=2.0, linestyle=(0, (6, 4)),
-            alpha=0.85, zorder=3,
+            zorder=3,
             label=f"fitted line: hourly count = {sl:.2f} x actual (r\u00b2 = {r ** 2:.3f})")
     # 2px surface ring keeps overlapping points readable where the lineup packs in
     ax.scatter(s.truth, s.det, s=42, color=AQUA, alpha=0.7,
