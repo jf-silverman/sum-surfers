@@ -259,3 +259,59 @@ The scripts for this section and the two above it (`test_conditions_change.py`,
 `fetch_nearby_ratings.py`, `test_nearby_ratings.py`, `test_max_frame.py`,
 `test_first_fair_day.py`) and the fetched ratings are kept local; only their
 results are committed.
+
+## Five frames one second apart (`five_frames_results.csv`, 2026-10-26)
+
+Four more frames per clip (0.5, 1.5, 3.5 and 4.5 s, with the existing 2.5 s
+count) were counted with the production detector for the 2,073 hours whose
+clips are still on disk (`extra_frame_counts.csv`); re-extracting the 2.5 s
+frame reproduced production's count in 8 of 8 clips checked. 2,054 hours have
+all five frames. Every arm below uses the same hours.
+
+Against hand counts of the 2.5 s frame (215 frames), bias by crowd size:
+
+| Truth | Mean of 3 | Max of 3 | Mean of 5 | Max of 5 |
+|---|---|---|---|---|
+| 0-5 | +0.08 | +0.53 | +0.11 | +0.77 |
+| 6-15 | −0.82 | −0.16 | −1.04 | −0.02 |
+| 16-30 | −1.88 | −0.76 | −1.76 | −0.12 |
+| 31+ | −2.83 | −0.98 | −2.50 | −0.30 |
+| Overall MAE | 1.54 | 1.39 | 1.53 | 1.49 |
+
+The max of five removes the busy-frame undercount almost entirely, at the cost
+of overcounting near-empty water (+0.77), where a stray false positive in any
+of five frames sets the max.
+
+The GBT refitted on each target:
+
+| Target | Daylight mean | Shortfall, own target 30+ | MAE vs hand counts | Bias vs hand counts, 31+ |
+|---|---|---|---|---|
+| Mean of 3 (production) | 14.97 | −11.5 (−29.0%) | 6.50 | −13.2 |
+| Max of 3 | 15.85 | −11.2 (−28.1%) | 6.27 | −12.1 |
+| Mean of 5 | 15.00 | −11.7 (−29.4%) | 6.55 | −13.8 |
+| Max of 5 | 16.17 | −11.2 (−27.9%) | 6.37 | −11.9 |
+
+All four forecasts are scaled copies of each other (mean of 3 against max of 5,
+correlation 0.992), and the spread ratio stays at 0.80. More frames make the
+count more accurate; they do not change which hours the model expects to pack.
+
+**Median and hybrids (added the same day).** Median of 3 and median of 5 behave
+like the means (−2.96 and −2.48 at 31+). Hybrids read the crowd level from the
+median of 5, keep the median below a cut and use the max of 5 at or above it.
+Bias against hand counts:
+
+| Truth | Max of 5 | Median <6, max ≥6 | Median <16, max ≥16 | Median <31, max ≥31 |
+|---|---|---|---|---|
+| 0-5 | +0.77 | +0.06 | +0.05 | +0.05 |
+| 6-15 | −0.02 | −0.07 | −0.96 | −0.98 |
+| 16-30 | −0.12 | −0.12 | −0.47 | −1.78 |
+| 31+ | −0.30 | −0.30 | −0.30 | −0.74 |
+| Overall MAE | 1.49 | **1.32** | 1.46 | 1.51 |
+
+The cut at 6 is the best count tested: the median removes the one-frame false
+positive that inflates near-empty water, and the max recovers hidden surfers
+from 6 up, where the undercount starts (it is proportional, not confined to
+crowds). A cut at 31 leaves 6-30 undercounted. The cut was picked on the same
+215 frames it is scored on. As training targets the hybrids change little:
+cut 6 gives a 30+ shortfall of −11.0 (−27.3%) and MAE vs hand counts 6.27,
+against −11.5 (−29.0%) and 6.50 for production.
