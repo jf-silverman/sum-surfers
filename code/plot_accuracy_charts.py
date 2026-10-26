@@ -67,6 +67,7 @@ BG, INK, INK_DIM, GRID = "black", "white", "#bbbbbb", "#333333"
 # the right hierarchy instead of a distraction.
 AQUA = "#3ab4c9"    # the data
 LIME = "#9de35a"    # the fitted line / the second panel
+TRUTH = "#5a5a5a"   # reference line: well below the ink, above the #333333 grid
 DATE_RE = r"^\d{4}-\d{2}-\d{2}$"
 
 
@@ -100,25 +101,22 @@ def detector_chart(s):
     _style(ax)
     hi = max(s.truth.max(), s.det.max()) * 1.06
 
-    # Layers, back to front: the truth line (solid, widest), the fitted line
-    # (dashed, slightly transparent, so the truth line shows through its gaps
-    # where the two nearly coincide), then the points.
-    ax.plot([0, hi], [0, hi], color=INK_DIM, linewidth=3.0, solid_capstyle="butt", zorder=2)
+    # Layers, back to front: the truth line (solid, widest, dark gray so it
+    # reads as a reference rather than data), the fitted line (dashed, slightly
+    # transparent, so the truth line shows through its gaps where the two
+    # nearly coincide), then the points.
+    ax.plot([0, hi], [0, hi], color=TRUTH, linewidth=3.0, solid_capstyle="butt",
+            zorder=2, label="perfect agreement")
     xs = np.array([0, hi])
     ax.plot(xs, sl * xs + ic, color=LIME, linewidth=2.0, linestyle=(0, (6, 4)),
-            alpha=0.85, zorder=3)
+            alpha=0.85, zorder=3,
+            label=f"fitted line: hourly count = {sl:.2f} x actual (r\u00b2 = {r ** 2:.3f})")
     # 2px surface ring keeps overlapping points readable where the lineup packs in
     ax.scatter(s.truth, s.det, s=42, color=AQUA, alpha=0.7,
-               edgecolors=BG, linewidths=1.0, zorder=4)
-
-    # Direct labels placed where the two lines separate, which is the whole
-    # point of the chart -- no leader lines to drag across the scatter.
-    lx = hi * 0.56
-    ax.text(lx, lx + hi * 0.055, "perfect agreement", color=INK_DIM, fontsize=10,
-            rotation=38, rotation_mode="anchor", va="bottom", ha="left")
-    ax.text(lx, sl * lx + ic - hi * 0.075, f"hourly count = {sl:.2f} x actual",
-            color=LIME, fontsize=10, rotation=36, rotation_mode="anchor",
-            va="top", ha="left")
+               edgecolors=BG, linewidths=1.0, zorder=4, label="one hand-counted frame")
+    leg = ax.legend(loc="upper left", fontsize=9.5, frameon=True, facecolor=BG,
+                    edgecolor=GRID, labelcolor=INK, borderpad=0.7, handlelength=2.6)
+    leg.set_zorder(5)
 
     ax.set_xlim(-2, hi); ax.set_ylim(-2, hi)
     ax.set_xlabel("surfers actually there (counted by hand)", color=INK, fontsize=10.5)
@@ -127,7 +125,7 @@ def detector_chart(s):
                  fontweight="bold", loc="left", pad=28)
     ax.text(0, 1.025,
             f"{len(s)} frames hand-counted across {s.date.nunique()} days  ·  "
-            f"{int(s.truth.sum()):,} real surfers  ·  r = {r:.3f}",
+            f"{int(s.truth.sum()):,} real surfers",
             transform=ax.transAxes, color=INK_DIM, fontsize=9.5)
     fig.tight_layout()
     p = OUT / "detector_accuracy.png"
