@@ -342,6 +342,8 @@ Spring 2026 breaks, from official calendars except where noted:
 
 Mon 2026-03-16, the same-day pair with the biggest miss (48 counted against a
 16 hindcast at 12:44), was a Live Oak non-school day and the first day of UCSC
-finals, three days after a Santa Cruz City Schools non-student Friday. The
+finals, three days after a Santa Cruz City Schools non-student Friday.
+Cabrillo held regular classes that week (semester; finals May 18-23, no
+entries for Mar 16-20 on its Spring 2026 dates page). The
 record has no counted days between 2026-03-17 and 2026-04-20, so the college
 and high-school spring breaks themselves cannot be tested on this year's data.
