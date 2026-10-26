@@ -6657,3 +6657,19 @@ little: crossing swells and short-period share do not track the misses, and
 only the top train's share of the power helps (6.322 against 6.401, beats all
 8 placebos, p = 0.18 by week). Packed-hour shortfall unchanged. Not adopted.
 Details in `analysis/packed_hours/packed_hours_notes.md`.
+
+## 2026-10-26 — The hour's count becomes median/max over five frames
+
+Five frames one second apart (0.5-4.5 s) were counted for the 2,054 hours
+whose clips were on disk. Against 215 hand-counted frames, the mean of three
+undercounts in proportion to the crowd (−2.8 at 31+), the max of five fixes
+that but over-counts near-empty water (+0.8), and the median of five below 6
+with the max from 6 up is within 0.3 in every band (MAE 1.32 against 1.54).
+Joel chose the hybrid. `get_cropped_frame.py` now cuts the four extra frames,
+`detect_surfers.py` writes `frame_count_t05..t45` and `frame_count_hybrid` and
+uses the hybrid as `surfer_count`, `build_training_features.py` prefers it as
+the target, and `migrate_hybrid_counts.py` moved history onto the same scale.
+The forecast trained on it reads about 6% higher; the packed-hour shortfall
+moves only from −11.5 to −11.0, so this is a measurement fix, not the answer to
+that gap. The cut at 6 was chosen on the frames it was scored on and should be
+rechecked as hand counts come in.

@@ -134,12 +134,18 @@ def load_rows(csv_path):
 
 
 def resolve_target_count(pred_row):
-    """Prefer the multi-frame-averaged count (frame_count_mean, rounded — same
+    """Since 2026-10-26 the median/max hybrid over five frames one second apart
+    (frame_count_hybrid) comes first, wherever it exists; see detect_surfers.py.
+
+    Prefer the multi-frame-averaged count (frame_count_mean, rounded — same
     convention detect_surfers.py's run_inference_multi() uses live) over the
     legacy single-frame surfer_count, wherever multi-frame data is available.
     backfill_multiframe_counts.py deliberately never overwrites surfer_count
     itself (non-destructive by design), so without this the model would keep
     training on stale single-frame values even after a multi-frame backfill."""
+    hybrid = (pred_row.get("frame_count_hybrid") or "").strip()
+    if hybrid:
+        return int(float(hybrid))
     frame_mean = pred_row.get("frame_count_mean", "").strip()
     if frame_mean:
         return round(float(frame_mean))

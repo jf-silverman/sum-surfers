@@ -12,6 +12,7 @@ Tiling mirrors the training setup:
 
 import os
 import csv
+import re
 import sys
 import torch
 import pytz
@@ -149,7 +150,19 @@ CSV_HEADER = [
     "date", "time_local", "filename", "surfer_count", "confidence_avg",
     "quality_ok", "quality_reason", "brightness", "lap_var", "glare_frac", "human_count",
     "frame_count_1", "frame_count_2", "frame_count_3", "frame_count_mean", "frame_count_stdev",
+    "frame_count_t05", "frame_count_t15", "frame_count_t35", "frame_count_t45", "frame_count_hybrid",
 ]
+
+# Five frames one second apart (0.5, 1.5, 2.5, 3.5, 4.5 s; the 2.5 s one is the
+# primary crop). Against 215 hand-counted frames, averaging undercounts busy
+# water (-2.8 at 31+ surfers) because a surfer behind a wave face in one frame
+# is visible in the next, while the max of five over-counts near-empty water
+# (+0.8) because one stray false positive in any frame sets it. Median below
+# HYBRID_CUT, max from it up, is within 0.3 of the hand count in every crowd band
+# (analysis/packed_hours/packed_hours_notes.md, 2026-10-26). The cut was chosen
+# on the same frames it was scored on; recheck it against new hand counts.
+SECOND_FRAME_SUFFIXES = ("t05", "t15", "t35", "t45")
+HYBRID_CUT = 6
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -436,6 +449,21 @@ def side_frame_paths(primary_img_path):
     return parent / f"{stem}_side1.jpg", parent / f"{stem}_side2.jpg"
 
 
+def second_frame_paths(primary_img_path):
+    """The four one-second-apart crops for a primary crop (get_cropped_frame.py's
+    <base>_t05.jpg ... <base>_t45.jpg), whether or not they exist."""
+    stem, parent = primary_img_path.stem, primary_img_path.parent
+    return [parent / f"{stem}_{s}.jpg" for s in SECOND_FRAME_SUFFIXES]
+
+
+def hybrid_count(counts):
+    """Median of the five counts below HYBRID_CUT, their max from it up. The
+    median decides the crowd level, since there is no truth to choose by live."""
+    import statistics
+    med = statistics.median(counts)
+    return int(round(med)) if med < HYBRID_CUT else max(counts)
+
+
 def run_inference_multi(model, primary_img_path):
     """
     Runs detection on the primary frame plus its two side frames (if
@@ -467,12 +495,26 @@ def run_inference_multi(model, primary_img_path):
     valid_confs = [c for c in confs if c is not None]
     mean_conf = statistics.mean(valid_confs) if valid_confs else 0.0
 
-    return {
+    result = {
         "frame_count_1": counts[0], "frame_count_2": counts[1], "frame_count_3": counts[2],
         "frame_count_mean": round(mean_count, 2), "frame_count_stdev": round(stdev_count, 2),
         "surfer_count": round(mean_count), "confidence_avg": round(mean_conf, 4),
         "n_frames_used": len(valid_counts),
+        **{f"frame_count_{s}": "" for s in SECOND_FRAME_SUFFIXES}, "frame_count_hybrid": "",
     }
+
+    # With all four one-second frames and the primary on disk, the hour's count
+    # is the median/max hybrid. Otherwise (older crops, clips extracted by tools
+    # that only cut the side frames) it stays the mean of three, as before.
+    seconds = second_frame_paths(primary_img_path)
+    if counts[1] is not None and all(p.exists() for p in seconds):
+        sec = [run_inference(model, p)[0] for p in seconds]
+        for s, c in zip(SECOND_FRAME_SUFFIXES, sec):
+            result[f"frame_count_{s}"] = c
+        five = sec[:2] + [counts[1]] + sec[2:]
+        result["frame_count_hybrid"] = hybrid_count(five)
+        result["surfer_count"] = result["frame_count_hybrid"]
+    return result
 
 
 _light_window_cache = {}
@@ -565,6 +607,13 @@ def load_existing(csv_path):
 
 def append_row(csv_path, row):
     write_header = not csv_path.exists()
+    if not write_header:
+        with open(csv_path, newline="") as f:
+            have = next(csv.reader(f), [])
+        if have != CSV_HEADER:
+            raise RuntimeError(
+                f"{csv_path.name} has {len(have)} columns, this build writes {len(CSV_HEADER)}; "
+                "run code/migrate_hybrid_counts.py --apply first")
     with open(csv_path, "a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_HEADER)
         if write_header:
@@ -603,10 +652,12 @@ def main():
     existing = load_existing(PREDS_CSV)
     processed_files = {r["filename"] for r in existing}
 
-    # Exclude the side-frame crops (crop<ts>_side1.jpg / _side2.jpg) — those
-    # are inputs to run_inference_multi() for the matching primary crop, not
-    # independent images to process/log their own predictions.csv row.
-    crop_files = sorted(p for p in CROPS_DIR.glob("crop*.jpg") if "_side" not in p.stem)
+    # Exclude the side-frame crops (crop<ts>_side1.jpg / _side2.jpg) and the
+    # one-second crops (crop<ts>_t05.jpg ...) — those are inputs to
+    # run_inference_multi() for the matching primary crop, not independent
+    # images to process/log their own predictions.csv row.
+    crop_files = sorted(p for p in CROPS_DIR.glob("crop*.jpg")
+                        if "_side" not in p.stem and not re.search(r"_t\d\d$", p.stem))
     scoped_files = [p for p in crop_files if in_detection_scope(p)]
     new_files = [p for p in scoped_files if p.name not in processed_files]
 
@@ -658,6 +709,7 @@ def main():
             print(f"  {img_path.name}  →  {result['surfer_count']} surfer(s)  "
                   f"(frames={result['frame_count_1']},{result['frame_count_2']},{result['frame_count_3']}  "
                   f"mean={result['frame_count_mean']} stdev={result['frame_count_stdev']}  "
+                  f"hybrid={result['frame_count_hybrid']}  "
                   f"n_frames_used={result['n_frames_used']})")
         except Exception as e:
             print(f"  ERROR {img_path.name}: {e}")
@@ -665,6 +717,7 @@ def main():
                 "surfer_count": -1, "confidence_avg": 0.0,
                 "frame_count_1": "", "frame_count_2": "", "frame_count_3": "",
                 "frame_count_mean": "", "frame_count_stdev": "",
+                **{f"frame_count_{s}": "" for s in SECOND_FRAME_SUFFIXES}, "frame_count_hybrid": "",
             }
 
         append_row(PREDS_CSV, {
@@ -679,6 +732,8 @@ def main():
             "frame_count_1": result["frame_count_1"], "frame_count_2": result["frame_count_2"],
             "frame_count_3": result["frame_count_3"], "frame_count_mean": result["frame_count_mean"],
             "frame_count_stdev": result["frame_count_stdev"],
+            **{f"frame_count_{s}": result[f"frame_count_{s}"] for s in SECOND_FRAME_SUFFIXES},
+            "frame_count_hybrid": result["frame_count_hybrid"],
         })
 
     print(f"\nDone. Results appended to {PREDS_CSV}")

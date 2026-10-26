@@ -19,6 +19,11 @@ SIDE_FRAME_OFFSET_SEC = 1.5              # Two extra frames at FRAME_TIME_SEC +/
                                           # 2026-08-25 entry — per-frame counts on the
                                           # same clip vary by several surfers within a
                                           # few seconds, so averaging reduces noise).
+SECOND_FRAME_TIMES_SEC = (0.5, 1.5, 3.5, 4.5)  # With the 2.5 s primary, five frames one
+                                          # second apart. detect_surfers.py counts the
+                                          # hour as their median below 6 surfers and
+                                          # their max from 6 up (see PROJECT_HISTORY.md,
+                                          # 2026-10-26). Saved as <base>_t05.jpg etc.
 ROI_X, ROI_Y, ROI_W, ROI_H = 0, 420, 1280, 180  # Crop region
 # --------------------------------
 
@@ -94,6 +99,16 @@ def main():
                     continue
                 extract_frame_at(clip_path, t, side_path)
                 print(f"✅ Saved frame {side_name}")
+
+            # Frames one second apart for the median/max count.
+            for t in SECOND_FRAME_TIMES_SEC:
+                sec_name = f"{base_name}_t{round(t * 10):02d}.jpg"
+                sec_path = OUTPUT_DIR / sec_name
+                if sec_path.exists():
+                    skipped.append(sec_name)
+                    continue
+                extract_frame_at(clip_path, t, sec_path)
+                print(f"✅ Saved frame {sec_name}")
 
         except Exception as e:
             print(f"⚠️ Error with {clip_path}: {e}")

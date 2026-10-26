@@ -8,9 +8,10 @@ in `PROJECT_HISTORY.md`.
 
 1. **Capture**: `code/get_clips.py` downloads short video clips from the
    Surfline camera.
-2. **Frame + crop**: `code/get_cropped_frame.py` grabs **three** frames per
-   clip — a primary frame at 2.5s in, plus two "side" frames 1.5s before
-   and after it — and crops each down to a fixed region of interest (ROI):
+2. **Frame + crop**: `code/get_cropped_frame.py` grabs a primary frame at
+   2.5s in, two "side" frames 1.5s before and after it, and four more at
+   0.5, 1.5, 3.5 and 4.5s (so 0.5-4.5s gives five frames one second apart),
+   and crops each down to a fixed region of interest (ROI):
    a wide, short strip of the ocean, `1280×180` pixels. Three frames exist
    because counts on the *same* clip vary meaningfully second to second
    (occlusion by whitewater, a surfer paddling behind another) — see
@@ -45,11 +46,14 @@ in `PROJECT_HISTORY.md`.
    reliably trigger false detections. A small coordinate-based filter drops
    boxes that land in those specific zones — see `code/detect_surfers.py`
    and `PROJECT_HISTORY.md` for exactly how those zones were derived.
-8. **Count + average**: steps 4-7 run independently on all three frames,
-   giving three per-frame counts. The row's `surfer_count` is the mean of
-   the three (rounded), and `confidence_avg` is the mean of their average
-   confidences — appended to `data/predictions/predictions.csv` along with the raw
-   per-frame counts, mean, and standard deviation (see below).
+8. **Count**: steps 4-7 run independently on every frame. The row's
+   `surfer_count` is the median of the five one-second frames when that
+   median is under 6, and their max from 6 up (`frame_count_hybrid`; see
+   "Median/max count" below). Rows without all five frames fall back to the
+   mean of the three 1.5s-apart frames, the count used before 2026-10-26.
+   `confidence_avg` is the mean of the three frames' average confidences.
+   Everything is appended to `data/predictions/predictions.csv` with the raw
+   per-frame counts.
 
 ## Multi-frame count averaging
 
@@ -89,6 +93,32 @@ Spreading the three frames across the whole clip instead would cut the error to
 **1.17** on the 2026-08-28 hour, a 43% reduction rather than 20%. That is a real
 and cheap improvement, but it needs a re-extraction and re-detection pass over
 the archive to apply retroactively, so it is logged rather than adopted.
+
+## Median/max count (2026-10-26)
+
+The five frames one second apart are close to the same moment, so the
+question is less noise than occlusion: a surfer behind a wave face in one
+frame is visible in the next. Against 215 hand-counted frames, the mean of
+three runs short in proportion to the crowd (−0.8 at 6-15 surfers, −2.8 at
+31+). The max of five recovers those surfers but over-counts near-empty water
+(+0.8), where one stray false positive in any frame sets it. The median keeps
+the low end clean and the max fixes the rest:
+
+| Hand count | Mean of 3 | Max of 5 | Median <6, max ≥6 |
+|---|---|---|---|
+| 0-5 | +0.08 | +0.77 | +0.06 |
+| 6-15 | −0.82 | −0.02 | −0.07 |
+| 16-30 | −1.88 | −0.12 | −0.12 |
+| 31+ | −2.83 | −0.30 | −0.30 |
+
+The crowd level is read from the median itself, since there is no truth to
+choose by live. The cut at 6 was picked on the same 215 frames, so it should
+be rechecked against new hand counts. New columns: `frame_count_t05`,
+`frame_count_t15`, `frame_count_t35`, `frame_count_t45` (the 2.5s count is
+`frame_count_2`) and `frame_count_hybrid`. Past hours whose clips were on
+disk were counted the same way and migrated by `code/migrate_hybrid_counts.py`.
+Hours forecast on the new count run about 6% higher; the share of the
+packed-hour forecast gap it closes is small (−11.5 to −11.0 surfers).
 
 **Historical backfill**: for existing `predictions.csv` rows where the raw
 clip is still on disk, `code/backfill_multiframe_counts.py` fills in the
