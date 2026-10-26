@@ -76,6 +76,14 @@ surfer counts that surfer whether or not it hugs the outline.
 | recall | **91.9%** |
 | count error | **1.47 surfers** per frame (bias −1.23) |
 
+**From frames to the hour's count (2026-10-26).** The figures above are per
+frame. The hour's count uses five frames one second apart in the clip: their
+median when it is under 6, their max from 6 up. Against the same hand counts
+(215 frames with all five), that count's bias is +0.06 at 0-5 surfers, −0.07
+at 6-15, −0.12 at 16-30 and −0.30 at 31+, against +0.08, −0.82, −1.88 and
+−2.83 for the mean of three frames it replaced. The cut at 6 was chosen on
+those same frames. See `analysis/packed_hours/packed_hours_notes.md`.
+
 These are higher than the validation figures above because they ask a different
 question — is this box on a surfer — rather than requiring a close overlap with
 a labelled box.

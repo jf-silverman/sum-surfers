@@ -93,15 +93,15 @@ The same forecast run out a week, with each hour's crowd level from 1 (near-empt
 
 ## What the data shows so far
 
-**Tide is by far the biggest driver of the crowd.** The lineup is busiest with the tide between 0 and 3 feet (a typical 22 to 25 surfers), and nearly empty above 4 feet (3 or fewer).
+**Tide is by far the biggest driver of the crowd.** The lineup is busiest with the tide between 0 and 3 feet (a typical 23 to 28 surfers), and nearly empty above 4 feet (3 or fewer).
 
 ![Typical surfer count by tide height](docs/images/tide_vs_count.png)
 
-**At low tide, weekends are busier all day.** Between 8am and 5pm, a typical weekend hour has 34 surfers out, against 22 on a weekday. Each cell is the typical count for that hour and day, using only hours with the tide below 3 feet, so the tide doesn't hide the weekly pattern.
+**At low tide, weekends are busier all day.** Between 8am and 5pm, a typical weekend hour has 37 surfers out, against 24 on a weekday. Each cell is the typical count for that hour and day, using only hours with the tide below 3 feet, so the tide doesn't hide the weekly pattern.
 
 ![Typical surfers in the water, by hour and day of week](docs/images/when_to_go.png)
 
-**The weekend effect is stronger in some months than others.** Counting only hours with the tide below 3 feet, weekends ran from about 1.1x as busy as weekdays (October 2025) to 2.0x and 2.7x (November and December 2025, the late-autumn months, when weekday crowds drop off most). October 2026 so far is 1.3x. Several months rest on only two to four low-tide weekend days, so treat single months loosely.
+**The weekend effect is stronger in some months than others.** Counting only hours with the tide below 3 feet, weekends ran from about 1.1x as busy as weekdays (October 2025) to 2.0x and 2.5x (November and December 2025, the late-autumn months, when weekday crowds drop off most). October 2026 so far is 1.3x. Several months rest on only two to four low-tide weekend days, so treat single months loosely.
 
 ![Average surfer count by month, weekday vs weekend](docs/images/weekend_by_month.png)
 
@@ -123,13 +123,13 @@ The same forecast run out a week, with each hour's crowd level from 1 (near-empt
 
 ![Object detector count against a hand count, one point per reviewed frame](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/detector_accuracy.png?v=20261025)
 
-Overall it counts about 7% low: about 4% low with fewer than 10 surfers out, and 8 to 9% low with 10 to 40. **Surfers lying flat on their boards (paddling) are the hardest for the object detector to spot**: two out of three misses were surfers in a flat position, and only 10 of 316 were standing.
+Overall it counts about 7% low in a single frame: about 4% low with fewer than 10 surfers out, and 8 to 9% low with 10 to 40. **The hourly count makes up most of that** by looking at five frames a second apart and keeping the highest, since a surfer hidden behind a wave in one frame is usually visible in another. Against the same hand counts, the hour's count is within about 0.3 surfers at every crowd size, where averaging three frames ran 2.8 low with 31 or more out. **Surfers lying flat on their boards (paddling) are the hardest for the object detector to spot**: two out of three misses were surfers in a flat position, and only 10 of 316 were standing.
 
 ![Standing, sitting and lying-down surfers, enlarged from one frame](docs/images/surfer_poses.png)
 
 ### The forecast
 
-**The night before, it typically misses by about 5 surfers in an hour.** Over 380 scored hours, the average miss was 5.4 surfers, and 59% of hours were within 5. The 80% likely range held the actual count 83% of the time. A forecast a week out is a little worse.
+**The night before, it typically misses by about 5 surfers in an hour.** Over 417 scored hours, the average miss was 5.6 surfers, and 58% of hours were within 5. The 80% likely range held the actual count 80% of the time. A forecast a week out is a little worse.
 
 ![How often the forecast lands within N surfers](docs/images/forecast_within_n.png)
 
