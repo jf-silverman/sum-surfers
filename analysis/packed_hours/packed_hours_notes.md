@@ -321,8 +321,11 @@ against −11.5 (−29.0%) and 6.50 for production.
 `frame_pairs_review.md` shows crowded hours the hindcast got right next to ones
 it forecast 10+ low: five pairs from consecutive hours of one day, and five
 from different days matched on the forecast, hour, weekday/weekend and
-conditions. Holidays, long weekends and school or college break days appear
-only in the same-day pairs. The tables carry a "Holiday / school break" column.
+conditions. Holidays (Labor Day, Independence Day and the like) and their long
+weekends appear only in the same-day pairs, so a holiday is only compared with
+itself; the tables carry a "Holiday / long weekend" column. School and college
+breaks are not treated as holidays: Joel left the 2026 spring breaks
+undetermined.
 
 Spring 2026 breaks, from official calendars except where noted:
 
