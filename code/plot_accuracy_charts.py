@@ -100,11 +100,15 @@ def detector_chart(s):
     _style(ax)
     hi = max(s.truth.max(), s.det.max()) * 1.06
 
-    ax.plot([0, hi], [0, hi], color=INK_DIM, linewidth=1.4, linestyle=(0, (5, 4)), zorder=2)
+    # Layers, back to front: the truth line (solid, widest), the fitted line
+    # (dashed, slightly transparent, so the truth line shows through its gaps
+    # where the two nearly coincide), then the points.
+    ax.plot([0, hi], [0, hi], color=INK_DIM, linewidth=3.0, solid_capstyle="butt", zorder=2)
     xs = np.array([0, hi])
-    ax.plot(xs, sl * xs + ic, color=LIME, linewidth=2.0, zorder=3)
+    ax.plot(xs, sl * xs + ic, color=LIME, linewidth=2.0, linestyle=(0, (6, 4)),
+            alpha=0.85, zorder=3)
     # 2px surface ring keeps overlapping points readable where the lineup packs in
-    ax.scatter(s.truth, s.det, s=42, color=AQUA, alpha=0.78,
+    ax.scatter(s.truth, s.det, s=42, color=AQUA, alpha=0.7,
                edgecolors=BG, linewidths=1.0, zorder=4)
 
     # Direct labels placed where the two lines separate, which is the whole
