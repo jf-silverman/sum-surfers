@@ -268,3 +268,4 @@ data/reviews/protocol_review/.pass_b_key.csv
 data/reviews/protocol_review/pass_a_direct_count/
 data/reviews/protocol_review/pass_b_box_review/
 data/reviews/protocol_review/.pass_b_conf.csv
+data/predictions/*.bak-*

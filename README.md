@@ -81,7 +81,7 @@ The same forecast run out a week, with each hour's crowd level from 1 (near-empt
 
 3. **Count.** The boxes become one number per hour from five frames a second apart: their median on near-empty water, their max once 6 or more surfers are out, so a surfer hidden behind a wave in one frame still counts. Frames too dark, foggy or blurry to count are thrown out rather than guessed at. → [Image-quality gate](docs/HOW_IT_WORKS.md#image-quality-gate)
 
-   ![36 surfers at 4:20 pm on Friday, September 25, 2026](docs/images/pipeline_3_count.png)
+   ![40 surfers at 4:20 pm on Friday, September 25, 2026](docs/images/pipeline_3_count.png)
 
 4. **Match.** Tide, swell, wind and weather for that hour are stored next to each count. → [Predictors](docs/HOW_IT_WORKS.md#predictors-weather-tide-swell-wind-energy-consistency)
 
