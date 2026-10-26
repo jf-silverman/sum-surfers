@@ -174,3 +174,88 @@ Sources: Visit Santa Cruz County events API
 (https://www.santacruz.org/wp-json/tribe/events/v1/events), County Parks surf
 contest permits (https://parks.santacruzcountyca.gov/Home/PermitsReservations/Surfing.aspx),
 Lookout Santa Cruz (https://lookout.co/arts-entertainment).
+
+## What explains the packed-hour gap? Three candidates tested (2026-10-25)
+
+Baseline for these tests is 6.401: the nightly run on 2026-10-25 added a day
+to the training table, so it is not comparable with the 6.33-6.34 above.
+
+**Binned by the hindcast, the model is calibrated.** When it says 30-40 the
+hours average 32.3; at 40+ they average 42.3. The packed-hour shortfall comes
+from selecting hours by their outcome: packed hours mostly arrive on hours the
+model put at 20-30. About 1.7 of the 12.2 is measurement noise (one frame
+against the hour's mean, sd 3.66, from the three per-second hours) favoured by
+that selection.
+
+- **Conditions improving since yesterday** (`test_conditions_change.py`):
+  rating change 6.338 (15/29 weeks, p = 0.31; beats 6 of 8 placebos, −1.0 sd);
+  swell and period change, Surfline surf height change and a new-swell flag
+  (period up 2 s and height up; 9 days) no better or worse. The early
+  correlation (Spearman +0.21 on day means) does not hold up. Not a cause.
+- **Nearby breaks** (`fetch_nearby_ratings.py`, `test_nearby_ratings.py`):
+  Surfline's hourly ratings for Steamer Lane, Pleasure Point, The Hook,
+  Capitola and Manresa, 380 days each. The convergence idea predicts busier
+  hours when the alternatives are worse; the data say the opposite. The
+  residual rises with Steamer Lane's rating (Spearman +0.09, p < 0.001), so the
+  Lane is acting as a second reading of how good the swell is in town, not as
+  a competitor. Jack's-minus-best-alternative carries nothing (−0.03). Missed
+  and caught packed hours have the same nearby ratings (best alternative 3.39
+  against 3.33). As inputs: Steamer Lane alone 6.278 (−0.12; 15/29 weeks,
+  p = 0.09; beats all 8 placebos, −4.6 sd); all four columns 6.290 (21/29
+  weeks, p = 0.035, the first weekly-significant input in these tests). The
+  packed shortfall barely moves (−12.0 to −11.7 to −11.9).
+
+## Max of the three frames instead of their mean (`max_frame_results.csv`, 2026-10-26)
+
+The three frames per hour come from one clip, 1.5 s apart (1.0, 2.5 and
+4.0 s), so a surfer hidden behind a wave in one frame is often visible in the
+next. The mean counts that surfer as a fraction of a person; the max counts
+them once.
+
+**Against Joel's hand counts** (218 primary frames, truth = true positives +
+missed), the max is the closest of the three at every crowd size above 5:
+
+| Truth | Primary frame | Mean of 3 | Max of 3 |
+|---|---|---|---|
+| 0-5 (67) | +0.03 | +0.12 | +0.53 |
+| 6-15 (48) | −0.96 | −1.00 | −0.28 |
+| 16-30 (59) | −1.90 | −1.79 | −0.71 |
+| 31+ (46) | −2.70 | −2.76 | −0.98 |
+| Overall MAE | 1.49 | 1.59 | 1.41 |
+
+The hand count is of one frame, so it also misses anyone hidden in that frame.
+The true undercount from averaging is, if anything, larger.
+
+**As the training target** (production GBT, same folds), the max-trained
+forecast is a scaled copy of the mean-trained one (correlation 0.993; daylight
+mean 15.81 against 14.93). Against hand counts it is closer: MAE 6.43 against
+6.69, bias −3.07 against −4.12, and −11.7 against −13.4 on hand counts of 31+.
+On its own target the packed shortfall barely moves: −11.5 (−28.9%) against
+−12.0 (−30.3%), with the spread ratio unchanged at 0.80. Averaging hides about
+2 surfers on a busy hour; it is not what leaves the packed hours 12 short.
+
+## First fair day after poorer days (`first_fair_day_results.csv`, 2026-10-26)
+
+Do people wait for "fair" and turn out the first day it appears? A day's
+rating is the mean of Jack's hourly Surfline rating from 7am to 6pm, taken from
+its full 381-day rating history so every day has a yesterday. "Fair day" means
+that mean is 2.5 or more (mostly fair or better); a looser "any fair hour"
+version is also shown. Daily mean residual (actual minus the production
+hindcast) and raw daily mean count:
+
+| Definition | Days | First fair (n) | Repeat fair (n) | Residual p | Count, first vs repeat |
+|---|---|---|---|---|---|
+| Mostly fair | all | +2.0 (18) | +1.2 (42) | 0.56 | 15.6 vs 16.4 |
+| Mostly fair | weekday | +1.3 (16) | +0.1 (27) | 0.43 | 15.1 vs 13.7 |
+| Any fair hour | all | +2.1 (16) | +1.0 (75) | 0.46 | 14.9 vs 16.2 |
+
+First fair days run about 1 surfer further above the forecast than repeat ones,
+the direction the idea predicts, but well inside noise. Only 2 first fair days
+fell on a weekend, so the weekend case, where it would matter most, cannot be
+tested yet. A first_fair_day flag in the GBT changes nothing (6.408 and 6.396
+against 6.401; 15/29 weeks, p = 0.95 and 0.90).
+
+The scripts for this section and the two above it (`test_conditions_change.py`,
+`fetch_nearby_ratings.py`, `test_nearby_ratings.py`, `test_max_frame.py`,
+`test_first_fair_day.py`) and the fetched ratings are kept local; only their
+results are committed.

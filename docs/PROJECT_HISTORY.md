@@ -6608,3 +6608,30 @@ of low tide left average 32-34 surfers against 27 with under 0.7 h left;
 weekdays are flat (19-23). One column does what the five tide-shape columns
 did, slightly better, and still leaves the packed hours about 12 short. Not
 adopted. `analysis/forecast_amplitude/test_low_tide_window.py`.
+
+**What explains the packed-hour gap: three candidates, the same day.** Binned by
+the hindcast rather than by the outcome, the model is calibrated at the top
+(says 30-40, gets 32.3; says 40+, gets 42.3), so the 12-surfer shortfall on
+packed hours is mostly the model not knowing *which* hours will pack; about
+1.7 of it is single-frame noise favoured by selecting on the outcome.
+Conditions improving since yesterday is not a cause (rating change −0.06 MAE,
+beats 6 of 8 placebos). Nearby breaks: Surfline's hourly ratings for Steamer
+Lane, Pleasure Point, The Hook, Capitola and Manresa (380 days each, pulled
+with the premium token at the backfill's pacing) show the reverse of
+convergence: Jack's runs busier than expected when Steamer Lane is good,
+which reads as a second measure of the swell. Steamer Lane's rating as an
+input gives −0.12 MAE (beats all 8 placebos, −4.6 sd), and all four nearby
+columns are better in 21 of 29 weeks (p = 0.035), but the packed shortfall
+stays at about −12. Not adopted. Details in
+`analysis/packed_hours/packed_hours_notes.md`.
+
+**Max of three frames, and the first fair day (2026-10-26).** The three frames
+per hour are 1.5 s apart in one clip, so averaging them counts a surfer hidden
+by a wave in one frame as a fraction. Against 218 hand-counted frames the max
+is the closest of primary, mean and max at every crowd size above 5 (−0.98
+against −2.76 for the mean at 31+). Trained on the max, the forecast is a
+scaled copy (correlation 0.993), closer to hand counts (MAE 6.43 against 6.69),
+but the packed shortfall is −11.5 against −12.0. Separately, first fair days
+after poorer days run about 1 surfer further above the forecast than a second
+fair day in a row (p = 0.4-0.6, only 2 on weekends), and a flag for them adds
+nothing. Neither adopted. Details in `analysis/packed_hours/packed_hours_notes.md`.

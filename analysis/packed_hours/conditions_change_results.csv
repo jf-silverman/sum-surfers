@@ -1,0 +1,7 @@
+arm,MAE,bias actual 30+,weeks better,p,placebo_mean_for_best
+production,6.401,-11.978,,,
++ rating_chg,6.338,-11.779,15/29,0.314,6.386
+"+ swell_h_chg, period_chg",6.456,-12.325,11/29,0.11,
++ new_swell,6.412,-12.26,14/29,0.932,
++ surf_max_chg,6.388,-12.017,17/29,0.831,
++ all change,6.401,-12.071,14/29,0.915,

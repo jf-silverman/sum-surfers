@@ -1,0 +1,6 @@
+part,arm,n,MAE,bias,slope,bias truth 0-5,bias truth 6-15,bias truth 16-30,bias truth 31-+,relative MAE,spread ratio,hours own target 30+,bias own target 30+,shortfall 30+ pct,MAE vs hand counts,bias vs hand counts,bias vs hand counts truth 31+,n hand
+vs hand counts,primary frame,218,1.491,-1.28,0.94,0.03,-0.957,-1.898,-2.696,,,,,,,,,
+vs hand counts,mean of 3,218,1.587,-1.245,0.939,0.121,-0.999,-1.786,-2.762,,,,,,,,,
+vs hand counts,max of 3,218,1.408,-0.298,0.971,0.53,-0.277,-0.712,-0.978,,,,,,,,,
+GBT out-of-fold,trained on mean,1995,6.401,-0.644,,,,,,0.429,0.797,329.0,-11.978,-30.312,6.688,-4.12,-13.384,212.0
+GBT out-of-fold,trained on max,1995,6.481,-0.747,,,,,,0.41,0.798,367.0,-11.518,-28.868,6.432,-3.07,-11.654,212.0

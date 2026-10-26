@@ -1,0 +1,6 @@
+arm,MAE,bias actual 30+,weeks better,p,placebo_mean_for_best
+production,6.401,-11.978,,,
+"+ best_alt, jacks_vs_alt",6.366,-11.688,18/29,0.381,
++ lane,6.278,-11.886,15/29,0.092,6.399
++ pp,6.391,-11.813,16/29,0.67,
++ all nearby,6.29,-11.705,21/29,0.035,

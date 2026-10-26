@@ -1,0 +1,7 @@
+definition,days,first fair n,repeat fair n,first resid,repeat resid,resid p,first mean count,repeat mean count,count p,flag arm MAE,production MAE
+mostly fair (mean >= 2.5),all,18,42,2.025,1.221,0.556,15.622,16.448,0.79,6.408,6.401
+mostly fair (mean >= 2.5),weekday,16,27,1.302,0.117,0.429,15.073,13.692,0.286,6.408,6.401
+mostly fair (mean >= 2.5),weekend,2,15,7.813,3.209,,20.016,21.408,,6.408,6.401
+any fair hour (max >= 3),all,16,75,2.118,1.001,0.456,14.891,16.152,0.545,6.396,6.401
+any fair hour (max >= 3),weekday,14,53,1.027,0.061,0.483,13.372,13.823,0.677,6.396,6.401
+any fair hour (max >= 3),weekend,2,22,9.754,3.265,,25.521,21.763,,6.396,6.401
