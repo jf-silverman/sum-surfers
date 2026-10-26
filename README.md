@@ -121,7 +121,7 @@ The same forecast run out a week, with each hour's crowd level from 1 (near-empt
 | of the surfers really there, how many it found | **91.9%** |
 | average count error | **1.5 surfers** per frame |
 
-![Hourly count against a hand count, one point per reviewed frame](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/detector_accuracy.png?v=20261026d)
+![Hourly count against a hand count, one point per reviewed frame](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/detector_accuracy.png?v=20261026e)
 
 In a single frame it counts about 7% low: about 6% low with fewer than 10 surfers out, and 8% low with 10 to 40. **The hourly count makes up nearly all of that** by looking at five frames a second apart and keeping the highest once 6 or more surfers are out, since a surfer hidden behind a wave in one frame is usually visible in another. Against the same hand counts the hour's count is less than 1% low overall (about 1% with fewer than 10 out, under 1% with 10 or more), where the old average of three frames ran 7% low. In the chart above, that change (October 2026) raised the fitted line's slope from 0.94 to 0.99, so the count now tracks the hand count almost one for one; r² rose only slightly, from 0.974 to 0.980, because the old count was already consistently proportional, just low. **Surfers lying flat on their boards (paddling) are the hardest for the object detector to spot**: two out of three misses were surfers in a flat position, and only 10 of 316 were standing.
 

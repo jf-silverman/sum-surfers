@@ -110,13 +110,20 @@ def detector_chart(s):
     xs = np.array([0, hi])
     ax.plot(xs, sl * xs + ic, color=LIME, linewidth=2.0, linestyle=(0, (6, 4)),
             zorder=3,
-            label=f"fitted line: hourly count = {sl:.2f} x actual (r\u00b2 = {r ** 2:.3f})")
+            label="fitted line")
     # 2px surface ring keeps overlapping points readable where the lineup packs in
     ax.scatter(s.truth, s.det, s=42, color=AQUA, alpha=0.7,
                edgecolors=BG, linewidths=1.0, zorder=4, label="one hand-counted frame")
     leg = ax.legend(loc="upper left", fontsize=9.5, frameon=True, facecolor=BG,
                     edgecolor=GRID, labelcolor=INK, borderpad=0.7, handlelength=2.6)
     leg.set_zorder(5)
+    # The fit's equation and r-squared, boxed in the empty lower-right corner.
+    sign = "+" if ic >= 0 else "\u2212"
+    eq = f"y = {sl:.2f}x {sign} {abs(ic):.2f}" if abs(ic) >= 0.05 else f"y = {sl:.2f}x"
+    ax.text(0.96, 0.05, f"{eq}\nr\u00b2 = {r ** 2:.2f}", transform=ax.transAxes,
+            ha="right", va="bottom", multialignment="left", color=INK, fontsize=11,
+            linespacing=1.5, zorder=5,
+            bbox=dict(boxstyle="round,pad=0.6", facecolor=BG, edgecolor=GRID))
 
     ax.set_xlim(-2, hi); ax.set_ylim(-2, hi)
     ax.set_xlabel("surfers actually there (counted by hand)", color=INK, fontsize=10.5)
