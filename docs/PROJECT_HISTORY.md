@@ -6563,3 +6563,48 @@ session, and the weekend's residuals (+2.8, +1.3, +1.0) match an ordinary
 weekend. That Saturday was a tide day: zero surfers through a 5.5 ft midday
 high, then 38-64 on the afternoon low, which the hindcast shaped right but
 sized about 12 short.
+
+## 2026-10-25 — The model is not held back; the shape of the tide helps
+
+The forecast swings less than the crowd (hindcast sd 9.7 against 12.8; a day's
+hindcast spans 25 surfers where the counts span 35), so low-tide peaks come in
+short. Two causes were tested on week-grouped folds against the production
+model (MAE 6.343 on 1,982 daylight hours).
+
+**Capacity is not the problem.** More trees (600: 6.485, p = 0.005; 1000:
+6.559, p = 0.002) and a faster learning rate (6.466, p = 0.005) are
+significantly worse, and deeper trees, no L2 and smaller leaves are no better.
+None widens the swing (sd ratio 0.78-0.82 throughout). Weighting the busy hours
+twice or switching to a squared-error loss trims the 30+ shortfall by about
+one surfer (−12.0 to −11.1/−11.5) at a cost in overall MAE. The flatness is
+day-to-day variation the inputs do not carry, not over-regularization.
+
+**The tide's shape is the first feature since August to beat its placebo.**
+Production gives the model `tide_ft` (Surfline's predicted height at the hour)
+and three counts of daylight hours under 3.5 ft. Adding five shape columns,
+all computed from the day's own tide values and so known in advance: the
+slope (rising or falling), height above the day's daylight low, signed hours
+from that low, how low the low gets, and the day's range. Together they
+reach 6.242 (−0.10, better in 20 of 29 weeks, p = 0.15); dropping the
+`good_tide_*` columns as well gives 6.233. Against eight placebos that give
+each date another date's tide shape, the real columns beat all eight, by
+2.8 sd. Singly each column is worth almost nothing (−0.01 to −0.03), so the
+gain comes from the combination. It sharpens the low-tide hours (bias −1.4 to
+−1.0) but does not widen the overall swing. An earlier test
+(2026-09-23) rejected `hours_from_day_low` as part of a bundle dominated by
+lunar terms; tested on its own family here, the tide shape holds up.
+
+Not adopted yet. Analysis: `analysis/forecast_amplitude/`.
+
+**Low tide left ahead, the same day.** Joel's idea: an hour with half an hour
+of low tide left and the tide rising fast should draw fewer surfers than one
+with a long, slowly dropping low still to come. `low_left` is the time from
+the frame until the tide (interpolated to the minute from the day's hourly
+values) next rises above a threshold or last light comes. At 3.5 ft it gives
+6.224 (−0.12, 18 of 29 weeks, p = 0.12) and beats all eight date-shuffled
+placebos by 4.3 sd; at 3.0 ft it is weaker (6.317, or 6.288 with the wait
+until the next low added). On weekends, frames below 3 ft with 1-3.4 hours
+of low tide left average 32-34 surfers against 27 with under 0.7 h left;
+weekdays are flat (19-23). One column does what the five tide-shape columns
+did, slightly better, and still leaves the packed hours about 12 short. Not
+adopted. `analysis/forecast_amplitude/test_low_tide_window.py`.

@@ -1,0 +1,7 @@
+arm,MAE,bias actual 30+,bias low tide <1.5,weeks better,p,placebo_mean_for_best
+production,6.343,-12.039,-1.395,,,
++ low_left 3ft,6.317,-12.041,-0.953,15/29,0.55,
+"+ low_left, wait 3ft",6.288,-12.119,-0.979,17/29,0.417,
++ low_left 3.5ft,6.224,-11.88,-1.097,18/29,0.115,6.354
+"+ low_left, wait 3.5ft",6.237,-11.92,-1.129,16/29,0.304,
+"+ low_left, wait 3ft - good_tide_*",6.28,-11.901,-1.038,17/29,0.265,
