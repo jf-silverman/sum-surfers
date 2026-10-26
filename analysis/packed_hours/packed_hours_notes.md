@@ -366,3 +366,29 @@ As inputs (MAE 6.401 production): a lunch flag for clip times 12:00-13:29
 6.410 (13/29 weeks, p = 0.52); hour as an integer 6.396 (p = 0.41); minutes
 after midnight 6.346 (17/29, p = 0.26). Lunch hours' bias is +0.18 in
 production. Not a cause of the misses; not adopted.
+
+## Swell period and the swell mix (`swell_mix_results.csv`, 2026-10-26)
+
+**Period is already in the model** (`primary_swell_period_s`, the most
+powerful train's period). Daylight crowds rise with it: 12.2 at 9 s or under,
+12.5 at 9-11 s, 14.5 at 11-13 s, 15.1 at 13-15 s, 19.8 above 15 s. The
+residual creeps up with period (−0.1 to +1.2; Spearman +0.04, p = 0.09), so
+the model takes most of it. Dropping period leaves MAE 6.423 against 6.401
+(worse in 20/29 weeks, p = 0.09); dropping Surfline's consistency input gives
+6.347 (better, p = 0.64), and dropping the rating 6.392 (p = 0.77): the rating
+overlaps the swell inputs.
+
+**The rest of the mix.** Production keeps one train per hour. Every train
+Jack's reports was fetched for 382 days (`fetch_swell_mix.py`, kept local
+with `swell_mix.csv`; 1-7 trains an hour, mostly 3-5). Per hour: trains
+carrying 10%+ of the power, the top train's share of the power, the
+power-weighted spread of directions, the share of power under 10 s, and the
+second train's period and height.
+
+None of the clash measures tracks the residual (|Spearman| ≤ 0.04). As inputs,
+direction spread is slightly worse (6.418) and the clash trio is no better
+(6.405). The one gain is the top train's share of the power, a measure of how
+clean the swell is: 6.322 (19/29 weeks, p = 0.18; beats all 8 placebos,
+−3.7 sd). That is the same size as Steamer Lane's rating and the low-tide
+window. None of these moves the packed-hour shortfall (−11.8 to −12.2). Not
+adopted.

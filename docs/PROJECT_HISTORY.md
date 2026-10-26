@@ -6649,3 +6649,11 @@ Forward in time, refitting weekly on earlier dates only, the blend's gain
 mostly disappears: 6.87 against 6.97 at 0.7/0.3 (15/24 weeks, p = 0.19). With
 60+ days of history (from 2026-07-16) it is 6.79 against 6.94, 11 of 15
 weeks, p = 0.095. Not adopted.
+
+**Swell period and the swell mix (2026-10-26).** Period is already an input,
+and crowds rise with it (12 surfers at 9 s or under, 20 above 15 s); the
+model takes most of that. The other swell trains, fetched for 382 days, add
+little: crossing swells and short-period share do not track the misses, and
+only the top train's share of the power helps (6.322 against 6.401, beats all
+8 placebos, p = 0.18 by week). Packed-hour shortfall unchanged. Not adopted.
+Details in `analysis/packed_hours/packed_hours_notes.md`.
