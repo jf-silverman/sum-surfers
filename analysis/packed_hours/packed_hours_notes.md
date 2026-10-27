@@ -460,3 +460,39 @@ on Friday 10/9 to Monday 10/12, the Indigenous Peoples' Day weekend; that
 Monday is not in the holiday list. Two more fall on Thursday 10/15 and Friday
 10/16, the two Santa Cruz City Schools non-student days: peaks of 59 and 46
 against 27 and 21.
+
+## Testing the three calendar leads (`test_day_features.py`, 2026-10-27)
+
+Each added to the production features, same ten week-grouped folds and Poisson
+GBT, 2,008 daylight hours on 156 days, 30 weeks. Results in
+`day_features_test.csv`.
+
+| arm | MAE | packed bias | Fri+Mon MAE | long-weekend MAE | weeks better | p |
+|---|---:|---:|---:|---:|---:|---:|
+| production features | 6.737 | -11.61 | 6.34 | 8.73 | | |
+| + day of week (7 columns) | 6.718 | -11.84 | 6.38 | 8.57 | 15/30 | 0.90 |
+| + wider holidays, long weekend | 6.662 | -11.47 | 6.22 | 8.26 | 19/30 | 0.026 |
+| + no school (local districts) | 6.740 | -11.81 | 6.32 | 8.75 | 12/30 | 0.30 |
+| + all three | 6.713 | -11.73 | 6.34 | 8.35 | 20/30 | 0.19 |
+
+- **Day of week adds nothing.** Friday and Monday error doesn't fall; the high
+  Fri/Mon miss rate was long weekends, not the weekday itself.
+- **No school adds nothing**, as on 2026-10-24 (27 no-school weekdays outside
+  weekends, most in summer, which month already carries).
+- **The wider holiday list is the only one to reach p < 0.05.** It adds
+  Indigenous Peoples' Day (2nd Monday of October), Cesar Chavez Day, Christmas
+  Eve and New Year's Eve to the 2026-10-24 list. Of these, only the two
+  Indigenous Peoples' Days (2025-10-13, 2026-10-12) are counted days, so the
+  whole difference from the earlier list rests on those two Mondays and their
+  weekends. Rerun on today's data, the earlier list gives 6.721, 13/30 weeks,
+  p = 0.84.
+- **Placebo** (`wide_holiday_placebo.csv`): swapping the two Indigenous
+  Peoples' Days for two random counted non-holiday Mondays, 40 times. 15% of
+  draws give an MAE as low (median 6.698), 3% a p as low. Part of the gain is
+  any extra long weekend giving the trees room; the real dates do better than
+  most random ones.
+- **Caveat: the dates were chosen after seeing the misses.** Indigenous
+  Peoples' Day was added because 2026-10-12's weekend topped the logged
+  forecast misses, so this p is optimistic. Two days can't settle it; next
+  October's weekend, or Veterans Day (2026-11-11, already in the list) and
+  Thanksgiving, will show whether holidays keep being under-forecast.

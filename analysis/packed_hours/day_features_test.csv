@@ -1,0 +1,6 @@
+arm,MAE,packed bias,packed (30+) MAE,Fri+Mon MAE,Tue-Thu MAE,long weekend (wide) MAE,no-school weekday MAE,weeks better,p (weeks)
+production features,6.737,-11.612,13.067,6.335,5.86,8.732,7.358,,
++ day of week,6.718,-11.835,13.045,6.375,5.884,8.568,7.328,15/30,0.903
+"+ wider holidays, long weekend",6.662,-11.471,12.854,6.22,5.835,8.256,7.072,19/30,0.026
++ no school,6.74,-11.807,13.176,6.322,5.839,8.747,7.389,12/30,0.299
++ all three,6.713,-11.731,13.083,6.338,5.831,8.351,7.106,20/30,0.191
