@@ -121,6 +121,14 @@ log "Step 4/10 — Running YOLOv8 detection locally..."
 run_step "Step 4 (detection)" "$PYTHON" code/detect_surfers.py
 log "Step 4 done."
 
+# ── Step 4b: Count the sub-hourly frame sets ─────────────────────────────────
+# Counts step 2b's sets into data/predictions/subhourly_counts.csv (median of
+# ten frames per set). Read only by the evening email (step 10), which plots
+# them between the hourly counts; training and the forecast don't use them.
+log "Step 4b — Counting sub-hourly frame sets..."
+run_step "Step 4b (sub-hourly counts)" "$PYTHON" code/detect_subhourly.py
+log "Step 4b done."
+
 # ── Step 5: Pull Surfline predictors (weather/rating/tide/swell) for Jack's ──
 log "Step 5/10 — Pulling Surfline predictors for Jack's..."
 run_step "Step 5 (surf predictors)" "$PYTHON" code/get_surf_predictors.py

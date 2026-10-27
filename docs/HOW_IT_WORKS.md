@@ -62,10 +62,21 @@ clips per hour, 18 and 36 minutes after that hour's main clip, crops ten frames
 from each (3 to 57 s, one every 6 seconds, same ROI) into
 `data/j_shore_cam/subhourly_crops/<date>/`, and deletes the clip. The main
 clips are about 54 minutes apart, so the three clips split each gap into even
-thirds. Nothing reads these frames yet. They are being collected to test
-whether sampling the hour three times, rather than once, improves the hourly
-estimate: counts only decorrelate over about a minute, so one clip says little
-about the rest of the hour. They take about 38 MB a day.
+thirds. They are being collected to test whether sampling the hour three
+times, rather than once, improves the hourly estimate: counts only decorrelate
+over about a minute, so one clip says little about the rest of the hour. They
+take about 38 MB a day.
+
+From 2026-10-27, `code/detect_subhourly.py` counts each set with the
+production detector and writes `data/predictions/subhourly_counts.csv`: the
+ten frame counts, their median and max, and the set's count, which is the
+median. The evening forecast-vs-actual email plots these as small hollow points
+between the hourly counts and lists them in its table. The median rather than
+the hourly count's median/max rule, because on the first five days (124 sets)
+the median of the ten sat 1.5% below the hourly counts on either side, while
+the max of the ten ran 8% above them: a max over ten frames across a minute
+picks up more than a max over five frames in four seconds. The forecast, its
+training and the email's accuracy numbers still use only the hourly counts.
 
 ## Multi-frame count averaging
 

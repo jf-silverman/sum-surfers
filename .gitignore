@@ -13,6 +13,7 @@ archive/data/not_needed_in_repo
 # data/reviews/ subfolders that also hold real, trackable .py scripts —
 # see docs/PROJECT_FILES.md for the data/ and analysis/ layout.
 data/predictions/predictions.csv
+data/predictions/subhourly_counts.csv
 data/predictor_vars/surfline_predictors.csv
 data/predictor_vars/openmeteo_weather.csv
 data/training_features.csv

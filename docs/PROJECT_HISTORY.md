@@ -6722,3 +6722,17 @@ table and the actual water. The logged forecasts show it too: the actual
 centre is 14 min after the forecast's (p = 0.0002). A higher peak is not shown
 (p = 0.15), and a shorter real low-tide window does not raise it. Details:
 `analysis/tide_ramp/tide_ramp_notes.md`. Production is unchanged.
+
+## 2026-10-27 — Sub-hourly counts in the evening email
+
+Joel asked for the evening forecast-vs-actual email to include the new
+sub-hourly sets. A new step 4b, `code/detect_subhourly.py`, runs the
+production detector over each set's ten crops and writes
+`data/predictions/subhourly_counts.csv`. The set's count is the median of its
+ten frames. On the first five days (2026-10-22 to 10-26, 124 sets) that sat
+1.5% below the hourly counts on either side (interpolated, 15+ surfers), while
+the max of the ten ran 8% high, so the hourly count's median/max rule was not
+reused. The email chart shows the sets as small hollow points between the
+hourly counts, and its table gains a "Between hours" column. The accuracy
+headline, the forecast and its training still use only the hourly counts.
+Counting adds about 35 s a night (130 sets took 2 min 50 s).

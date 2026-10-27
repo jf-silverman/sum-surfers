@@ -44,6 +44,10 @@ from send_email import send_email  # noqa: E402
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PREDICTIONS_CSV = _PROJECT_ROOT / "data" / "predictions" / "predictions.csv"
+# Sub-hourly set counts (detect_subhourly.py, step 4b): two more per hour, 18
+# and 36 min after the main clip. Shown on the chart and in the table; the
+# headline accuracy numbers stay on the hourly counts the forecast is trained on.
+SUBHOURLY_CSV = _PROJECT_ROOT / "data" / "predictions" / "subhourly_counts.csv"
 # Dated report artefacts go to daily/ (pruned); the one published copy the
 # README embeds goes to published/. See plot_daily_prediction.py for the split.
 OUT_DIR = _PROJECT_ROOT / "data" / "charts" / "daily"
@@ -64,6 +68,30 @@ def actual_counts(target_date):
         out.append((datetime(target_date.year, target_date.month, target_date.day, hh, mm),
                     float(r["surfer_count"])))
     return sorted(out)
+
+
+def subhourly_counts(target_date):
+    """Sub-hourly set counts for a date: [(datetime, count), ...]; [] if none."""
+    if not SUBHOURLY_CSV.exists():
+        return []
+    df = pd.read_csv(SUBHOURLY_CSV)
+    df = df[(df["date"] == target_date.isoformat())
+            & (df["quality_ok"].astype(str) == "True") & df["set_count"].notna()]
+    out = []
+    for _, r in df.iterrows():
+        hh, mm = map(int, str(r["time_local"]).split(":")[:2])
+        out.append((datetime(target_date.year, target_date.month, target_date.day, hh, mm),
+                    float(r["set_count"])))
+    return sorted(out)
+
+
+def subhourly_between(actuals, subs):
+    """{index of hourly actual: [sub-hourly counts after it, before the next]}."""
+    out = {}
+    for i, (when, _c) in enumerate(actuals):
+        nxt = actuals[i + 1][0] if i + 1 < len(actuals) else datetime.max
+        out[i] = [c for t, c in subs if when < t < nxt]
+    return out
 
 
 def most_recent_counted_day(lookback=30):
@@ -411,7 +439,7 @@ def missing_predictor_note(target_date):
             f"check the pipeline log for 403s.")
 
 
-def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path, tide=None):
+def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path, tide=None, subs=None):
     fig, ax = plt.subplots(figsize=(13, 6.2), facecolor=pdp.BG_COLOR)
     ax.set_facecolor(pdp.AXES_BG)
 
@@ -433,6 +461,12 @@ def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path, tide
         ax.plot(ah, av, color=pdp.CORAL, linewidth=2.2, linestyle="-", marker="o",
                 markersize=7, markeredgecolor="white", markeredgewidth=0.8,
                 label="Actual detected", zorder=5)
+    if subs:
+        # Smaller and hollow, so the hourly counts the forecast is scored on stay
+        # the main line and these read as extra looks between them.
+        ax.plot([s[0] for s in subs], [s[1] for s in subs], linestyle="none", marker="o",
+                markersize=5, markerfacecolor=pdp.AXES_BG, markeredgecolor=pdp.CORAL,
+                markeredgewidth=1.4, label="Between hours (median of 10 frames)", zorder=4)
 
     if tide:
         # Second axis on the right, matching the daily chart's convention so the
@@ -513,7 +547,7 @@ def summarize(forecast_rows, actuals):
     return "\n".join(lines), stats
 
 
-def hourly_table_html(forecast_rows, actuals):
+def hourly_table_html(forecast_rows, actuals, subs=None):
     """The hour-by-hour comparison as a real HTML table.
 
     The plain-text version of this is column-aligned with spaces, which only
@@ -531,12 +565,20 @@ def hourly_table_html(forecast_rows, actuals):
                       for h, a in [("Hour", "left"), ("Counted", "right"), ("Forecast", "right"),
                                    (f"{forecast_rows[0]['band_label']} range"
                                     if forecast_rows else "range", "right"),
-                                   ("", "left")])
+                                   ("", "left")]
+                      + ([("Between hours", "left")] if subs else []))
             + "</tr>")
 
     by_hour = {r["hour"].hour: r for r in forecast_rows} if forecast_rows else {}
+    between = subhourly_between(actuals, subs or [])
     rows = []
     for i, (when, count) in enumerate(actuals):
+        sub_cell = ""
+        if subs:
+            sub_txt = ", ".join(f"{c:g}" for c in between[i]) or "&ndash;"
+            sub_cell = (f'<td style="padding:5px 10px;border-bottom:1px solid #e8e8e8;'
+                        f'font-family:system-ui,sans-serif;font-size:13px;color:#666;'
+                        f'background:{"#fafafa" if i % 2 else "#ffffff"};">{sub_txt}</td>')
         bg = "#fafafa" if i % 2 else "#ffffff"
         cell = (f'padding:5px 10px;border-bottom:1px solid #e8e8e8;'
                 f'font-family:system-ui,sans-serif;font-size:13px;background:{bg};')
@@ -544,7 +586,8 @@ def hourly_table_html(forecast_rows, actuals):
         if f is None:
             rows.append(f'<tr><td style="{cell}">{when.strftime("%-I:%M %p")}</td>'
                         f'<td style="{cell}text-align:right;"><b>{count:.0f}</b></td>'
-                        f'<td style="{cell}text-align:right;color:#999;" colspan="3">no forecast for this hour</td></tr>')
+                        f'<td style="{cell}text-align:right;color:#999;" colspan="3">no forecast for this hour</td>'
+                        f'{sub_cell}</tr>')
             continue
         hit = f["lower"] <= count <= f["upper"]
         # Not colour alone: the word carries the meaning, the colour reinforces it.
@@ -555,7 +598,7 @@ def hourly_table_html(forecast_rows, actuals):
             f'<td style="{cell}text-align:right;"><b>{count:.0f}</b></td>'
             f'<td style="{cell}text-align:right;">{f["point"]:.1f}</td>'
             f'<td style="{cell}text-align:right;color:#666;">{f["lower"]:.0f}&ndash;{f["upper"]:.0f}</td>'
-            f'<td style="{cell}font-size:12px;">{mark}</td></tr>')
+            f'<td style="{cell}font-size:12px;">{mark}</td>{sub_cell}</tr>')
 
     return ('<table cellspacing="0" cellpadding="0" '
             'style="border-collapse:collapse;margin:4px 0 2px 0;">'
@@ -584,7 +627,8 @@ def main():
     print(f"Reporting on {target_date}")
 
     actuals = actual_counts(target_date)
-    print(f"  {len(actuals)} counted hours")
+    subs = subhourly_counts(target_date)
+    print(f"  {len(actuals)} counted hours, {len(subs)} sub-hourly sets")
 
     recorded = load_recorded_forecast(target_date)
     forecast_note = ""
@@ -612,7 +656,7 @@ def main():
 
     tide = tide_by_hour(target_date)
     out_path = OUT_DIR / f"forecast_vs_actual_{target_date.isoformat()}.png"
-    build_chart(target_date, forecast_rows, actuals, made_at, out_path, tide=tide)
+    build_chart(target_date, forecast_rows, actuals, made_at, out_path, tide=tide, subs=subs)
     print(f"  Chart: {out_path}  (tide points: {len(tide)})")
 
     # A stable, git-tracked copy for the README's accuracy section, mirroring the
@@ -702,7 +746,11 @@ def main():
            f'{band_note.strip()}</p>' if band_note else "")
         + (f'<p style="margin:0 0 14px 0;color:#444;">{tide_note.strip()}</p>' if tide_note else "")
         + f'<h3 style="font-size:14px;margin:18px 0 6px 0;">Hour by hour</h3>'
-        + hourly_table_html(forecast_rows, actuals)
+        + hourly_table_html(forecast_rows, actuals, subs)
+        + (f'<p style="margin:6px 0 0 0;color:#666;font-size:12px;">Between hours: two more '
+           f'counts each hour, about 18 and 36 min after the hourly clip, each the median of '
+           f'ten frames across a minute. Not yet checked against hand counts, and not in the '
+           f'accuracy numbers above.</p>' if subs else "")
         + f'<h3 style="font-size:14px;margin:20px 0 6px 0;">Attached</h3>'
         + '<ul style="margin:0;padding-left:20px;color:#444;font-size:13px;">'
         + f'<li>Forecast vs. actual chart for {target_date.strftime("%b %d")}, tide on the right axis</li>'
