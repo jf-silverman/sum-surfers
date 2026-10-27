@@ -6688,3 +6688,17 @@ chain and a fixed :19 or :47 would sometimes land on top of one. Surfline
 serves clips from any start time. Tested on 2026-10-25: 26 sets, 260 crops,
 38 MB kept, every clip deleted, 4 min 43 s of downloading. The hourly count,
 training table and forecast are unchanged.
+
+## 2026-10-27 — What the biggest crowded-hour misses share
+
+Joel asked for any commonalities among the worst under-forecasts on crowded
+days. Week-held-out hindcasts were refreshed on the median/max counts, and the
+quarter of 30+ hours with the biggest shortfall (94 hours on 44 days) was
+compared with the other crowded hours on 34 traits, tested by day. No trait
+survives a multiple-comparison correction. The leads are long weekends, misses
+that run over consecutive days, Fridays and Mondays, the day's peak hour and
+late morning. The misses do not differ in rating, swell, wind, temperature,
+nearby spots' ratings, events or frame spread. The logged forecasts point the
+same way: their worst misses fall on the Indigenous Peoples' Day weekend and
+the two Santa Cruz City Schools non-student days in October. Details are in
+`analysis/packed_hours/packed_hours_notes.md`. Nothing in production changed.
