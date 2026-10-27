@@ -109,6 +109,24 @@ rather than observation. Notes seasonal variation in how often surfers go out.
 A reminder that the population generating these counts is not fixed across the
 year.
 
+## Evaluating the detector
+
+**A free-response approach to the measurement and characterization of
+radiographic-observer performance.** Bunch, P. C., Hamilton, J. F.,
+Sanderson, G. K., and Simmons, A. H. *Journal of Applied Photographic
+Engineering*, 4 (1978), 166-171 (some sources date it 1977).
+
+Where the FROC curve used in `HOW_IT_WORKS.md` comes from: radiologists mark
+suspected lesions anywhere on an image, which the ROC method cannot score
+without ambiguity, so recall is plotted against false marks per image instead.
+
+**A brief history of FROC paradigm data analysis.** Chakraborty, D. P.
+*Academic Radiology*, 20(7), 2013. https://pmc.ncbi.nlm.nih.gov/articles/PMC3679336/
+
+The history of the free-response paradigm, crediting Bunch et al. with
+recognising it for radiology and laying out why ROC breaks down for
+localisation tasks.
+
 ---
 
 Tool and library references — Ultralytics, CVAT — are in

@@ -380,8 +380,11 @@ measure different things, and both are kept.
 
 ![Detector count against a hand count, one point per reviewed frame](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/detector_accuracy.png)
 
-Overall the detector counts about 7% low (fitted slope 0.94), and the gap
-widens in a crowded lineup. **It misses far more than it invents.** Of 316
+In a single frame the detector counts about 7% low (fitted slope 0.94), and
+the gap widens in a crowded lineup. The chart above plots the hourly count
+instead, which since 2026-10-26 takes the median of five frames a second apart
+on near-empty water and their max from 6 surfers up; that recovers most of the
+surfers a single frame misses, and the slope is 0.99 (see "Median/max count"). **It misses far more than it invents.** Of 316
 missed surfers, 286 had no box at all and 30 were inside a box drawn around
 several people; of 46 false positives, 35 were on something that is not a
 surfer — a bird, a wind sock, a head on the beach — and 11 were a second box on
@@ -391,6 +394,44 @@ smudge a few pixels across. Hand counting is itself imperfect, and 8 boxes and
 45 possible misses were flagged as judgement calls the reviewer would not
 defend either way. The raw record is
 [`data/reviews/review_all.csv`](../data/reviews/review_all.csv).
+
+### Across every confidence threshold: precision-recall and FROC
+
+The figures above are at the production confidence threshold (0.195). To see
+the whole trade-off, the detector's boxes on the 61 labelled frames it never
+trained on (1,509 surfers) were replayed through the production path at every
+threshold from 0.02 to 0.95 (`analysis/detector_pr_curve/`).
+
+The usual summary of a yes/no classifier, an ROC curve, does not apply here: it
+plots true positives against the *rate* of false positives, which needs a count
+of true negatives, and a detector has none to count, since every patch of empty
+water is a "correct rejection". Detection uses two substitutes:
+
+- **Precision-recall**: precision against recall as the threshold moves. Its
+  area is the average precision ([AP](#term-map)), the detection counterpart of
+  the area under an ROC curve.
+- **[FROC](#term-froc) (free-response ROC)**: the share of real objects found
+  against the number of false marks per image. It comes from medical imaging,
+  where a radiologist marks suspected lesions anywhere on a scan rather than
+  calling the whole image normal or abnormal (Bunch et al., 1978), which is the
+  same problem as boxing surfers anywhere in a frame. It remains a standard way
+  to evaluate lesion-detection systems.
+
+![Precision-recall and FROC curves across confidence thresholds](../analysis/detector_pr_curve/pr_froc.png)
+
+| Box counts as found if it overlaps the label by | AP | At 0.195: precision | recall | false boxes per frame |
+|---|---|---|---|---|
+| IoU 0.5 (the usual standard) | 0.778 | 0.87 | 0.80 | 3.0 |
+| IoU 0.3 | 0.890 | 0.95 | 0.88 | 1.1 |
+
+Surfer boxes are 10-20 px, so a box a few pixels off can fail IoU 0.5 while
+sitting on the right surfer; the IoU 0.3 curve is the one comparable with the
+hand review above. The production threshold sits at the knee of both curves:
+lowering it toward 0.02 adds about 2 points of recall while roughly doubling
+the false boxes, and raising it costs recall faster than it gains precision.
+Recall levels off near 0.82 and 0.90 even at the lowest threshold, because the
+remaining misses are never proposed at any confidence; only better training
+data or a better model would find them.
 
 ## Predictors: weather, tide, swell, wind, energy, consistency
 
@@ -722,6 +763,12 @@ Full investigation, metrics, and known error rates are in
   have few strong edges and a low variance. Used here as a general
   "unreliable image" signal, since fog, lens condensation, and smooth
   low-texture water all suppress it similarly.
+- <a id="term-froc"></a>**FROC (free-response receiver operating characteristic)** — recall
+  (share of real objects found) plotted against false marks per image as the
+  confidence threshold moves. Developed in radiology for lesion detection,
+  where findings can appear anywhere on an image and there are no countable
+  true negatives; used here for the same reason. See "Across every
+  confidence threshold" above.
 - <a id="term-mae"></a>**MAE (Mean Absolute Error)** — the average, across every prediction, of
   how far off (in either direction) that prediction was from the real
   value, ignoring sign — e.g. an MAE of 6 surfers means predictions are,
