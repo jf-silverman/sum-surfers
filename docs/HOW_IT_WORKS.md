@@ -57,9 +57,9 @@ in `PROJECT_HISTORY.md`.
 
 ## Sub-hourly frame sets (collected from 2026-10-26)
 
-Each night, `code/get_subhourly_frames.py` also takes two extra 11-second clips
-per hour, 18 and 36 minutes after that hour's main clip, crops ten frames from
-each (0.5 to 9.5 s, one second apart, same ROI) into
+Each night, `code/get_subhourly_frames.py` also takes two extra one-minute
+clips per hour, 18 and 36 minutes after that hour's main clip, crops ten frames
+from each (3 to 57 s, one every 6 seconds, same ROI) into
 `data/j_shore_cam/subhourly_crops/<date>/`, and deletes the clip. The main
 clips are about 54 minutes apart, so the three clips split each gap into even
 thirds. Nothing reads these frames yet. They are being collected to test

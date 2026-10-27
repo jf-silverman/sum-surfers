@@ -1,6 +1,6 @@
 """
-Sub-hourly frame sets: two extra short clips per hour, cut into 10 cropped
-frames each, clip deleted afterwards (added 2026-10-26).
+Sub-hourly frame sets: two extra one-minute clips per hour, cut into 10
+cropped frames each, clip deleted afterwards (added 2026-10-26).
 
 Why. The hour's count comes from one clip near the start of the hour (five
 frames one second apart). Counts only decorrelate over about a minute
@@ -15,10 +15,14 @@ schedule (get_clips.py), so their minute drifts through the hour. Placing the
 extra clips at fixed offsets from each main clip (SUB_OFFSETS_MIN) splits each
 gap into even thirds and never lands on top of a main clip, which fixed clock
 minutes would. Surfline serves clips from any start time (checked 2026-10-26:
-starts at :19 and :47 returned normally); an 11 s request returns 12.2 s at
-25 fps.
+starts at :19 and :47 returned normally).
 
-What is kept. For each extra clip, frames at 0.5, 1.5, ..., 9.5 s are cropped to
+Why a minute, not a few seconds. Counts one second apart correlate at about
+0.8 and only decorrelate over about a minute, so ten frames spread across a
+minute (one every 6 s) sample more of the hour than ten frames in ten seconds.
+The download is bigger, but the clip is deleted as soon as the frames are cut.
+
+What is kept. For each extra clip, frames at 3, 9, ..., 57 s are cropped to
 the production ROI (get_cropped_frame.py) and saved as
 data/j_shore_cam/subhourly_crops/<date>/sub<date>_<HH-MM>_f00.jpg ... _f09.jpg
 (JPEG quality 100, like the main crops). The uncropped frame is never written,
@@ -53,8 +57,8 @@ MAIN_CLIPS = ROOT / "data" / "not_needed_in_repo" / "surf_clips"
 TMP_CLIPS = ROOT / "data" / "not_needed_in_repo" / "subhourly_clips"
 CROPS = ROOT / "data" / "j_shore_cam" / "subhourly_crops"
 SUB_OFFSETS_MIN = (18, 36)
-SUB_CLIP_SEC = 11
-FRAME_TIMES_SEC = [0.5 + i for i in range(10)]
+SUB_CLIP_SEC = 60
+FRAME_TIMES_SEC = [3.0 + 6 * i for i in range(10)]  # 3, 9, ..., 57 s
 SETTLE_MIN = 5  # don't request a clip that ended less than this long ago
 
 
