@@ -50,7 +50,7 @@ at 2026-10-15). Results: `tide_drop_events.csv`.
   table said it did for 1 to 6 hours. In fall 2025 that never happened.
 - **The logged forecasts agree.** On the 20 fall events with logged forecasts,
   the actual crowd centre is 2.15 h after the table crossing against the
-  forecast's 1.92 h: 14 min later, every way of pairing them (p = 0.0002).
+  forecast's 1.92 h: 14 min later (paired Wilcoxon, p = 0.0002).
 - **A higher peak is not shown.** Fall 2026 peaks average 39.8 against 31.0 in
   fall 2025, but with controls the difference is +5.5 (p = 0.15). The "one
   window" idea doesn't hold up either: the peak doesn't rise when the real
