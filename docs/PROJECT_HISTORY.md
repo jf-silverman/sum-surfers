@@ -6707,4 +6707,4 @@ Joel then asked to test the three leads. Day of week and local no-school
 days add nothing. A wider holiday list, adding Indigenous Peoples' Day, is
 the only one to reach p < 0.05 (MAE 6.737 to 6.662, 19 of 30 weeks better,
 p = 0.026). That rests on two counted Mondays, and the day was picked after
-seeing the misses, so it was not adopted.
+seeing the misses, so it stays a lead; production is unchanged.
