@@ -73,3 +73,29 @@ of the observed residual. The full correction hurt on 2026-10-15; this result
 suggests the partial one is closer to how people behave. The model would need
 the residual at forecast time, which NOAA does not forecast; persisting the
 last observed value is the obvious stand-in.
+
+## Weekdays against weekends and holidays (2026-10-27)
+
+Joel's idea: weekday surfers follow conditions like the Kelvin wave more
+closely, while weekend surfers glance at the tide chart. If so, the delay
+should show on weekdays only. 53 weekday events, 19 weekend/holiday; the water
+ran about as high on both (0.53 and 0.58 ft above the table on average).
+
+| | events | delay per ft of extra water | 95% CI | p |
+|---|---:|---:|---|---:|
+| weekdays | 53 | +0.27 h | -0.01 to +0.56 | 0.06 |
+| weekends and holidays | 19 | +0.23 h | -0.15 to +0.62 | 0.23 |
+| difference (weekend minus weekday) | | +0.11 h | -0.34 to +0.55 | 0.64 |
+
+- **Both groups shift by about the same amount**, about 15 min per foot. The
+  weekend estimate is less certain because it rests on fewer days. Nothing
+  says weekend surfers ignore the water level.
+- Comparing this fall with the rest of the record instead, the delay sits on
+  weekends: +0.06 h on weekdays (p = 0.52), +0.44 h more on weekends
+  (p = 0.007). That rests on 6 weekend days this fall and runs opposite to
+  the idea, so it is a reason not to read too much into either split.
+- In the logged forecasts, the actual crowd centre is later than forecast by
+  14 min on weekdays (14 days) and 13 min on weekends (6 days).
+
+The weekday-only idea is not supported; with 19 weekend events, a modest
+difference either way can't be ruled out.
