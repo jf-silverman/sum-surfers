@@ -55,6 +55,18 @@ in `PROJECT_HISTORY.md`.
    Everything is appended to `data/predictions/predictions.csv` with the raw
    per-frame counts.
 
+## Sub-hourly frame sets (collected from 2026-10-26)
+
+Each night, `code/get_subhourly_frames.py` also takes two extra 11-second clips
+per hour, 18 and 36 minutes after that hour's main clip, crops ten frames from
+each (0.5 to 9.5 s, one second apart, same ROI) into
+`data/j_shore_cam/subhourly_crops/<date>/`, and deletes the clip. The main
+clips are about 54 minutes apart, so the three clips split each gap into even
+thirds. Nothing reads these frames yet. They are being collected to test
+whether sampling the hour three times, rather than once, improves the hourly
+estimate: counts only decorrelate over about a minute, so one clip says little
+about the rest of the hour. They take about 38 MB a day.
+
 ## Multi-frame count averaging
 
 A single instant of video is a noisy sample of "how many surfers are out

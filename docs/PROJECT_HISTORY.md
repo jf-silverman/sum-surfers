@@ -6673,3 +6673,17 @@ The forecast trained on it reads about 6% higher; the packed-hour shortfall
 moves only from −11.5 to −11.0, so this is a measurement fix, not the answer to
 that gap. The cut at 6 was chosen on the frames it was scored on and should be
 rechecked as hand counts come in.
+
+## 2026-10-26 — Collecting sub-hourly frame sets
+
+Joel asked for two more frame sets per hour, to test later whether they
+improve the hourly estimate. `code/get_subhourly_frames.py` (pipeline step 2b,
+after crop extraction) takes an 11 s clip 18 and 36 minutes after each main
+clip, crops frames at 0.5-9.5 s, one second apart, into
+`data/j_shore_cam/subhourly_crops/`, and deletes the clip; the uncropped frame
+is never written. Offsets from the main clip rather than fixed clock minutes,
+because the main clips drift through the hour on a 54-minute chain and a fixed
+:19 or :47 would sometimes land on top of one. Surfline serves clips from any
+start time; an 11 s request returns 12.2 s at 25 fps. Tested on 2026-10-25: 26
+sets, 260 crops, 38 MB, 85 s. The hourly count, training table and forecast are
+unchanged.

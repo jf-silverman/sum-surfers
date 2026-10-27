@@ -96,6 +96,15 @@ log "Step 2/10 — Extracting crop frames..."
 run_step "Step 2 (extract crops)" "$PYTHON" code/get_cropped_frame.py
 log "Step 2 done."
 
+# ── Step 2b: Sub-hourly frame sets ───────────────────────────────────────────
+# Two extra 11 s clips per hour, 18 and 36 min after each main clip, cut to ten
+# cropped frames each and then deleted. Collected for a later test of whether
+# they improve the hourly estimate; nothing downstream reads them yet, and a
+# failure here never affects the hourly count or the forecast.
+log "Step 2b — Sub-hourly frame sets..."
+run_step "Step 2b (sub-hourly frames)" "$PYTHON" code/get_subhourly_frames.py
+log "Step 2b done."
+
 # ── Step 3: Check local clips storage ────────────────────────────────────────
 # Emails a warning if clips folder exceeds CLIPS_DIR_LIMIT_GB; never fails the pipeline.
 log "Step 3/10 — Checking clips storage..."
