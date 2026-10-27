@@ -416,3 +416,47 @@ and correlate at about 0.8, so their spread mostly reflects detection
 difficulty (occlusion, chop), not how well the frames sample the hour, and
 that part of the label noise is small next to the forecast's error. Not
 adopted.
+
+## What the biggest crowded-hour misses share (`profile_big_misses.py`, 2026-10-27)
+
+Hindcasts refreshed on the median/max counts (2,079 hours, 156 days). Crowded =
+30+ surfers: 375 hours on 114 days. "Big miss" = the quarter of those with the
+largest shortfall (18.9+ surfers under): 94 hours on 44 days. Tests are run on
+days (each crowded day's mean shortfall, Spearman), with Benjamini-Hochberg
+across 34 traits. **No trait survives the correction (best q = 0.20)**, so the
+leads below are patterns to check, not findings. Full table:
+`big_miss_profile.csv`; days ranked by total shortfall: `big_miss_days.csv`.
+
+Leads, strongest first:
+
+- **Long weekends.** 25% of big-miss hours fall on a long weekend against 7% of
+  the other crowded hours (p = 0.04). Four of the 13 worst days are Labor Day
+  weekend (Fri 9/4 to Mon 9/7); 7/3 and Thanksgiving Sunday 11/30 are also in the
+  top six.
+- **Misses come in runs.** 28 of the 44 big-miss days sit next to another one,
+  against 21 if they were scattered at random (p = 0.05). A day's shortfall
+  tracks the day before's (rho 0.22, p = 0.03). Something lasts several days
+  that the inputs don't carry.
+- **Friday and Monday.** The share of crowded hours that are big misses is 35%
+  on Friday and 29% on Monday, against 16 to 21% Tuesday to Thursday. The model
+  only knows weekend or not.
+- **The day's peak.** 45% of big-miss hours are the day's busiest hour, against
+  27% of the rest. The forecast flattens the peak, as found above.
+- **Late morning and higher tide.** 35% of 9am-12pm crowded hours are big misses,
+  against 19-20% after 12pm. Mean tide is 2.5 ft against 2.0 ft (p = 0.01), but on
+  busy days the model's drop from 2-3 ft to 3-4 ft (28 to 20) matches the actual
+  drop (33 to 23), so tide is probably not the cause.
+
+Not shared (the misses look like the other crowded hours): Jack's rating,
+swell height, period and direction, wind, local and inland temperature, cloud,
+change in rating or swell from the day before, days since a fair day, nearby
+spots' ratings, Visit Santa Cruz events, school days off, and the spread of the
+five frames. Because the frame spread is the same, the misses are not a
+counting artifact.
+
+**The logged forecasts (Sep 23 to Oct 26, 61 crowded hours) agree.** The 15
+worst under-forecasts are all between 2pm and 6pm in October. Eight of them fall
+on Friday 10/9 to Monday 10/12, the Indigenous Peoples' Day weekend; that
+Monday is not in the holiday list. Two more fall on Thursday 10/15 and Friday
+10/16, the two Santa Cruz City Schools non-student days: peaks of 59 and 46
+against 27 and 21.
