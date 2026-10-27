@@ -6708,3 +6708,17 @@ days add nothing. A wider holiday list, adding Indigenous Peoples' Day, is
 the only one to reach p < 0.05 (MAE 6.737 to 6.662, 19 of 30 weeks better,
 p = 0.026). That rests on two counted Mondays, and the day was picked after
 seeing the misses, so it stays a lead; production is unchanged.
+
+## 2026-10-27 — The crowd arrives a little later when the water runs high
+
+Joel saw the crowd ramping up after the tide drops below 3 ft later than
+forecast this fall, and asked whether the Kelvin wave is behind it and whether
+the peak is higher. Across 72 days on which the tide table falls below 3 ft
+with at least 4 h of daylight left, the crowd's count-weighted centre comes
+about 19 min later per foot of water above the table (p = 0.006, controlling
+for the time of day, weekend and the length of the low tide). That is about a
+third of the delay in the real water itself, so people land between the tide
+table and the actual water. The logged forecasts show it too: the actual
+centre is 14 min after the forecast's (p = 0.0002). A higher peak is not shown
+(p = 0.15), and a shorter real low-tide window does not raise it. Details:
+`analysis/tide_ramp/tide_ramp_notes.md`. Production is unchanged.
