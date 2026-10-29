@@ -172,6 +172,23 @@ pip install -r docs/requirements.txt
 
 The full setup, including the scheduled pipeline, environment variables and where the data lives, is in [SETUP.md](docs/SETUP.md).
 
+## Built with
+
+Python 3.13, and these libraries:
+
+| What it does | Libraries |
+|---|---|
+| Surfer detection | [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics), [PyTorch](https://pytorch.org/), torchvision |
+| Video frames and image processing | [OpenCV](https://opencv.org/) |
+| Crowd forecast and statistical testing | [scikit-learn](https://scikit-learn.org/) (Poisson gradient-boosted trees), [statsmodels](https://www.statsmodels.org/), [SciPy](https://scipy.org/) |
+| Data handling | [pandas](https://pandas.pydata.org/), [NumPy](https://numpy.org/) |
+| Charts | [Matplotlib](https://matplotlib.org/) |
+| Surfline, Open-Meteo and NOAA data | [Requests](https://requests.readthedocs.io/) |
+| First and last light, time zones | [Astral](https://astral.readthedocs.io/), pytz |
+| Hand-labeling surfers | [CVAT](https://www.cvat.ai/) (a tool, not a library) |
+
+Exact versions are pinned in [docs/requirements.txt](docs/requirements.txt).
+
 ## Learn more
 
 - [How it works](docs/HOW_IT_WORKS.md): the pipeline step by step, both models, accuracy in depth, and a glossary
