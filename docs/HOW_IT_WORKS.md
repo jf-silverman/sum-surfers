@@ -69,14 +69,20 @@ take about 38 MB a day.
 
 From 2026-10-27, `code/detect_subhourly.py` counts each set with the
 production detector and writes `data/predictions/subhourly_counts.csv`: the
-ten frame counts, their median and max, and the set's count, which is the
-median. The evening forecast-vs-actual email plots these as small hollow points
-between the hourly counts and lists them in its table. The median rather than
-the hourly count's median/max rule, because on the first five days (124 sets)
-the median of the ten sat 1.5% below the hourly counts on either side, while
-the max of the ten ran 8% above them: a max over ten frames across a minute
-picks up more than a max over five frames in four seconds. The forecast, its
-training and the email's accuracy numbers still use only the hourly counts.
+ten frame counts, their median and max, and the set's count. Since 2026-10-28
+the set's count uses the same rule as the hourly count: the median of the ten
+below 6, their max from 6 up. On a good day surfers who catch a set wave ride
+out of frame behind the cliff, and wide waves hide others, so a single look
+runs low while a set is breaking; the max over the clip catches the lineup
+between sets. The cost is that a max over ten frames runs higher than a max
+over five: on the first five days (124 sets) the max of the ten ran 8% above
+the hourly counts on either side, against 1.5% below for the median. Neither
+is checked against hand counts yet.
+
+The evening forecast-vs-actual email plots these as diamonds, with the actual
+line running through hourly and between-hours points alike, and lists them in
+its table. The forecast, its training and the email's accuracy numbers still
+use only the hourly counts.
 
 ## Multi-frame count averaging
 

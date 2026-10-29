@@ -6736,3 +6736,26 @@ reused. The email chart shows the sets as small hollow points between the
 hourly counts, and its table gains a "Between hours" column. The accuracy
 headline, the forecast and its training still use only the hourly counts.
 Counting adds about 35 s a night (130 sets took 2 min 50 s).
+
+## 2026-10-28 — Between-hours sets counted with the hourly rule
+
+Joel switched the between-hours set count from the median of its ten frames
+to the hourly count's rule: the median below 6, the max from 6 up. His reading
+from the cam: on a good day (fair, 2+ ft) surfers who catch a set wave ride
+out of frame to the bottom left, behind the cliff, and most return 1–7 minutes
+later, while wider waves hide others still in frame. So a count taken while a
+set is breaking runs low, and the max over the clip is closer to the lineup.
+`code/detect_subhourly.py` now writes `set_count` with
+`detect_surfers.hybrid_count`, and the 179 rows already in
+`subhourly_counts.csv` were recomputed from their frame counts (78 changed;
+backup kept as `subhourly_counts.csv.bak-2026-10-28`). On 10/28 the change
+added 1.5–4 surfers to sets of 6+, for example 40 → 43 at 4:20 pm and 55 → 59
+at 5:14 pm.
+
+The email chart now draws the between-hours sets as filled diamonds and runs
+the actual line through every point in time order, hourly and between-hours
+alike. The trade-off stands: a max over ten frames runs higher than a max over
+five (8% above the interpolated hourly counts on the first five days), and
+neither is checked against hand counts. The forecast, its training and the
+accuracy numbers still use only the hourly counts.
+

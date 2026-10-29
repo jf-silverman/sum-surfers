@@ -458,15 +458,23 @@ def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path, tide
         # Coral, not lime: lime is the tide line on the right-hand axis, and two
         # lime lines on one chart is exactly the confusion this chart exists to
         # avoid — the whole point is reading crowd against tide.
-        ax.plot(ah, av, color=pdp.CORAL, linewidth=2.2, linestyle="-", marker="o",
+        # With sub-hourly sets, the line runs through every look in time order
+        # (hourly circles and between-hours diamonds alike); the markers say which
+        # is which, and only the circles are scored against the forecast.
+        if subs:
+            line = sorted(list(actuals) + list(subs))
+            ax.plot([p[0] for p in line], [p[1] for p in line], color=pdp.CORAL,
+                    linewidth=2.2, linestyle="-", zorder=4.5)
+        ax.plot(ah, av, color=pdp.CORAL, linewidth=2.2, linestyle="none" if subs else "-", marker="o",
                 markersize=7, markeredgecolor="white", markeredgewidth=0.8,
-                label="Actual detected", zorder=5)
+                label="Actual detected (hourly)", zorder=5)
     if subs:
-        # Smaller and hollow, so the hourly counts the forecast is scored on stay
-        # the main line and these read as extra looks between them.
-        ax.plot([s[0] for s in subs], [s[1] for s in subs], linestyle="none", marker="o",
-                markersize=5, markerfacecolor=pdp.AXES_BG, markeredgecolor=pdp.CORAL,
-                markeredgewidth=1.4, label="Between hours (median of 10 frames)", zorder=4)
+        # Diamonds off the line, so the hourly counts the forecast is scored on
+        # stay the main line and these read as extra looks between them. Same
+        # count rule as the hourly points (median under 6, max from 6).
+        ax.plot([s[0] for s in subs], [s[1] for s in subs], linestyle="none", marker="D",
+                markersize=6, color=pdp.CORAL, markeredgecolor="white", markeredgewidth=0.8,
+                label="Between hours (10 frames: median under 6, max from 6)", zorder=5)
 
     if tide:
         # Second axis on the right, matching the daily chart's convention so the
@@ -748,8 +756,9 @@ def main():
         + f'<h3 style="font-size:14px;margin:18px 0 6px 0;">Hour by hour</h3>'
         + hourly_table_html(forecast_rows, actuals, subs)
         + (f'<p style="margin:6px 0 0 0;color:#666;font-size:12px;">Between hours: two more '
-           f'counts each hour, about 18 and 36 min after the hourly clip, each the median of '
-           f'ten frames across a minute. Not yet checked against hand counts, and not in the '
+           f'counts each hour, about 18 and 36 min after the hourly clip, from ten frames across '
+           f'a minute and counted like the hourly clips: the median when it is under 6, '
+           f'otherwise the highest frame. Not yet checked against hand counts, and not in the '
            f'accuracy numbers above.</p>' if subs else "")
         + f'<h3 style="font-size:14px;margin:20px 0 6px 0;">Attached</h3>'
         + '<ul style="margin:0;padding-left:20px;color:#444;font-size:13px;">'

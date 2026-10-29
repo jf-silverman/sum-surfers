@@ -13,15 +13,18 @@ set to data/predictions/subhourly_counts.csv:
   n_frames              frames counted (a set is only counted when all 10 exist)
   count_f00 ... count_f09
   count_median, count_max
-  set_count             the median of the ten
+  set_count             the hourly count's rule (detect_surfers.hybrid_count):
+                        the median of the ten below 6, their max from 6 up
 
-set_count is what the evening email plots between the hourly counts. The
-median, not the hourly count's median/max rule: on the first five days
-(2026-10-22 to 10-26, 124 sets) the median of the ten sat 1.5% below the
-hourly counts on either side (interpolated, 15+ surfers), while the max of
-the ten ran 8% above them. A max over ten frames spread across a minute picks
-up more than a max over five frames in four seconds. Neither is checked
-against hand counts yet.
+set_count is what the evening email plots between the hourly counts. It was
+the median of the ten until 2026-10-28, when Joel switched it to the hourly
+rule so both kinds of point are read the same way: on a good day surfers ride
+out of frame behind the cliff during sets, so a single look runs low, and the
+max catches the lineup between sets. On the first five days (2026-10-22 to
+10-26, 124 sets) the max of the ten ran 8% above the interpolated hourly
+counts (15+ surfers) and the median 1.5% below; a max over ten frames across a
+minute picks up more than a max over five frames in four seconds. Neither is
+checked against hand counts yet. count_median and count_max stay in the file.
 
 Nothing in training or forecasting reads this file.
 
@@ -108,10 +111,11 @@ def main():
                 continue
             counts = [len(ds.run_inference_with_boxes(model, p)) for p in paths]
             med = statistics.median(counts)
+            set_count = ds.hybrid_count(counts)
             w.writerow([day, hhmm, True, "ok", N_FRAMES] + counts
-                       + [med, max(counts), med])
+                       + [med, max(counts), set_count])
             f.flush()
-            print(f"  {day} {hhmm}  ->  {med:g}  (frames {counts})")
+            print(f"  {day} {hhmm}  ->  {set_count}  (frames {counts})")
     print(f"Done. Results appended to {OUT_CSV}")
 
 
