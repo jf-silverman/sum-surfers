@@ -6759,3 +6759,34 @@ five (8% above the interpolated hourly counts on the first five days), and
 neither is checked against hand counts. The forecast, its training and the
 accuracy numbers still use only the hourly counts.
 
+
+## 2026-10-30 — The tide residual, retested two weeks later: still left out
+
+Joel asked whether to put the non-tidal residual into the model anyway, since
+the Kelvin wave looks to matter more as the fall goes on. The 2026-10-15 test
+(`analysis/forecast_tide_residual/test_tide_residual.py`) was rerun after
+refreshing `tide_residual.csv`: 2,117 rows / 159 days (was 1,927 / 145),
+16 rolling origins, residual mean +0.499 ft, range −0.49 to +1.42.
+
+| arm | MAE | vs base | p | better | placebo seeds as good or better |
+|---|---:|---:|---:|---:|---:|
+| `base` | 7.032 | — | — | — | — |
+| `corrected` (tide_ft + residual) | 7.224 | +0.192 | 0.325 | 5/16 | — |
+| `both` (residual as its own column) | 7.133 | +0.101 | 0.322 | 6/16 | 8/8 |
+| `dev_only` (detrended residual added) | 7.050 | +0.018 | 0.726 | 6/16 | 2/8 |
+
+Shuffled-residual placebo: mean +0.031, sd 0.029.
+
+The extra two weeks moved the raw column the wrong way: `both` went from
++0.033 to +0.101, now worse than every one of the eight placebo columns.
+A likely reading is that a raw residual acts as a "this autumn" marker. It
+ran about 1 ft in October 2026 against 0.24 ft in October 2025, and the
+model has month (`month_sin`/`month_cos`) but no year term. The detrended
+form strips that trend and costs about nothing, but it gains nothing either.
+`corrected` still beats both of its controls (scrambled 0/8, date-shifted
+1/8 seeds as good), so the residual carries a little real signal about these
+hours, but not enough to pay for itself.
+
+Nothing adopted. If the residual goes in later, `residual_dev_ft` is the form
+that does no harm, and serving it needs a nightly fetch plus the last observed
+value carried forward, since NOAA publishes no residual forecast.
