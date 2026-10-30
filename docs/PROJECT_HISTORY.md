@@ -6790,3 +6790,32 @@ hours, but not enough to pay for itself.
 Nothing adopted. If the residual goes in later, `residual_dev_ft` is the form
 that does no harm, and serving it needs a nightly fetch plus the last observed
 value carried forward, since NOAA publishes no residual forecast.
+
+## 2026-10-30 — A year term changes nothing yet, because month already is one
+
+Joel asked whether year could be a predictor. Tested on the same 16 rolling
+origins (2,117 rows / 159 days: 45 in 2025, 114 in 2026), with eight random
+day-level 0/1 columns as the placebo.
+
+| arm | MAE | vs base | p | better |
+|---|---:|---:|---:|---:|
+| `base` | 7.032 | — | — | — |
+| `year` (2025/2026) | 7.030 | −0.002 | 0.333 | 1/16 |
+| `trend` (days since first row) | 7.080 | +0.048 | 0.776 | 7/16 |
+
+Placebo: mean +0.043, sd 0.028. The trend sits inside it.
+
+The year result is not a small effect but no effect: in 15 of 16 windows the
+forecasts with and without `year` are identical to three decimals, because the
+trees never split on it. 2025 is only Oct–Dec and 2026 only Mar–Oct, so until
+October 2026 arrived, year was a function of month and added nothing. The one
+window that changed (test block from 10-16) is the first where October exists
+in both years; there it moved predictions by up to 5.3 surfers and the mean by
+−0.07.
+
+So year only starts to carry information now, and its first real use is
+forecasting Nov–Dec 2026, where every same-month training row is from 2025.
+That is the case to watch: a year split can either correct last year's level
+or wall off the only Nov–Dec rows. It cannot be scored until Nov–Dec 2026 data
+exists. Nothing adopted; rerun `analysis/forecast_year_term/test_year_term.py`
+(local) once there are a few weeks of November.
