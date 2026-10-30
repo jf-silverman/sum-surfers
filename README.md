@@ -49,17 +49,17 @@ Crowd forecasting for surf is rare. I haven't found a published study that forec
 #### A Full Day of Surfer Detections: Saturday, October 24, 2026
 
 Each green box is a surfer, according to the detection model. Each hour is shown twice, first bare and then with the boxes, so you can try spotting the surfers yourself first. It still misses some surfers and occasionally boxes something else: [what isn't a surfer](docs/non_surfer_objects.md).
-![Detections through Saturday, October 24, 2026](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_detection.gif?v=20261028)
+![Detections through Saturday, October 24, 2026](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_detection.gif?v=20261029)
 
-#### The Surfer Crowd Forecast for: Thursday, October 29, 2026
+#### The Surfer Crowd Forecast for: Friday, October 30, 2026
 
 The forecast for each hour of the coming day, made the evening before. The aqua line is the best guess, the shaded band is the likely range, the dashed green line is the tide, and the right-hand column rates each hour from 1 (near-empty) to 5 (packed).
-![Latest daily prediction chart](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest.png?v=20261028)
+![Latest daily prediction chart](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest.png?v=20261029)
 
-#### The Week Ahead: October 29 - November 04, 2026
+#### The Week Ahead: October 30 - November 05, 2026
 
 The same forecast run out a week, with each hour's crowd level from 1 (near-empty) to 5 (packed). A green outline marks an hour mostly under 3 ft of tide, and a purple line inside it means Surfline also rates the surf fair or better. The further right, the less certain: read the end of the week as a shape, not a number.
-![Crowd outlook for the week ahead](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_week.png?v=20261028)
+![Crowd outlook for the week ahead](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_week.png?v=20261029)
 
 <!-- DAILY_CHART_END -->
 <!-- ====================================================================
@@ -121,7 +121,7 @@ The same forecast run out a week, with each hour's crowd level from 1 (near-empt
 | of the surfers really there, how many it found | **91.9%** |
 | average count error | **1.5 surfers** per frame |
 
-![Hourly count against a hand count, one point per reviewed frame](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/detector_accuracy.png?v=20261028e)
+![Hourly count against a hand count, one point per reviewed frame](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/detector_accuracy.png?v=20261029e)
 
 In a single frame it counts about 7% low: about 6% low with fewer than 10 surfers out, and 8% low with 10 to 40. **The hourly count makes up nearly all of that** by looking at five frames a second apart and keeping the highest once 6 or more surfers are out, since a surfer hidden behind a wave in one frame is usually visible in another. Against the same hand counts the hour's count is less than 1% low overall (about 1% with fewer than 10 out, under 1% with 10 or more), where the old average of three frames ran 7% low. In the chart above, that change (October 2026) raised the fitted line's slope from 0.94 to 0.99, so the count now tracks the hand count almost one for one; r² rose only slightly, from 0.974 to 0.980, because the old count was already consistently proportional, just low. **Surfers lying flat on their boards (paddling) are the hardest for the object detector to spot**: two out of three misses were surfers in a flat position, and only 10 of 316 were standing.
 
@@ -133,7 +133,7 @@ In a single frame it counts about 7% low: about 6% low with fewer than 10 surfer
 
 ![How often the forecast lands within N surfers](docs/images/forecast_within_n.png)
 
-![Forecast vs. actual surfer counts for the most recently scored day, with tide](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_forecast_vs_actual.png?v=20261028)
+![Forecast vs. actual surfer counts for the most recently scored day, with tide](https://raw.githubusercontent.com/jf-silverman/sum-surfers/assets/latest_forecast_vs_actual.png?v=20261029)
 
 *Above is the most recently scored day (rebuilt each night): the blue line is what was forecast the evening before, the coral line is what the object detector counted, and the dashed green line is the tide.*
 
