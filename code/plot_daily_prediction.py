@@ -323,6 +323,34 @@ def apply_point_recalibration(raw, lower, upper, recal):
     return float(min(max(corrected, lower, 0.0), max(upper, lower)))
 
 
+# Exit code for "Surfline conditions missing": daily_chart.sh retries it at
+# 5, 15 and 30 min, like any network failure, and fails the step after that.
+EXIT_SOURCES_MISSING = 4
+# Hold the forecast back when tides is missing (the model's most-used input) or
+# when this many of the eight Surfline endpoints are. Added 2026-10-30, after a
+# Cloudflare block emptied 6 of 8 and that forecast was still recorded and
+# published with tide, rating, surf, swell and wind all blank.
+MAX_MISSING_SOURCES = 2
+
+
+def check_forecast_sources(missing):
+    """Exit before anything is saved or published if the conditions are gone.
+
+    Nothing is written on this path, so the forecast record for tomorrow stays
+    absent rather than wrong: save_forecast_record never overwrites, and a bad
+    record would block the good one a retry or rerun produces.
+    """
+    if not missing:
+        return
+    if "tides" in missing or len(missing) > MAX_MISSING_SOURCES:
+        print(f"ERROR: Surfline conditions missing for {len(missing)} of "
+              f"{len(sp.ENDPOINT_PATHS)} sources ({', '.join(missing)}). "
+              f"Not saving or publishing this forecast.")
+        sys.exit(EXIT_SOURCES_MISSING)
+    print(f"  WARNING: forecasting without {', '.join(missing)} "
+          f"(within the {MAX_MISSING_SOURCES}-source allowance).")
+
+
 def main():
     args = parse_args()
     if args.date:
@@ -404,6 +432,7 @@ def main():
     # window costs exactly the same number of requests as asking for two days.
     by_hour = add_tide_residual_feature(
         add_tide_daylight_features(sp.build_predictor_map(days=FORECAST_DAYS + 1)))
+    check_forecast_sources(sp.LAST_MISSING_ENDPOINTS)
     local_tz = pytz.timezone(gc.LOCATION["timezone"])
 
     recal = fit_point_recalibration()

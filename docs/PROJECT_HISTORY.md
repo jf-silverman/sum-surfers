@@ -6864,3 +6864,27 @@ table is rebuilt; `build_training_features.py` writes the column;
 `fit_surfer_count_model.load_and_prepare` adds it to the numeric features;
 `predict_surf_count.add_tide_residual_feature` serves it for every forecast
 hour, used by `plot_daily_prediction.py`.
+
+## 2026-10-30 — A forecast with its conditions missing is now held back
+
+The 2026-10-30 evening run hit two failures at once. The Surfline access token
+had expired (401 on every clip request, so no clips for the day), and
+Cloudflare's bot check returned 403 on 6 of the 8 forecast endpoints through
+all their retries. The forecast step still ran, and it recorded and published
+tomorrow's forecast with tide, rating, surf, swell and wind all blank (13
+missing predictors per hour). Because forecast records are never overwritten,
+that bad record would also have blocked the corrected one. After a new token
+and a rerun (the block had lifted), the bad record was moved aside by hand and
+the forecast remade.
+
+Two changes so it cannot recur:
+
+- `plot_daily_prediction.check_forecast_sources` exits with code 4 before
+  anything is saved or published when `tides` is missing or more than 2 of the
+  8 endpoints are. One or two non-tide gaps are allowed with a warning.
+  `daily_chart.sh` treats exit 4 like a network failure and retries at 5, 15
+  and 30 minutes. If every attempt fails, the step fails and the failure email
+  goes out, and no record is written, so a rerun can still produce one.
+- The forecast response cache is written and reused only when all 8 endpoints
+  returned data. It used to be kept if any one did, so the run's later calls
+  reused the 6-of-8-empty responses instead of asking again.

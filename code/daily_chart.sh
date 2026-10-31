@@ -67,6 +67,10 @@ for delay in "${RETRY_DELAYS_MIN[@]}"; do
         # minutes doing exactly that.
         log "ERROR: plot_daily_prediction.py failed deterministically (exit 3) — not retrying."
         break
+    elif [[ "$rc" -eq 4 ]]; then
+        # Exit 4 = Surfline conditions missing (usually a Cloudflare block);
+        # nothing was saved or published, and a later attempt refetches.
+        log "WARNING: Surfline conditions missing (exit 4) — forecast held back."
     else
         log "WARNING: plot_daily_prediction.py failed (exit $rc, see traceback above)."
     fi

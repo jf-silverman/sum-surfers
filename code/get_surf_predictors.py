@@ -396,9 +396,12 @@ def load_cached_responses(days):
     responses = blob.get("responses")
     if not isinstance(responses, dict) or not responses:
         return None
-    # A cache of nothing but failures is worse than refetching: it would pin a
-    # bad run's emptiness in place for the whole TTL.
-    if not any(responses.get(path) for path in ENDPOINT_PATHS):
+    # A cache with ANY failed endpoint is worse than refetching: it would pin a
+    # bad run's gaps in place for the whole TTL, and the forecast's retries
+    # (daily_chart.sh) would replay them instead of asking again. Tightened
+    # from "all failed" on 2026-10-30, when a cache with 6 of 8 endpoints
+    # empty was reused.
+    if not all(responses.get(path) for path in ENDPOINT_PATHS):
         return None
     return responses
 
@@ -434,6 +437,11 @@ def fetch_endpoint_responses(days):
     return responses
 
 
+# Endpoints that came back empty on the latest build_predictor_map() call, so a
+# caller can refuse to publish a forecast built without them.
+LAST_MISSING_ENDPOINTS = []
+
+
 def build_predictor_map(days=DAYS, use_cache=True):
     """Live (forward-looking) fetch of `days` days starting today — no auth
     token needed/used.
@@ -460,9 +468,11 @@ def build_predictor_map(days=DAYS, use_cache=True):
               f"(0 requests).")
     else:
         responses = fetch_endpoint_responses(days)
-        if any(responses.get(path) for path in ENDPOINT_PATHS):
+        if all(responses.get(path) for path in ENDPOINT_PATHS):
             save_cached_responses(responses, days)
 
+    global LAST_MISSING_ENDPOINTS
+    LAST_MISSING_ENDPOINTS = [path for path in ENDPOINT_PATHS if not responses.get(path)]
     by_hour = merge_into_by_hour({}, **responses)
 
     try:
