@@ -6888,3 +6888,32 @@ Two changes so it cannot recur:
 - The forecast response cache is written and reused only when all 8 endpoints
   returned data. It used to be kept if any one did, so the run's later calls
   reused the 6-of-8-empty responses instead of asking again.
+
+## 2026-10-31 — Three-look hour count: 37% higher, not yet testable as a target
+
+Joel proposed a new hour count: reduce each count set (the hourly clip and the
+two between-hours sets at +18 and +36 min) by the hourly rule (median below 6,
+max from 6), then take the max of the three. Sub-hourly sets exist only from
+2026-10-22, so 108 hours over 9 days have all three
+(`analysis/hour_max_view/test_three_look_target.py`, local).
+
+| current count | hours | current mean | three-look mean | raised | uplift |
+|---|---:|---:|---:|---:|---:|
+| 0 | 44 | 0.00 | 0.43 | 25% | +0.43 |
+| 1–5 | 19 | 2.11 | 5.89 | 53% | +3.79 |
+| 6–14 | 10 | 8.60 | 15.10 | 80% | +6.50 |
+| 15–29 | 16 | 21.12 | 29.62 | 69% | +8.50 |
+| 30+ | 19 | 40.74 | 49.42 | 68% | +8.68 |
+
+Overall 11.46 → 15.69 (×1.37), raised in 49% of hours.
+
+Leave-one-day-out over the 9 days, scored against the three-look count: the
+current model 7.18 MAE, the current model times a fitted ratio 6.47, a model
+trained on the three-look target 6.46 (better on 6 of 9 days). The retrained
+model is no better than a flat scale factor, so on this data the change is a
+level shift, not new shape. This test also cannot say which count is closer
+to the real number of surfers, because each arm is scored against the count it
+was built toward. A max of three noisy looks runs high even when the crowd is
+steady, and a quarter of empty hours gain a surfer, so part of the uplift is
+noise or false positives. Settling it needs hand counts over whole hours, and
+more than 9 days of between-hours sets for a forecast test.
