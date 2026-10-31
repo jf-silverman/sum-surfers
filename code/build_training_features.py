@@ -28,6 +28,7 @@ from datetime import datetime
 
 import pytz
 
+import backfill_tide_residual as btr
 import get_clips as gc
 from pathlib import Path
 
@@ -112,6 +113,9 @@ def daylight_hours_for(date_str, _cache={}):
         _cache[date_str] = (dawn.hour, dusk.hour)
     return _cache[date_str]
 TIDE_FEATURE_COLS = ["good_tide_hours", "good_tide_frac", "good_tide_hours_left"]
+# Non-tidal water level (Kelvin waves), added 2026-10-30: the previous day's
+# mean detrended residual at Monterey, by backfill_tide_residual.prior_dev_mean.
+RESIDUAL_FEATURE_COLS = ["tide_resid_dev_prior_ft"]
 
 
 OUT_HEADER = [
@@ -119,7 +123,7 @@ OUT_HEADER = [
     "surfer_count", "used_multiframe",
     "hour_local", "day_of_week", "is_weekend", "month",
     "weather_simple", "is_night",
-] + PREDICTOR_FEATURE_COLS + OPENMETEO_FEATURE_COLS + TIDE_FEATURE_COLS
+] + PREDICTOR_FEATURE_COLS + OPENMETEO_FEATURE_COLS + TIDE_FEATURE_COLS + RESIDUAL_FEATURE_COLS
 
 
 def parse_args():
@@ -289,6 +293,13 @@ def main():
     with_tide = sum(1 for r in rows_out if r["good_tide_hours"] != "")
     print(f"tide/daylight features attached to {with_tide} of {len(rows_out)} row(s) "
           f"(good tide = under {GOOD_TIDE_MAX_FT} ft, daylight = first light to last light per date)")
+
+    resid_means = btr.daily_dev_means()
+    for r in rows_out:
+        r["tide_resid_dev_prior_ft"] = btr.prior_dev_mean(
+            datetime.strptime(r["date"], "%Y-%m-%d").date(), resid_means)
+    with_resid = sum(1 for r in rows_out if r["tide_resid_dev_prior_ft"] != "")
+    print(f"tide residual (prior day, detrended) attached to {with_resid} of {len(rows_out)} row(s)")
 
     with open(out_csv, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=OUT_HEADER)

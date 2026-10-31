@@ -119,6 +119,7 @@ from sklearn.metrics import mean_absolute_error
 _ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT / "code"))
 from fit_surfer_count_model import load_and_prepare  # noqa: E402
+import backfill_tide_residual as btr  # noqa: E402
 
 RESID_CSV = _ROOT / "data" / "predictor_vars" / "tide_residual.csv"
 TEST_BLOCK = 5
@@ -160,6 +161,11 @@ def main():
     X = X.drop(columns=["const"])
 
     resid, dev = join_residual(df)
+    # The servable form (2026-10-30): the previous day's mean detrended residual,
+    # by the same rule the nightly forecast uses (btr.prior_dev_mean).
+    means = btr.daily_dev_means()
+    prior = np.array([btr.prior_dev_mean(d, means) for d in pd.to_datetime(df["date"]).dt.date], dtype=object)
+    prior = np.array([np.nan if v == "" else v for v in prior], float)
     keep = ~np.isnan(resid) & ~np.isnan(dev)
     # Rows the gauge cannot cover (outages, dates outside the pull) are dropped
     # from EVERY arm, so the baseline is scored on identical data.
@@ -187,6 +193,8 @@ def main():
             Z["tide_residual_ft"] = resid
         elif arm == "dev_only":
             Z["tide_residual_dev_ft"] = dev
+        elif arm == "dev_prior":
+            Z["tide_resid_dev_prior_ft"] = prior
         elif arm.startswith("shuffle"):
             Z["tide_residual_ft"] = rng.permutation(resid)
         elif arm.startswith("shifted"):
@@ -210,7 +218,7 @@ def main():
             Z["tide_ft"] = Z["tide_ft"].to_numpy() + rng.permutation(resid)
         return Z
 
-    arms = (["base", "corrected", "both", "dev_only"]
+    arms = (["base", "corrected", "both", "dev_only", "dev_prior"]
             + [f"shuffle{s}" for s in range(args.seeds)]
             + [f"corrupt{s}" for s in range(args.seeds)]
             + [f"shifted{s}" for s in range(args.seeds)])
@@ -248,7 +256,7 @@ def main():
     sh = np.array([deltas[a] for a in arms if a.startswith("shuffle")])
     print(f"\n  shuffled-residual placebo, {len(sh)} seeds: mean {sh.mean():+.3f}, "
           f"sd {sh.std(ddof=1):.3f}, range {sh.min():+.3f} to {sh.max():+.3f}")
-    for arm in ("both", "dev_only"):
+    for arm in ("both", "dev_only", "dev_prior"):
         print(f"  {arm:10s} {deltas[arm]:+.3f}  ->  "
               f"{int((sh <= deltas[arm]).sum())}/{len(sh)} placebo seeds did as well or better")
 

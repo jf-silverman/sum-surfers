@@ -145,6 +145,15 @@ log "Step 6/10 — Backfilling real observed weather (Open-Meteo)..."
 run_step "Step 6 (Open-Meteo backfill)" "$PYTHON" code/backfill_openmeteo_weather.py
 log "Step 6 done."
 
+# ── Step 6b: Non-tidal tide residual (NOAA, Monterey) ────────────────────────
+# Added 2026-10-30. Feeds tide_resid_dev_prior_ft, the model's Kelvin-wave
+# water-level feature. Re-fetches the last 45 days each run because NOAA's
+# preliminary data gets revised. If it fails, the forecast carries the last
+# stored day forward, the same rule it uses for days 2-7.
+log "Step 6b — Fetching the NOAA tide residual..."
+run_step "Step 6b (tide residual)" "$PYTHON" code/backfill_tide_residual.py
+log "Step 6b done."
+
 # ── Step 7: Rebuild the model's training table ───────────────────────────────
 # Joins predictions (target) with all predictor sources (features). Also
 # manual-only until 2026-09-09 — see Step 6. Rebuilt from scratch each run.

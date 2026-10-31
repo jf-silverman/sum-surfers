@@ -61,7 +61,8 @@ from fit_surfer_count_model import (  # noqa: E402
     load_and_prepare, fit_quantile_model_robust, fit_hurdle_band, split_by_day,
     BAND_LOWER_Q, BAND_UPPER_Q,
 )
-from predict_surf_count import build_feature_row, add_tide_daylight_features, MEAN_KWARGS  # noqa: E402
+from predict_surf_count import (build_feature_row, add_tide_daylight_features,  # noqa: E402
+                                add_tide_residual_feature, MEAN_KWARGS)
 from build_training_features import simplify_weather_condition  # noqa: E402
 from crowd_rating import (  # noqa: E402
     CROWD_LEVELS, RATING_QUANTILE, band_text, crowd_level, level_info, rating_from_quantiles,
@@ -401,7 +402,8 @@ def main():
     # build_predictor_map() call rather than one per chart — these endpoints
     # have been returning intermittent Cloudflare 403s, and asking for a wider
     # window costs exactly the same number of requests as asking for two days.
-    by_hour = add_tide_daylight_features(sp.build_predictor_map(days=FORECAST_DAYS + 1))
+    by_hour = add_tide_residual_feature(
+        add_tide_daylight_features(sp.build_predictor_map(days=FORECAST_DAYS + 1)))
     local_tz = pytz.timezone(gc.LOCATION["timezone"])
 
     recal = fit_point_recalibration()

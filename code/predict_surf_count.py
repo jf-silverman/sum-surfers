@@ -28,6 +28,7 @@ import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import backfill_tide_residual as btr  # noqa: E402
 import get_surf_predictors as sp  # noqa: E402
 from fit_surfer_count_model import (load_and_prepare, fit_quantile_model_robust,  # noqa: E402
                                     BAND_LOWER_Q, BAND_UPPER_Q, BAND_LABEL)
@@ -97,6 +98,20 @@ def add_tide_daylight_features(by_hour):
     return by_hour
 
 
+def add_tide_residual_feature(by_hour):
+    """Attach tide_resid_dev_prior_ft to each live forecast hour.
+
+    NOAA forecasts no non-tidal residual, so every forecast day gets the mean of
+    the latest observed day before it: tonight's run serves today's mean to
+    tomorrow and carries it forward to days 2-7. The same rule builds the
+    training column (build_training_features.py), so train and serve match.
+    """
+    means = btr.daily_dev_means()
+    for hk, preds in by_hour.items():
+        preds["tide_resid_dev_prior_ft"] = btr.prior_dev_mean(hk.date(), means)
+    return by_hour
+
+
 def build_feature_row(target_dt, predictors, numeric_cols, weather_categories, train_mean, train_std, template_columns):
     """Build one row of features matching the training design matrix exactly —
     same cyclical encoding, same weather-category collapsing, same standardization
@@ -145,7 +160,7 @@ def main():
     hours = args.hours.split(",") if args.hours else DEFAULT_HOURS
 
     print(f"Fetching live forecast (today + tomorrow) for Jack's...")
-    by_hour = add_tide_daylight_features(sp.build_predictor_map())
+    by_hour = add_tide_residual_feature(add_tide_daylight_features(sp.build_predictor_map()))
     if not by_hour:
         print("ERROR: no forecast data returned — check network/Surfline API status.")
         return

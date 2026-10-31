@@ -481,6 +481,18 @@ to backfill predictors for existing `predictions.csv` rows. See that
 script's docstring for usage, and `PROJECT_HISTORY.md` for how the
 mechanism was discovered.
 
+**Non-tidal water level (from 2026-10-30).** Surfline's tide is a harmonic
+prediction, astronomy only, so it cannot see a coastally trapped Kelvin wave
+raising the sea a foot or more. `code/backfill_tide_residual.py` fetches the
+residual (observed minus predicted water level) hourly from NOAA's Monterey
+gauge each night and removes its trailing 30-day trend. The model reads one
+number per day from it, `tide_resid_dev_prior_ft`: the mean of that detrended
+residual over the latest observed day before the day being forecast. NOAA does
+not forecast the residual, so tonight's value is used for tomorrow and carried
+forward to days 2-7; training uses the same rule. In backtests it costs +0.19
+in mean miss, almost all in one window at the peak of the October 2026 event,
+and it was added deliberately for a recheck after a few more months.
+
 ## Forecast accuracy and calibration
 
 The forecast model is off by about **7.6 surfers** ([MAE](#term-mae)) on a

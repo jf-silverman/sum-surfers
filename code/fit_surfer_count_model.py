@@ -56,6 +56,11 @@ def load_and_prepare():
         # information that no per-hour column carries — tide_ft says what the
         # tide is now, not how long the good window lasts.
         "good_tide_hours", "good_tide_frac", "good_tide_hours_left",
+        # Added 2026-10-30 (Joel's call, accepting a worse backtest): the
+        # previous day's mean detrended non-tidal residual at Monterey, so the
+        # model can see Kelvin-wave water level that the harmonic tide_ft
+        # cannot. Served nightly by carrying the last observed day forward.
+        "tide_resid_dev_prior_ft",
     ]
     for c in numeric_cols:
         df[c] = pd.to_numeric(df[c], errors="coerce")

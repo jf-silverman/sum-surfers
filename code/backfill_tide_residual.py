@@ -109,6 +109,36 @@ CSV_HEADER = [
 CHUNK_DAYS = {"hourly_height": 365, "water_level": 31, "predictions": 365}
 
 
+MIN_DAY_HOURS = 12           # a day needs this many hours to give a daily mean
+
+
+def daily_dev_means(path=OUT_CSV):
+    """{date: mean residual_dev_ft over that day's hours}, days with enough hours."""
+    by_day = {}
+    if not Path(path).exists():
+        return {}
+    with open(path, newline="") as f:
+        for r in csv.DictReader(f):
+            try:
+                by_day.setdefault(date.fromisoformat(r["date"]), []).append(float(r["residual_dev_ft"]))
+            except (ValueError, KeyError):
+                continue
+    return {d: sum(v) / len(v) for d, v in by_day.items() if len(v) >= MIN_DAY_HOURS}
+
+
+def prior_dev_mean(target, means):
+    """The model feature `tide_resid_dev_prior_ft` for a day being forecast.
+
+    The mean detrended residual of the latest day with data BEFORE `target`.
+    At the evening run that is today for tomorrow's forecast, and still today
+    for days 2-7 (carried forward, since NOAA forecasts no residual). In
+    training, with the full record, it is almost always the day before. Same
+    rule both ways, so the model trains on what it will be served.
+    """
+    earlier = [d for d in means if d < target]
+    return round(means[max(earlier)], 4) if earlier else ""
+
+
 def fetch(product, start, end, station):
     """One CO-OPS request. Returns [(datetime, value, quality_flag), ...].
 

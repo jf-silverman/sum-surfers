@@ -6819,3 +6819,48 @@ That is the case to watch: a year split can either correct last year's level
 or wall off the only Nov–Dec rows. It cannot be scored until Nov–Dec 2026 data
 exists. Nothing adopted; rerun `analysis/forecast_year_term/test_year_term.py`
 (local) once there are a few weeks of November.
+
+## 2026-10-30 — The detrended tide residual goes into the forecast
+
+Joel decided to add the tide residual despite the backtest, to see how it
+behaves through the fall and winter Kelvin-wave pulses, with a recheck in a
+couple of months against the numbers below.
+
+**The form that can be served.** The earlier arms used each hour's own
+residual, which the nightly forecast cannot know: NOAA publishes no residual
+forecast. The added feature is `tide_resid_dev_prior_ft`, the mean detrended
+residual (`residual_dev_ft`, residual minus its trailing 30-day mean) over the
+latest observed day before the day being forecast, needing 12+ hours of data.
+The evening run therefore gives tomorrow today's mean and carries it forward
+to days 2–7, and training uses the same rule (`prior_dev_mean` in
+`code/backfill_tide_residual.py`).
+
+**Baseline for the recheck** (2,117 rows / 159 days, 16 rolling origins,
+5-day test blocks, `analysis/forecast_tide_residual/test_tide_residual.py`):
+
+| arm | MAE | vs base | p | better | placebo seeds as good or better |
+|---|---:|---:|---:|---:|---:|
+| `base` | 7.032 | — | — | — | — |
+| `dev_prior` (added) | 7.220 | +0.188 | 0.517 | 9/16 | 8/8 |
+| `dev_only` (same hour, not servable) | 7.050 | +0.018 | 0.726 | 6/16 | 2/8 |
+| `both` (raw residual column) | 7.133 | +0.101 | 0.322 | 6/16 | 8/8 |
+| `corrected` (tide_ft + residual) | 7.224 | +0.192 | 0.325 | 5/16 | — |
+
+Placebo (shuffled residual column, 8 seeds): mean +0.031, sd 0.029.
+
+**The loss is one window** (`analysis/forecast_tide_residual/residual_windows.py`).
+In 2026-10-09 to 10-13, the peak of the October pulse, the feature ran 0.44–0.59
+ft, at or past the highest value in training (0.49 ft). The residual model
+roughly halved that window's afternoon forecasts (mean 8.2 against 14.6 without
+it, actual 17.5), lifting its MAE from 6.50 to 10.80 (+4.30). On 10-10 at
+4:38 pm it predicted 16.8 for an actual 65. Leaving that window out, the
+other 15 average −0.086 (better in 9 of 15). So the feature mildly helps in
+ordinary weeks and failed badly the first time a pulse went beyond what it had
+seen; the trees learned "high residual means quiet" from a handful of earlier
+days. Watch the next strong pulse for the same pattern.
+
+Wired in: a nightly fetch step (6b) in `local_pipeline.sh` before the training
+table is rebuilt; `build_training_features.py` writes the column;
+`fit_surfer_count_model.load_and_prepare` adds it to the numeric features;
+`predict_surf_count.add_tide_residual_feature` serves it for every forecast
+hour, used by `plot_daily_prediction.py`.
