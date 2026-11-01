@@ -6917,3 +6917,45 @@ was built toward. A max of three noisy looks runs high even when the crowd is
 steady, and a quarter of empty hours gain a surfer, so part of the uplift is
 noise or false positives. Settling it needs hand counts over whole hours, and
 more than 9 days of between-hours sets for a forecast test.
+
+## 2026-11-01 — The evening email shows one three-look count per hour
+
+Following the 2026-10-31 measurement, Joel switched the forecast-vs-actual
+email to one point per hour. Each of the hour's three looks (the hourly clip
+and the between-hours sets at +18 and +36 min) is already reduced by the
+hourly rule; the hour is then their max when most looks are 6 or more.
+Otherwise it is the median of every frame count in the three clips, 27 for a
+full hour (the hourly clip's 7 frames from 0.5 to 4.5 s plus 10 + 10), which
+Joel preferred to a median of three medians (`email_daily_report.hour_counts`).
+An hour with only two looks takes the max only if both are 6+. Over 2026-10-22
+to 10-31 the pooled median changed 3 of 69 quiet hours by one surfer against
+the median of the looks. The chart draws
+one point per hour at the hourly clip's time (the between-hours diamonds are
+gone), the table's "Counted" column holds the combined count with the three
+looks listed beside it, and the email's average miss, bias and in-range count
+use it. On 2026-10-31 it changed 7:56 am from 15 to 26 and 5:50 pm from 11 to
+14, and the day scored 5.2 average miss, bias −4.2, 10 of 12 in range.
+
+Unchanged: the forecast's training target, `forecast_log.csv` and the README's
+accuracy numbers, which all still score the hourly clip alone.
+
+## 2026-11-01 — Correcting the tide only during the Kelvin wave: slightly better, too few windows to tell
+
+Joel asked whether correcting `tide_ft` with the residual only in October,
+rather than everywhere, would help. `analysis/forecast_tide_residual/test_october_tide.py`,
+same 16 rolling origins; the base now includes `tide_resid_dev_prior_ft`.
+
+| arm | rows changed | MAE | vs base | p | Oct-2026 windows (4) |
+|---|---:|---:|---:|---:|---|
+| `base` | — | 7.215 | — | — | 6.489 |
+| Oct 2026, hourly residual (not servable) | 403 | 7.149 | −0.066 | 0.66 | −0.265, better 2/4 |
+| Oct 2026, prior-day mean (servable) | 403 | 7.177 | −0.038 | 0.80 | −0.152, better 2/4 |
+| Oct 2025 + 2026, prior-day mean | 614 | 7.114 | −0.101 | 0.55 | −0.471, better 2/4 |
+| prior-day mean residual > 0.75 ft | 403 (30 days) | 7.177 | −0.038 | 0.80 | −0.152, better 2/4 |
+
+The 0.75 ft gate picked exactly the October 2026 days, so it matches the
+servable October arm. The 12 windows before October are untouched by
+construction, so all the signal sits in 4 windows, 2 better and 2 worse.
+Every arm leans the right way, unlike the whole-record correction (+0.19),
+but nothing here separates from noise. Not adopted; the gated rule is the
+version to retest once a second pulse is in the record.

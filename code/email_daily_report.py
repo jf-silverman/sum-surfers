@@ -85,6 +85,66 @@ def subhourly_counts(target_date):
     return sorted(out)
 
 
+HOUR_CUT = 6  # same threshold as detect_surfers.HYBRID_CUT
+
+
+HOURLY_FRAME_COLS = ["frame_count_t05", "frame_count_1", "frame_count_t15", "frame_count_2",
+                     "frame_count_t35", "frame_count_3", "frame_count_t45"]
+
+
+def frame_counts(target_date):
+    """Every per-frame count behind each look, keyed by the look's time: the
+    hourly clip's seven frames (0.5-4.5 s) and each between-hours set's ten."""
+    out = {}
+    day = (target_date.year, target_date.month, target_date.day)
+    df = pd.read_csv(PREDICTIONS_CSV, float_precision="round_trip")
+    df = df[(df["date"] == target_date.isoformat()) & (df["quality_ok"].astype(str) == "True")]
+    for _, r in df.iterrows():
+        hh, mm = map(int, str(r["time_local"]).split(":")[:2])
+        out[datetime(*day, hh, mm)] = [float(r[c]) for c in HOURLY_FRAME_COLS
+                                       if c in r and pd.notna(r[c])]
+    if SUBHOURLY_CSV.exists():
+        sdf = pd.read_csv(SUBHOURLY_CSV)
+        sdf = sdf[(sdf["date"] == target_date.isoformat())
+                  & (sdf["quality_ok"].astype(str) == "True")]
+        for _, r in sdf.iterrows():
+            hh, mm = map(int, str(r["time_local"]).split(":")[:2])
+            out[datetime(*day, hh, mm)] = [float(r[f"count_f{i:02d}"]) for i in range(10)
+                                           if pd.notna(r.get(f"count_f{i:02d}"))]
+    return out
+
+
+def hour_counts(actuals, subs, frames=None):
+    """One count per hour from its three looks (Joel, 2026-11-01).
+
+    The looks are the hourly clip's count and the between-hours sets after it,
+    before the next hourly clip (normally two, at +18 and +36 min), each already
+    reduced by the hourly rule (median of its frames below 6, max from 6). If
+    most looks are 6+, the hour is the max of the looks, since on a busy,
+    good-surf hour riders leave the frame behind the cliff during sets and the
+    highest look is closest to the lineup. Otherwise it is the median of every
+    frame count behind those looks (27 for a full hour: 7 hourly + 10 + 10),
+    falling back to the median of the looks if the frame counts are missing.
+    Returns [(hourly clip time, count, [looks]), ...]; with no between-hours
+    sets the hourly count passes through unchanged.
+    """
+    frames = frames or {}
+    out = []
+    for i, (when, c) in enumerate(actuals):
+        nxt = actuals[i + 1][0] if i + 1 < len(actuals) else datetime.max
+        after = [(t, v) for t, v in subs if when < t < nxt]
+        if not after:
+            out.append((when, float(c), [c]))
+            continue
+        looks = [c] + [v for _t, v in after]
+        if sum(v >= HOUR_CUT for v in looks) > len(looks) / 2:
+            out.append((when, float(max(looks)), looks))
+            continue
+        pooled = [x for t in [when] + [t for t, _v in after] for x in frames.get(t, [])]
+        out.append((when, float(np.median(pooled if pooled else looks)), looks))
+    return out
+
+
 def subhourly_between(actuals, subs):
     """{index of hourly actual: [sub-hourly counts after it, before the next]}."""
     out = {}
@@ -453,28 +513,16 @@ def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path, tide
                 linewidth=2.5, label="Forecast")
 
     if actuals:
-        ah = [a[0] for a in actuals]
-        av = [a[1] for a in actuals]
         # Coral, not lime: lime is the tide line on the right-hand axis, and two
         # lime lines on one chart is exactly the confusion this chart exists to
         # avoid — the whole point is reading crowd against tide.
-        # With sub-hourly sets, the line runs through every look in time order
-        # (hourly circles and between-hours diamonds alike); the markers say which
-        # is which, and only the circles are scored against the forecast.
-        if subs:
-            line = sorted(list(actuals) + list(subs))
-            ax.plot([p[0] for p in line], [p[1] for p in line], color=pdp.CORAL,
-                    linewidth=2.2, linestyle="-", zorder=4.5)
-        ax.plot(ah, av, color=pdp.CORAL, linewidth=2.2, linestyle="none" if subs else "-", marker="o",
-                markersize=7, markeredgecolor="white", markeredgewidth=0.8,
-                label="Actual detected (hourly)", zorder=5)
-    if subs:
-        # Diamonds off the line, so the hourly counts the forecast is scored on
-        # stay the main line and these read as extra looks between them. Same
-        # count rule as the hourly points (median under 6, max from 6).
-        ax.plot([s[0] for s in subs], [s[1] for s in subs], linestyle="none", marker="D",
-                markersize=6, color=pdp.CORAL, markeredgecolor="white", markeredgewidth=0.8,
-                label="Between hours (10 frames: median under 6, max from 6)", zorder=5)
+        # One point per hour at the hourly clip's time. With between-hours sets
+        # it is the hour's three-look count (see hour_counts).
+        label = ("Actual detected (3 looks per hour: max when most are 6+, else median of all frames)"
+                 if subs else "Actual detected")
+        ax.plot([a[0] for a in actuals], [a[1] for a in actuals], color=pdp.CORAL,
+                linewidth=2.2, marker="o", markersize=7, markeredgecolor="white",
+                markeredgewidth=0.8, label=label, zorder=5)
 
     if tide:
         # Second axis on the right, matching the daily chart's convention so the
@@ -490,7 +538,7 @@ def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path, tide
         for spine in ax2.spines.values():
             spine.set_color(pdp.GRID_COLOR)
 
-    ax.set_title(f"Forecast vs. actual — {target_date.strftime('%A, %B %d, %Y')}",
+    fig.suptitle(f"Forecast vs. actual — {target_date.strftime('%A, %B %d, %Y')}",
                  color=pdp.TEXT_COLOR)
     ax.set_xlabel("Time", color=pdp.TEXT_COLOR)
     ax.set_ylabel("Surfer count", color=pdp.TEXT_COLOR)
@@ -505,8 +553,9 @@ def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path, tide
         h2, l2 = ax2.get_legend_handles_labels()
         handles += h2
         labels += l2
-    legend = ax.legend(handles, labels, loc="upper left", facecolor=pdp.AXES_BG,
-                       edgecolor=pdp.GRID_COLOR)
+    # Above the plot, not on it, so it never covers the tide line or the counts.
+    legend = ax.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 1.02),
+                       ncol=2, facecolor=pdp.AXES_BG, edgecolor=pdp.GRID_COLOR)
     for text in legend.get_texts():
         text.set_color(pdp.TEXT_COLOR)
 
@@ -555,7 +604,7 @@ def summarize(forecast_rows, actuals):
     return "\n".join(lines), stats
 
 
-def hourly_table_html(forecast_rows, actuals, subs=None):
+def hourly_table_html(forecast_rows, actuals, subs=None, looks=None):
     """The hour-by-hour comparison as a real HTML table.
 
     The plain-text version of this is column-aligned with spaces, which only
@@ -574,16 +623,16 @@ def hourly_table_html(forecast_rows, actuals, subs=None):
                                    (f"{forecast_rows[0]['band_label']} range"
                                     if forecast_rows else "range", "right"),
                                    ("", "left")]
-                      + ([("Between hours", "left")] if subs else []))
+                      + ([("Looks (hourly, +18, +36 min)", "left")] if subs else []))
             + "</tr>")
 
     by_hour = {r["hour"].hour: r for r in forecast_rows} if forecast_rows else {}
-    between = subhourly_between(actuals, subs or [])
+    looks = looks or []
     rows = []
     for i, (when, count) in enumerate(actuals):
         sub_cell = ""
         if subs:
-            sub_txt = ", ".join(f"{c:g}" for c in between[i]) or "&ndash;"
+            sub_txt = ", ".join(f"{c:g}" for c in looks[i]) or "&ndash;"
             sub_cell = (f'<td style="padding:5px 10px;border-bottom:1px solid #e8e8e8;'
                         f'font-family:system-ui,sans-serif;font-size:13px;color:#666;'
                         f'background:{"#fafafa" if i % 2 else "#ffffff"};">{sub_txt}</td>')
@@ -637,6 +686,12 @@ def main():
     actuals = actual_counts(target_date)
     subs = subhourly_counts(target_date)
     print(f"  {len(actuals)} counted hours, {len(subs)} sub-hourly sets")
+    # From here on, each hour's actual is its three-look count, so the chart,
+    # the table and the day's accuracy numbers all read the same value.
+    # forecast_log.csv (and the README's accuracy) still score the hourly clip.
+    combined = hour_counts(actuals, subs, frame_counts(target_date))
+    actuals = [(w, c) for w, c, _l in combined]
+    looks = [l for _w, _c, l in combined]
 
     recorded = load_recorded_forecast(target_date)
     forecast_note = ""
@@ -754,12 +809,13 @@ def main():
            f'{band_note.strip()}</p>' if band_note else "")
         + (f'<p style="margin:0 0 14px 0;color:#444;">{tide_note.strip()}</p>' if tide_note else "")
         + f'<h3 style="font-size:14px;margin:18px 0 6px 0;">Hour by hour</h3>'
-        + hourly_table_html(forecast_rows, actuals, subs)
-        + (f'<p style="margin:6px 0 0 0;color:#666;font-size:12px;">Between hours: two more '
-           f'counts each hour, about 18 and 36 min after the hourly clip, from ten frames across '
-           f'a minute and counted like the hourly clips: the median when it is under 6, '
-           f'otherwise the highest frame. Not yet checked against hand counts, and not in the '
-           f'accuracy numbers above.</p>' if subs else "")
+        + hourly_table_html(forecast_rows, actuals, subs, looks)
+        + (f'<p style="margin:6px 0 0 0;color:#666;font-size:12px;">Counted: each hour has '
+           f'three looks, the hourly clip and two more about 18 and 36 min later, each counted '
+           f'as the median of its frames under 6, otherwise the highest frame. The hour is the '
+           f'highest look when most looks are 6 or more, otherwise the median of every frame '
+           f'count in the three clips (27 frames). The accuracy '
+           f'numbers above use this count; not yet checked against hand counts.</p>' if subs else "")
         + f'<h3 style="font-size:14px;margin:20px 0 6px 0;">Attached</h3>'
         + '<ul style="margin:0;padding-left:20px;color:#444;font-size:13px;">'
         + f'<li>Forecast vs. actual chart for {target_date.strftime("%b %d")}, tide on the right axis</li>'

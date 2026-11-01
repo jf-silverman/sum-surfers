@@ -79,10 +79,15 @@ over five: on the first five days (124 sets) the max of the ten ran 8% above
 the hourly counts on either side, against 1.5% below for the median. Neither
 is checked against hand counts yet.
 
-The evening forecast-vs-actual email plots these as diamonds, with the actual
-line running through hourly and between-hours points alike, and lists them in
-its table. The forecast, its training and the email's accuracy numbers still
-use only the hourly counts.
+Since 2026-11-01 the evening forecast-vs-actual email combines each hour's
+three looks (the hourly count and the two sets after it) into one point at the
+hourly clip's time: their max when most of them are 6 or more, otherwise the
+median of every frame count in the three clips (27 for a full hour). That count is what the email's chart, table and day's accuracy numbers
+use, and the table lists the three looks beside it. Over the first nine days
+it ran 37% above the hourly count alone (+8.5 surfers in hours of 15+); part of
+that is a max of three noisy looks running high, and it is not yet checked
+against hand counts. The forecast, its training, `forecast_log.csv` and the
+README's accuracy numbers still use only the hourly counts.
 
 ## Multi-frame count averaging
 
