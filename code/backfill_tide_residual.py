@@ -112,15 +112,21 @@ CHUNK_DAYS = {"hourly_height": 365, "water_level": 31, "predictions": 365}
 MIN_DAY_HOURS = 12           # a day needs this many hours to give a daily mean
 
 
-def daily_dev_means(path=OUT_CSV):
-    """{date: mean residual_dev_ft over that day's hours}, days with enough hours."""
+# The model's tide_ft gets the prior day's mean raw residual added only when
+# that mean is above this (a Kelvin-wave pulse; added 2026-11-01). At 0.75 ft it
+# picked exactly the October 2026 event days and nothing before them.
+TIDE_CORRECTION_GATE_FT = 0.75
+
+
+def daily_dev_means(path=OUT_CSV, col="residual_dev_ft"):
+    """{date: mean of `col` over that day's hours}, days with enough hours."""
     by_day = {}
     if not Path(path).exists():
         return {}
     with open(path, newline="") as f:
         for r in csv.DictReader(f):
             try:
-                by_day.setdefault(date.fromisoformat(r["date"]), []).append(float(r["residual_dev_ft"]))
+                by_day.setdefault(date.fromisoformat(r["date"]), []).append(float(r[col]))
             except (ValueError, KeyError):
                 continue
     return {d: sum(v) / len(v) for d, v in by_day.items() if len(v) >= MIN_DAY_HOURS}
@@ -137,6 +143,15 @@ def prior_dev_mean(target, means):
     """
     earlier = [d for d in means if d < target]
     return round(means[max(earlier)], 4) if earlier else ""
+
+
+def tide_correction(target, raw_means):
+    """Feet to add to the model's tide_ft on `target`: the prior observed day's
+    mean raw residual (prior_dev_mean's rule) when it exceeds
+    TIDE_CORRECTION_GATE_FT, else 0. Feeds tide_correction_ft; the charts and
+    the good_tide_* features keep the harmonic tide people actually read."""
+    v = prior_dev_mean(target, raw_means)
+    return round(v, 4) if v != "" and v > TIDE_CORRECTION_GATE_FT else 0.0
 
 
 def fetch(product, start, end, station):

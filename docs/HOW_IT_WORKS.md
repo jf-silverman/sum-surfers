@@ -498,6 +498,17 @@ forward to days 2-7; training uses the same rule. In backtests it costs +0.19
 in mean miss, almost all in one window at the peak of the October 2026 event,
 and it was added deliberately for a recheck after a few more months.
 
+**Kelvin-wave tide correction (from 2026-11-01).** When the previous observed
+day's mean residual (raw, not detrended) is above 0.75 ft, the model's tide
+input becomes Surfline's tide plus that residual; otherwise it is Surfline's
+tide unchanged (`tide_correction_ft`, applied in `load_and_prepare` and
+`build_feature_row`). In the record this is exactly the October 2026 event.
+The charts, the forecast records and the good-tide features keep Surfline's
+tide, the number people read. In backtests it was −0.04 in mean miss, not
+significant, with only four October windows to judge by; it is up for a recheck
+in early December. It cuts forecasts sharply while it is on: on 2026-11-02,
+with +1.44 ft added, the 11 am forecast was 16 against 25 without it.
+
 ## Forecast accuracy and calibration
 
 The forecast model is off by about **7.6 surfers** ([MAE](#term-mae)) on a

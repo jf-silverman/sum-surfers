@@ -115,7 +115,7 @@ def daylight_hours_for(date_str, _cache={}):
 TIDE_FEATURE_COLS = ["good_tide_hours", "good_tide_frac", "good_tide_hours_left"]
 # Non-tidal water level (Kelvin waves), added 2026-10-30: the previous day's
 # mean detrended residual at Monterey, by backfill_tide_residual.prior_dev_mean.
-RESIDUAL_FEATURE_COLS = ["tide_resid_dev_prior_ft"]
+RESIDUAL_FEATURE_COLS = ["tide_resid_dev_prior_ft", "tide_correction_ft"]
 
 
 OUT_HEADER = [
@@ -295,9 +295,11 @@ def main():
           f"(good tide = under {GOOD_TIDE_MAX_FT} ft, daylight = first light to last light per date)")
 
     resid_means = btr.daily_dev_means()
+    raw_means = btr.daily_dev_means(col="residual_ft")
     for r in rows_out:
-        r["tide_resid_dev_prior_ft"] = btr.prior_dev_mean(
-            datetime.strptime(r["date"], "%Y-%m-%d").date(), resid_means)
+        d = datetime.strptime(r["date"], "%Y-%m-%d").date()
+        r["tide_resid_dev_prior_ft"] = btr.prior_dev_mean(d, resid_means)
+        r["tide_correction_ft"] = btr.tide_correction(d, raw_means)
     with_resid = sum(1 for r in rows_out if r["tide_resid_dev_prior_ft"] != "")
     print(f"tide residual (prior day, detrended) attached to {with_resid} of {len(rows_out)} row(s)")
 

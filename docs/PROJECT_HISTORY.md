@@ -6959,3 +6959,27 @@ construction, so all the signal sits in 4 windows, 2 better and 2 worse.
 Every arm leans the right way, unlike the whole-record correction (+0.19),
 but nothing here separates from noise. Not adopted; the gated rule is the
 version to retest once a second pulse is in the record.
+
+## 2026-11-01 — Kelvin-wave tide correction adopted behind a 0.75 ft gate
+
+Joel adopted the gated correction from the test above, for a recheck at the
+start of December. When the previous observed day's mean raw residual at
+Monterey exceeds 0.75 ft (`backfill_tide_residual.TIDE_CORRECTION_GATE_FT`),
+the model's `tide_ft` input is the harmonic tide plus that mean; otherwise it
+is unchanged. The value is a training-table column, `tide_correction_ft`
+(`tide_correction`, same prior-day rule as the residual feature), added to
+`tide_ft` in `fit_surfer_count_model.load_and_prepare` and in
+`predict_surf_count.build_feature_row`. It changed 415 training rows on 31
+days, 2026-10-01 to 10-31, by +1.06 ft on average. Charts, forecast records
+and the `good_tide_*` features keep the harmonic tide.
+
+Backtest baseline for the recheck (from the entry above): −0.038 MAE overall
+(p 0.80), −0.152 on the four October 2026 windows (better 2 of 4).
+
+The effect while it is on is large. For 2026-11-02, with +1.44 ft added, the
+mean-model forecast from 7 am to 6 pm was 0.3, 0.6, 2.1, 11.8, 16.4, 8.4, 1.9,
+1.0, 0.4, 0.3, 0.3, 0.6 against 1.4, 4.0, 9.9, 18.6, 24.9, 13.5, 10.3, 5.3,
+3.7, 2.0, 2.1, 1.8 without it. If the behavioural explanation from 2026-10-15
+holds (surfers follow the Surfline tide chart), these days will under-forecast,
+and the December check should compare the gated days against the forecast
+without the correction.

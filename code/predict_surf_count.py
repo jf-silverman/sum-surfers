@@ -107,8 +107,10 @@ def add_tide_residual_feature(by_hour):
     training column (build_training_features.py), so train and serve match.
     """
     means = btr.daily_dev_means()
+    raw_means = btr.daily_dev_means(col="residual_ft")
     for hk, preds in by_hour.items():
         preds["tide_resid_dev_prior_ft"] = btr.prior_dev_mean(hk.date(), means)
+        preds["tide_correction_ft"] = btr.tide_correction(hk.date(), raw_means)
     return by_hour
 
 
@@ -121,6 +123,8 @@ def build_feature_row(target_dt, predictors, numeric_cols, weather_categories, t
     for c in numeric_cols:
         val = predictors.get(c)
         row[c] = float(val) if val not in (None, "") else np.nan
+    # Same Kelvin-wave correction as load_and_prepare applies in training.
+    row["tide_ft"] = row.get("tide_ft", np.nan) + float(predictors.get("tide_correction_ft") or 0)
 
     row["hour_sin"] = np.sin(2 * np.pi * target_dt.hour / 24)
     row["hour_cos"] = np.cos(2 * np.pi * target_dt.hour / 24)

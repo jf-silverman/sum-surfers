@@ -65,6 +65,14 @@ def load_and_prepare():
     for c in numeric_cols:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
+    # Kelvin-wave tide correction (2026-11-01): on days after one whose mean
+    # non-tidal residual topped backfill_tide_residual.TIDE_CORRECTION_GATE_FT,
+    # the model sees tide_ft plus that residual; on every other day the
+    # harmonic tide unchanged. predict_surf_count.build_feature_row applies
+    # the same correction when serving.
+    if "tide_correction_ft" in df.columns:
+        df["tide_ft"] = df["tide_ft"] + pd.to_numeric(df["tide_correction_ft"], errors="coerce").fillna(0)
+
     before = len(df)
     df = df.dropna(subset=numeric_cols + ["surfer_count"]).reset_index(drop=True)
     print(f"Dropped {before - len(df)} row(s) with missing numeric features ({len(df)} remain)")
