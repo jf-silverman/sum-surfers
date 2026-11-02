@@ -201,12 +201,28 @@ def parse_args():
     return p.parse_args()
 
 
-def cached_models_are_usable(cache, n_rows, feature_names):
+def training_fingerprint(X, y, n_rows):
+    """Hash of the first n_rows of the training data (features and target).
+
+    The cache was fitted on the rows that existed then; if any of THOSE values
+    have since changed, the cache describes different data. Added 2026-11-02:
+    the Kelvin-wave tide correction rewrote October's tide_ft without changing
+    the row count or the columns, and the cache kept serving a fit that had
+    never seen the correction while the forecast row had it applied.
+    """
+    n = min(n_rows, len(X))
+    data = pd.concat([X.iloc[:n].reset_index(drop=True),
+                      y.iloc[:n].reset_index(drop=True).rename("_target")], axis=1)
+    return str(int(pd.util.hash_pandas_object(data, index=False).sum()))
+
+
+def cached_models_are_usable(cache, n_rows, feature_names, X=None, y=None):
     """Whether a cached fit can still be used for today's chart.
 
     Refuses a cache whose feature columns differ from the current ones: a
     silently mismatched feature order would produce plausible-looking nonsense
-    rather than an error.
+    rather than an error. Also refuses one whose training rows have changed
+    since the fit (training_fingerprint).
     """
     if cache is None:
         return False, "no cache yet"
@@ -215,6 +231,8 @@ def cached_models_are_usable(cache, n_rows, feature_names):
                        f"this build fits version {MODEL_CACHE_VERSION}")
     if list(cache.get("feature_names", [])) != list(feature_names):
         return False, "feature columns changed"
+    if X is not None and cache.get("data_hash") != training_fingerprint(X, y, cache.get("n_rows", 0)):
+        return False, "training data changed since the fit"
     age_days = (datetime.now() - datetime.fromisoformat(cache["fitted_at"])).days
     if age_days >= REFIT_AFTER_DAYS:
         return False, f"cache is {age_days} days old"
@@ -370,7 +388,7 @@ def main():
     X_std[numeric_cols] = (X_std[numeric_cols] - train_mean) / train_std
 
     cache = None if (args.no_cache or args.refit) else load_model_cache()
-    usable, why = cached_models_are_usable(cache, len(X_std), X_std.columns)
+    usable, why = cached_models_are_usable(cache, len(X_std), X_std.columns, X, y)
     if usable:
         print(f"  Reusing the cached forecast models ({why}). "
               f"Pass --refit to force a new fit.")
@@ -419,6 +437,7 @@ def main():
                               "top_predictors": top_predictors,
                               "feature_names": list(X_std.columns),
                               "n_rows": trained_rows,
+                              "data_hash": training_fingerprint(X, y, trained_rows),
                               "fitted_at": fitted_at.isoformat(timespec="seconds")})
 
     degenerate_levels = [lv for lv, m in quantile_models.items() if getattr(m, "degenerate", False)]
@@ -502,6 +521,7 @@ def main():
                     recal_a=recal["a"], recal_b=recal["b"],
                     weather_simple=weather_simple, is_night=is_night,
                     tide_ft=tide_ft, in_training_range=in_training_range,
+                    tide_correction_ft=float(predictors.get("tide_correction_ft") or 0),
                     predictor_values=predictor_values,
                     missing_predictors=missing,
                     crowd_level=level, crowd_level_value=level_value,
@@ -1129,6 +1149,14 @@ GOOD_TIDE_RING_WIDTH = 2.6
 GOOD_TIDE_MAX_FT = 3.0          # what counts as a good tide for this highlight
 GOOD_TIDE_MIN_FRAC = 0.5        # a cell is highlighted above this share of the hour
 
+# YELLOW replaces the green ring when the water stays under GOOD_TIDE_MAX_FT for
+# most of the hour even after adding a running Kelvin-wave pulse (Joel,
+# 2026-11-02). The pulse is the model's own tide correction (tide_correction_ft,
+# on only when the previous day's non-tidal residual topped 0.75 ft), so yellow
+# appears only while a pulse is on; then green means "low on the Surfline tide
+# chart, but the real water is higher". With no pulse, green as before.
+KELVIN_LOW_RING = "#ffd23f"
+
 # A second, thin PURPLE line just inside the green one marks a good-tide hour
 # whose Surfline rating is also fair or better: low tide AND decent surf. It
 # sits inside the green ring rather than replacing it so the tide reading is
@@ -1141,7 +1169,7 @@ GOOD_SURF_MIN_RATING = 3        # Surfline: 1 Poor, 2 Poor to fair, 3 Fair, 4 Fa
 GOOD_SURF_INSET = 0.07
 
 
-def low_tide_fraction(records):
+def low_tide_fraction(records, with_correction=False):
     """{hour: share of that hour spent under GOOD_TIDE_MAX_FT}.
 
     Predictors give one tide reading per hour, but a cell covers the whole hour,
@@ -1154,7 +1182,9 @@ def low_tide_fraction(records):
     The final hour of a day has no following reading, so it falls back to its own
     value: all or nothing.
     """
-    by_hour = {r["hour"].hour: r.get("tide_ft") for r in records}
+    by_hour = {r["hour"].hour: (None if r.get("tide_ft") is None else
+                                r["tide_ft"] + (r.get("tide_correction_ft", 0) if with_correction else 0))
+               for r in records}
     hours = sorted(by_hour)
     out = {}
     for i, h in enumerate(hours):
@@ -1207,10 +1237,12 @@ def generate_week_chart(made_date, day_records, n_train_rows):
     ax = fig.add_subplot(gs[0], facecolor=AXES_BG)
     ax_table = fig.add_subplot(gs[1], facecolor=AXES_BG)
 
-    flagged = good_tide_cells = good_surf_cells = 0
+    flagged = good_tide_cells = good_surf_cells = kelvin_low_cells = 0
     for row_i, (day, records) in enumerate(day_records):
         by_hour_num = {r["hour"].hour: r for r in records}
         low_frac = low_tide_fraction(records)
+        pulse_on = any(r.get("tide_correction_ft", 0) > 0 for r in records)
+        low_frac_kelvin = low_tide_fraction(records, with_correction=True) if pulse_on else {}
         for col_i, hour in enumerate(hour_cols):
             r = by_hour_num.get(hour)
             if r is None:
@@ -1219,11 +1251,17 @@ def generate_week_chart(made_date, day_records, n_train_rows):
                 continue
             level = r["crowd_level"]
             good_tide = low_frac.get(hour, 0.0) > GOOD_TIDE_MIN_FRAC
+            kelvin_low = low_frac_kelvin.get(hour, 0.0) > GOOD_TIDE_MIN_FRAC
+            # A pulse only adds water, so a yellow hour is always low on the
+            # Surfline tide too; it still counts as a good-tide hour below.
+            good_tide = good_tide or kelvin_low
             if good_tide:
                 good_tide_cells += 1
+            kelvin_low_cells += int(kelvin_low)
+            ring = KELVIN_LOW_RING if kelvin_low else GOOD_TIDE_RING
             ax.add_patch(plt.Rectangle((col_i + 0.03, row_i + 0.05), 0.94, 0.90,
                                        facecolor=CROWD_COLORS[level],
-                                       edgecolor=GOOD_TIDE_RING if good_tide else AXES_BG,
+                                       edgecolor=ring if good_tide else AXES_BG,
                                        linewidth=GOOD_TIDE_RING_WIDTH if good_tide else 1.5,
                                        zorder=3 if good_tide else 2))
             rating = r.get("rating_value")
@@ -1265,14 +1303,16 @@ def generate_week_chart(made_date, day_records, n_train_rows):
                      label=f"{b['level']} {b['name']} {band_text(b['level'], units=False)}")
                for b in CROWD_LEVELS]
     handles.append(Patch(facecolor=CROWD_COLORS[3], edgecolor=GOOD_TIDE_RING, linewidth=2.2,
-                         label=f"green outline = mostly under {GOOD_TIDE_MAX_FT:.0f} ft tide"))
+                         label=f"green outline = Surfline tide mostly under {GOOD_TIDE_MAX_FT:.0f} ft"))
+    handles.append(Patch(facecolor=CROWD_COLORS[3], edgecolor=KELVIN_LOW_RING, linewidth=2.2,
+                         label=f"yellow outline = under {GOOD_TIDE_MAX_FT:.0f} ft even with the Kelvin wave"))
     handles.append(Patch(facecolor=CROWD_COLORS[3], edgecolor=GOOD_SURF_RING,
                          linewidth=GOOD_SURF_RING_WIDTH,
                          label="purple inner outline = low tide and surf rated fair or better"))
     handles.append(Patch(facecolor="none", hatch="xx", edgecolor=CORAL,
                          label="lower confidence (see footer)"))
     legend = ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.11),
-                       ncol=4, fontsize=8, facecolor=AXES_BG, edgecolor=GRID_COLOR)
+                       ncol=5, fontsize=8, facecolor=AXES_BG, edgecolor=GRID_COLOR)
     for text in legend.get_texts():
         text.set_color(TEXT_COLOR)
 
@@ -1316,6 +1356,10 @@ def generate_week_chart(made_date, day_records, n_train_rows):
         notes.append(f"{good_tide_cells} hour(s) are outlined in green: more than half the hour "
                      f"sits under {GOOD_TIDE_MAX_FT:.0f} ft of tide, which is when this spot is "
                      f"busiest. The fill still reads the crowd level")
+    if kelvin_low_cells:
+        notes.append(f"{kelvin_low_cells} of those are outlined in yellow instead: the water "
+                     f"stays under {GOOD_TIDE_MAX_FT:.0f} ft for most of the hour even with "
+                     f"the Kelvin wave's extra water added")
     if good_surf_cells:
         notes.append(f"{good_surf_cells} of those also have a purple inner outline: "
                      f"Surfline rates the surf fair or better that hour")

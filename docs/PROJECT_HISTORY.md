@@ -6983,3 +6983,26 @@ mean-model forecast from 7 am to 6 pm was 0.3, 0.6, 2.1, 11.8, 16.4, 8.4, 1.9,
 holds (surfers follow the Surfline tide chart), these days will under-forecast,
 and the December check should compare the gated days against the forecast
 without the correction.
+
+## 2026-11-02 — Week chart marks Kelvin-wave low tide in yellow; model cache now checks its data
+
+**Yellow outline.** On the week chart, an hour that stays under 3 ft for most
+of the hour even with the running Kelvin-wave pulse added (Surfline tide plus
+`tide_correction_ft`) is outlined in yellow instead of green. Green keeps its
+meaning, Surfline's tide mostly under 3 ft, so while a pulse is on green now
+means "low on the chart, but the real water is higher". A cell carries one
+outline, never both. The pulse term is the model's own gated correction, so
+yellow appears only while the 0.75 ft gate is on; with no pulse the chart is
+as before. The purple inner outline still marks any outlined hour that
+Surfline rates fair or better. The legend gained a yellow entry and moved to
+two rows. In the first preview (Tue 3 to Mon 9 Nov, +1.44 ft carried forward),
+26 of 42 outlined hours were yellow.
+
+**Cache defect.** The forecast's model cache was reused while the row count and
+feature columns were unchanged. The tide correction rewrote October's `tide_ft`
+without changing either, so the 2026-11-01 evening run served models fitted
+before the correction while adding +1.44 ft to the forecast rows: the
+forecast for 2026-11-02 mixed an uncorrected fit with corrected inputs. The
+cache now stores a hash of the training rows it was fitted on
+(`training_fingerprint`) and refits when they change. Treat the 11-02 forecast
+as unrepresentative of the correction in the December check.

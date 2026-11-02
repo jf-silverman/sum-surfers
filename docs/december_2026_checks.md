@@ -31,7 +31,8 @@ Surfline tide plus that residual (`tide_correction_ft`).
   *(local)*, adding November. Also score the gated days in `forecast_log.csv`
   against a rerun of the same days without the correction, and check whether
   the gate was on at all in November (`tide_correction_ft > 0` in
-  `data/training_features.csv`).
+  `data/training_features.csv`). Leave out the 2026-11-02 forecast: a cache
+  defect paired a fit made before the correction with corrected inputs.
 
 ### 2. Detrended residual feature (`tide_resid_dev_prior_ft`)
 
