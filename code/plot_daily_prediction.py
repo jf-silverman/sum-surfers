@@ -523,6 +523,7 @@ def main():
                     tide_ft=tide_ft, in_training_range=in_training_range,
                     tide_correction_ft=float(predictors.get("tide_correction_ft") or 0),
                     predictor_values=predictor_values,
+                    raw_inputs=dict(predictors),
                     missing_predictors=missing,
                     crowd_level=level, crowd_level_value=level_value,
                     crowd_level_low=crowd_level(quantiles[FAN_LEVELS[0]]),
@@ -1008,6 +1009,16 @@ def forecast_row(target_date, r):
         # this hour had no value for when it is not.
         "n_missing_predictors": len(r["missing_predictors"]),
         "missing_predictors": ";".join(r["missing_predictors"]),
+        # Every input this hour was built from, unscaled and as received
+        # (Surfline and Open-Meteo values, wind and swell direction, the raw
+        # weather condition, the derived tide features, the residual and the
+        # tide correction), so any forecast can be rebuilt exactly later. The
+        # pred_* columns in the week record are the scaled numeric subset only;
+        # rebuilding the 2026-11-02 forecast found directions and the raw
+        # weather string missing. Added 2026-11-02.
+        **{f"raw_{k}": (round(v, 4) if isinstance(v, float) else v)
+           for k, v in sorted((r.get("raw_inputs") or {}).items())
+           if v is None or isinstance(v, (int, float, str, bool))},
     }
 
 

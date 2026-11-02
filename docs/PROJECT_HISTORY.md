@@ -7023,5 +7023,15 @@ the morning's Surfline fetch, the one input newer than the original.
 The midday hours came back several surfers higher: 9 am 0.7 → 7.2, 10 am
 2.4 → 9.1, 12 pm 4.7 → 9.8, 1 pm 1.8 → 7.4; early morning and afternoon stay
 at 0. The original is not kept in the repo; `week_2026-11-01.csv` still holds
-the week chart's version of 11-02 as published, and the December check
-should leave 11-02 out either way.
+the week chart's version of 11-02 as published. Joel judged the redo fit for
+the December tide-correction review.
+
+## 2026-11-02 — Forecast records now save every raw input
+
+Rebuilding the 11-02 forecast showed the records were incomplete: the week
+record kept only the 21 numeric model inputs, standardized (`pred_*`), and the
+day record none. Wind and swell direction, which the model takes as sin/cos
+pairs, the raw Surfline weather condition and the tide correction were never
+written. Both records (`forecast_<date>.csv` and `week_<date>.csv`) now carry
+a `raw_<name>` column for every input the hour was built from, unscaled and
+as received, so a forecast can be rebuilt exactly.
