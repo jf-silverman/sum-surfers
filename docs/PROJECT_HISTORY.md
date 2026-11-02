@@ -7006,3 +7006,22 @@ forecast for 2026-11-02 mixed an uncorrected fit with corrected inputs. The
 cache now stores a hash of the training rows it was fitted on
 (`training_fingerprint`) and refits when they change. Treat the 11-02 forecast
 as unrepresentative of the correction in the December check.
+
+## 2026-11-02 — The 11-02 forecast redone without the cache defect
+
+At Joel's request the day-ahead forecast for 2026-11-02 was remade as of the
+evening of 11-01 and replaced `data/forecasts/forecast_2026-11-02.csv`; its
+`forecast_made_at` (2026-11-02T08:55) records when the redo ran. Nothing from
+11-02 went in. The training table was unchanged since 20:58 on 11-01 (2,130
+usable rows), the model was the corrected-data fit, and the inputs were the
+predictor values recorded in last night's `week_2026-11-01.csv` with the
+standardization undone, the harmonic tide as recorded, and last night's
++1.381 ft correction (the residual has since been revised to +1.444 ft and
+was not used). Wind and swell direction were not recorded, so they came from
+the morning's Surfline fetch, the one input newer than the original.
+
+The midday hours came back several surfers higher: 9 am 0.7 → 7.2, 10 am
+2.4 → 9.1, 12 pm 4.7 → 9.8, 1 pm 1.8 → 7.4; early morning and afternoon stay
+at 0. The original is not kept in the repo; `week_2026-11-01.csv` still holds
+the week chart's version of 11-02 as published, and the December check
+should leave 11-02 out either way.
