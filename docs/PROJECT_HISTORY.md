@@ -7158,3 +7158,28 @@ a clip is made of people who chose to paddle out earlier. With clips a median
 hour, which is what production already uses, and is also exactly what the
 on-the-hour forecast serves. The 30-minute arm's −0.096 is not significant.
 Nothing changed; the item is off the December list.
+
+## 2026-11-03 — A rainy morning passes the gate; sectioned blur shows it, the absolute threshold does not
+
+Rain on the lens blurred the cam from about 8:30 am. Seven clips between 8:23
+and 10:29 were downloaded to a scratch folder (not the pipeline's, so the
+night's schedule was untouched) and run through the gate: six passed, and the
+one failure, 9:08, was for darkness (brightness 70.1 under heavy overcast, the
+B04 pattern), not blur. Blur scores fell from about 400 at 8:23 to about 95 by
+10:00, still about seven times the 12.7 fog threshold: rain leaves wave lips
+and drop outlines where fog removes detail everywhere.
+
+Joel asked for the blur test on equal sections. On 4 and 8 sections, no
+section fails the absolute threshold either (lowest 19). Against the same
+section of clear 2026-11-02 frames, the rain is clear: from 9:26 on, 6 to 8
+of 8 sections fall below 25% of clear-day sharpness. It misses the local
+damage at 8:50 (a raindrop and glare) and 9:08, and flags 8:23's far right,
+where the clear-day reference was full of sun glint, so the reference depends
+on the day. Logged as a candidate rain check, not adopted.
+
+The day's hourly frames from 8:30 to 10:45 are held out of training until
+Joel reviews them (`excluded_frames.csv`, reason `rain_pending_review`),
+under both possible clip schedules for the day (8:41/9:35/10:29 or
+8:50/9:44/10:38, depending on the first-light time Surfline returns). The
+exclusion keeps them out of `training_features.csv` only; the night's chart,
+email and forecast log still show their counts.
