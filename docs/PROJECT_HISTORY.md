@@ -7127,3 +7127,34 @@ kind and script and the time span. Tests: `tests/test_surfline_request_log.py`
 
 Next block: line it up against the request sequence that night, by step and
 rate, before changing anything.
+
+## 2026-11-03 — Tide at the clip's minute is worse; the crowd lags the tide by about half an hour
+
+Every row takes Surfline's tide for the start of the clip's hour (a 7:56
+clip gets 7:00's tide). Tested whether the tide at the clip's actual minute
+does better (`analysis/forecast_tide_minute/test_tide_minute.py`, local):
+Surfline's hourly value shifted by how much NOAA's harmonic curve (Monterey,
+cubic spline, read 6 minutes later for Santa Cruz) moves between the start of
+the hour and the target time. 2,142 rows / 161 days, 16 rolling origins;
+clips sit a median 29 minutes past the hour, and the shift to the clip minute
+averages 0.27 ft (95th percentile 0.81, max 1.56).
+
+| tide taken at | MAE | vs base | p | better |
+|---|---:|---:|---:|---:|
+| start of the hour (production) | 6.924 | — | — | — |
+| 30 min before the clip | 6.828 | −0.096 | 0.28 | 11/16 |
+| the clip's minute | 7.054 | +0.130 | 0.29 | 4/16 |
+| clip minute in training, start of hour in the forecast | 6.967 | +0.043 | 0.64 | 8/16 |
+| nearest hour | 7.308 | +0.384 | 0.038 | 3/16 |
+| 60 min before | 7.353 | +0.429 | 0.005 | 3/16 |
+| 90 min before | 7.985 | +1.061 | <0.001 | 0/16 |
+
+Placebo (the clip-minute shifts on the wrong rows): mean +0.625, sd 0.121.
+
+Later readings do worse and the best fit is about 30 minutes before the clip,
+so the count tracks the tide with a lag of roughly half an hour: the crowd at
+a clip is made of people who chose to paddle out earlier. With clips a median
+29 minutes past the hour, "30 minutes before" lands near the start of the
+hour, which is what production already uses, and is also exactly what the
+on-the-hour forecast serves. The 30-minute arm's −0.096 is not significant.
+Nothing changed; the item is off the December list.
