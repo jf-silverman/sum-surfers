@@ -40,6 +40,7 @@ import pandas as pd  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import plot_daily_prediction as pdp  # noqa: E402
+import surfline_request_log as srl  # noqa: E402
 from send_email import send_email  # noqa: E402
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -248,6 +249,18 @@ EMPTY_SHARE_TRIGGER = 0.30
 LOWER_EDGE_PINNED_SHARE_TRIGGER = 0.80
 FLAT_EDGE_TOLERANCE = 0.01   # an edge this flat across a day is a constant
 EMPTY_SHARE_WINDOW_DAYS = 30
+
+
+def cloudflare_note(day=None, path=None):
+    """One line naming tonight's Cloudflare refusals, or "" when there were none."""
+    b = srl.blocks_on(day, path)
+    if not b:
+        return ""
+    kinds = ", ".join(f"{n} {k}" for k, n in sorted(b["by_kind"].items(), key=lambda kv: -kv[1]))
+    steps = ", ".join(sorted(b["by_script"]))
+    return (f"Cloudflare blocked {b['refused']} of {b['requests']} Surfline requests tonight "
+            f"({kinds}), {b['first']} to {b['last']}, in {steps}. Per-request detail is in "
+            f"data/logs/surfline_requests.csv.")
 
 
 def band_health_note():
@@ -772,6 +785,10 @@ def main():
     # Quiet unless the forecast band needs attention. See band_health_note.
     band_note = band_health_note()
 
+    # Quiet unless Surfline's Cloudflare check refused requests during tonight's
+    # run (surfline_request_log.py; Joel asked to hear about every block).
+    block_note = cloudflare_note()
+
     look = []
     if (PUBLISHED_DIR / "latest.png").exists():
         look.append("tomorrow's hourly forecast")
@@ -783,6 +800,7 @@ def main():
     body = (f"Surf crowd forecast vs. actual for {target_date.strftime('%A, %B %d, %Y')}\n\n"
             f"{headline}\n"
             + (f"\n{band_note}" if band_note else "")
+            + (f"\n{block_note}\n" if block_note else "")
             + f"{tide_note}\n"
             f"Hour by hour:\n{table}\n\n"
             f"Detector frames attached, at the three points where counting is hardest\n"
@@ -807,6 +825,9 @@ def main():
         + (f'<p style="margin:0 0 14px 0;padding:10px 12px;background:#fdf3e3;'
            f'border-left:3px solid #d08a1d;color:#5a4209;font-size:13px;">'
            f'{band_note.strip()}</p>' if band_note else "")
+        + (f'<p style="margin:0 0 14px 0;padding:10px 12px;background:#fdecea;'
+           f'border-left:3px solid #c62828;color:#5a1a14;font-size:13px;">'
+           f'{block_note}</p>' if block_note else "")
         + (f'<p style="margin:0 0 14px 0;color:#444;">{tide_note.strip()}</p>' if tide_note else "")
         + f'<h3 style="font-size:14px;margin:18px 0 6px 0;">Hour by hour</h3>'
         + hourly_table_html(forecast_rows, actuals, subs, looks)

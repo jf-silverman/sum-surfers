@@ -9,6 +9,9 @@ from astral import LocationInfo
 from astral.sun import sun
 import pytz
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import surfline_request_log as srl  # noqa: E402
+
 # ---------- CONFIG ----------
 # Read lazily (.get, not [...]): these are only needed to actually download a
 # clip, but this module is also imported purely for LOCATION below — by
@@ -131,7 +134,9 @@ def download_clip(start_ms, end_ms, out_path):
     try:
         resp = requests.post(clip_api_url(), headers=REQUEST_HEADERS, json=payload, timeout=REQUEST_TIMEOUT_SEC)
     except requests.RequestException as e:
+        srl.record("clip_json", clip_api_url(), None)
         raise RuntimeError(f"Transient network error requesting clip JSON: {type(e).__name__}: {e}") from e
+    srl.record("clip_json", clip_api_url(), resp)
 
     if resp.status_code != 200:
         body_preview = " ".join(resp.text.split())[:180]
@@ -154,8 +159,11 @@ def download_clip(start_ms, end_ms, out_path):
 
     try:
         r = requests.get(clip_url, stream=True, timeout=REQUEST_TIMEOUT_SEC)
+        srl.record("clip_mp4", clip_url, r)
         r.raise_for_status()
     except requests.RequestException as e:
+        if "r" not in locals():
+            srl.record("clip_mp4", clip_url, None)
         raise RuntimeError(f"Transient error downloading MP4 from clipUrl: {type(e).__name__}: {e}") from e
 
     with open(out_path, "wb") as f:

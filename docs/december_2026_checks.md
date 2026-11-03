@@ -11,6 +11,10 @@ git.
   10-30, and the new one went in on 10-30, so expect a 401 around **11-29**.
   The pipeline emails an auth-failure warning when it happens. Refresh it then
   and rerun the pipeline the same night: the camera keeps five days.
+- **Cloudflare blocks.** Every Surfline request is now logged
+  (`data/logs/surfline_requests.csv`) and the evening email flags any 403s.
+  When the next block happens, line it up against that night's request
+  sequence (step, endpoint, rate) to find the trigger.
 - **Thanksgiving (11-26) and the long weekend.** Nothing to do on the day; it
   adds holiday rows for the holiday check below.
 

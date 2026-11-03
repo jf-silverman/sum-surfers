@@ -63,6 +63,7 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import get_surf_predictors as sp  # noqa: E402 — reuses ENDPOINT_PATHS, CSV_HEADER, merge_into_by_hour, local_hour_key
+import surfline_request_log as srl  # noqa: E402
 
 PROJECT_ROOT = sp.PROJECT_ROOT
 PREDS_CSV = sp.PREDS_CSV
@@ -187,6 +188,7 @@ def fetch_chunk(chunk_start, span_days, token, min_pause, max_pause):
                 f"https://services.surfline.com/kbyg/spots/forecasts/{path}",
                 params=params, headers=headers, timeout=20,
             )
+            srl.record("forecast_historical", r.url, r)
             if r.status_code == 400:
                 raise RequestDenied(f"[{path}] 400: {r.text[:150]} (likely token expired/invalid, or not premium)")
             if r.status_code == 429:

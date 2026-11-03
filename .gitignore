@@ -271,3 +271,6 @@ data/reviews/protocol_review/pass_b_box_review/
 data/reviews/protocol_review/.pass_b_conf.csv
 data/predictions/*.bak-*
 data/j_shore_cam/subhourly_crops/
+
+# Per-request Surfline log (surfline_request_log.py): local diagnostics only
+data/logs/

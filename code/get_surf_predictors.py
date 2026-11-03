@@ -53,6 +53,7 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from get_clips import LOCATION as CAMERA_LOCATION  # noqa: E402
+import surfline_request_log as srl  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PREDS_CSV = PROJECT_ROOT / "data" / "predictions" / "predictions.csv"
@@ -168,12 +169,13 @@ def fetch(path, params, headers=None, retries=3):
     attempt = 0
     while attempt < retries:
         try:
-            r = requests.get(
-                f"https://services.surfline.com/kbyg/spots/forecasts/{path}",
-                params=params,
-                headers=headers,
-                timeout=20,
-            )
+            url = f"https://services.surfline.com/kbyg/spots/forecasts/{path}"
+            try:
+                r = requests.get(url, params=params, headers=headers, timeout=20)
+            except requests.exceptions.RequestException:
+                srl.record("forecast", url, None, attempt=attempt + forbidden_attempt + 1)
+                raise
+            srl.record("forecast", url, r, attempt=attempt + forbidden_attempt + 1)
             r.raise_for_status()
             return r.json()["data"][path]
         except requests.exceptions.RequestException as e:

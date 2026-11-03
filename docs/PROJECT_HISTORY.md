@@ -7102,3 +7102,28 @@ original version. 2026-11-01's predictor rows, blank for tide and surf after a
 partial Cloudflare block, were backfilled with `backfill_historical_predictors.py
 --refetch-incomplete` (13 rows replaced), so the day rejoins training on the
 next run.
+
+## 2026-11-02 — Every Surfline request is logged, to trace the Cloudflare blocks
+
+Cloudflare refusals ("403 (bot check)") per night, from the pipeline logs:
+one or two a month through October (11 on 2026-09-26), then 29 on 10-30, 40 on
+10-31 and 19 on 11-01, and none on 11-02. The heavy nights came right after
+the between-hours clips (2026-10-26) added about 26 clip downloads a night, and
+overlapped the expired-token night (10-30), but the logs only ever recorded
+failures, so neither could be confirmed. Joel asked to hear about every block
+and to find and remove the trigger.
+
+`code/surfline_request_log.py` now writes one row per Surfline request to
+`data/logs/surfline_requests.csv` (gitignored): time, script, kind (forecast,
+clip_json, clip_mp4, forecast_historical), endpoint (host and path only; the
+clip API's query carries the token and is never written), status,
+Cloudflare's `cf-mitigated` and `cf-ray` headers, elapsed time and retry
+number. It is called from `get_surf_predictors.fetch` (forecasts and
+first/last light), `get_clips.download_clip` (both clip steps) and
+`backfill_historical_predictors.py`. Logging failures are swallowed. The
+evening email adds a red note when the night's log has any 403s, with counts by
+kind and script and the time span. Tests: `tests/test_surfline_request_log.py`
+(the token never reaches the log, header capture, the email note).
+
+Next block: line it up against the request sequence that night, by step and
+rate, before changing anything.
