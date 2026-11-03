@@ -251,6 +251,49 @@ FLAT_EDGE_TOLERANCE = 0.01   # an edge this flat across a day is a constant
 EMPTY_SHARE_WINDOW_DAYS = 30
 
 
+GATE_REASONS = {
+    "dark_or_night": "too dark",
+    "foggy_or_blurred": "fog or blur",
+    "night_sensor_noise": "night sensor noise",
+    "too_dark_human_review": "too dark (hand review)",
+}
+
+
+def rejected_frames(target_date, preds_csv=None, sub_csv=None):
+    """Frames the image-quality gate rejected on a date: [(time, file, reason), ...].
+
+    Joel asked (2026-11-03) for the names in the email, so he can find and
+    review them. Hourly frames are data/j_shore_cam/surf_crops/<file>; a
+    between-hours set is judged on its middle frame, listed as
+    data/j_shore_cam/subhourly_crops/<date>/<file>.
+    """
+    out = []
+    preds = pd.read_csv(preds_csv or PREDICTIONS_CSV, usecols=["date", "time_local", "filename",
+                                                               "quality_ok", "quality_reason"])
+    preds = preds[(preds["date"] == target_date.isoformat())
+                  & (preds["quality_ok"].astype(str) != "True")]
+    for _, r in preds.iterrows():
+        out.append((str(r["time_local"])[:5], r["filename"], str(r["quality_reason"])))
+    sub_path = sub_csv or SUBHOURLY_CSV
+    if Path(sub_path).exists():
+        sub = pd.read_csv(sub_path)
+        sub = sub[(sub["date"] == target_date.isoformat())
+                  & (sub["quality_ok"].astype(str) != "True")]
+        for _, r in sub.iterrows():
+            hhmm = str(r["time_local"])[:5]
+            out.append((hhmm, f"sub{target_date.isoformat()}_{hhmm.replace(':', '-')}_f05.jpg "
+                              f"(between-hours set)", str(r["quality_reason"])))
+    return sorted(out)
+
+
+def rejected_frames_text(rows):
+    if not rows:
+        return ""
+    lines = [f"  {t}  {f}  ({GATE_REASONS.get(why, why)})" for t, f, why in rows]
+    return ("Frames the image-quality gate rejected (not counted), for review:\n"
+            + "\n".join(lines))
+
+
 def cloudflare_note(day=None, path=None):
     """One line naming tonight's Cloudflare refusals, or "" when there were none."""
     b = srl.blocks_on(day, path)
@@ -788,6 +831,8 @@ def main():
     # Quiet unless Surfline's Cloudflare check refused requests during tonight's
     # run (surfline_request_log.py; Joel asked to hear about every block).
     block_note = cloudflare_note()
+    rejected = rejected_frames(target_date)
+    rejected_note = rejected_frames_text(rejected)
 
     look = []
     if (PUBLISHED_DIR / "latest.png").exists():
@@ -803,7 +848,8 @@ def main():
             + (f"\n{block_note}\n" if block_note else "")
             + f"{tide_note}\n"
             f"Hour by hour:\n{table}\n\n"
-            f"Detector frames attached, at the three points where counting is hardest\n"
+            + (f"{rejected_note}\n\n" if rejected_note else "")
+            + f"Detector frames attached, at the three points where counting is hardest\n"
             f"to trust:\n{frame_lines}\n\n"
             f"{provenance}\n\n"
             f"Chart attached, with tide on the right-hand axis. Counts come from the\n"
@@ -837,6 +883,13 @@ def main():
            f'highest look when most looks are 6 or more, otherwise the median of every frame '
            f'count in the three clips (27 frames). The accuracy '
            f'numbers above use this count; not yet checked against hand counts.</p>' if subs else "")
+        + (f'<h3 style="font-size:14px;margin:18px 0 6px 0;">Frames the gate rejected</h3>'
+           f'<p style="margin:0 0 6px 0;color:#444;font-size:13px;">Not counted; listed so they '
+           f'can be found and reviewed.</p>'
+           + '<ul style="margin:0;padding-left:20px;color:#444;font-size:13px;">'
+           + "".join(f'<li>{t} &nbsp;<code>{f}</code> &mdash; {GATE_REASONS.get(why, why)}</li>'
+                     for t, f, why in rejected)
+           + '</ul>' if rejected else "")
         + f'<h3 style="font-size:14px;margin:20px 0 6px 0;">Attached</h3>'
         + '<ul style="margin:0;padding-left:20px;color:#444;font-size:13px;">'
         + f'<li>Forecast vs. actual chart for {target_date.strftime("%b %d")}, tide on the right axis</li>'

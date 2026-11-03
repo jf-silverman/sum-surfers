@@ -7183,3 +7183,14 @@ under both possible clip schedules for the day (8:41/9:35/10:29 or
 8:50/9:44/10:38, depending on the first-light time Surfline returns). The
 exclusion keeps them out of `training_features.csv` only; the night's chart,
 email and forecast log still show their counts.
+
+**Hold-outs withdrawn; the email lists gate rejections instead (same day).**
+Joel preferred fixing the gate to excluding frames in advance, so the six
+`rain_pending_review` rows were removed, and asked for the evening email to
+name every frame the gate rejected, with the reason, so he can find them for
+review. `email_daily_report.rejected_frames` lists the day's hourly frames
+with `quality_ok` false (file under `data/j_shore_cam/surf_crops/`) and any
+rejected between-hours set (its middle frame, `sub<date>_<HH-MM>_f05.jpg`, the
+one the gate judges), in both the text and HTML parts. Test in
+`tests/test_count_rules.py`. Gate work for rain is under way in
+`analysis/rain_gate/`.

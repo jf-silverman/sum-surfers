@@ -86,3 +86,28 @@ def test_sets_are_assigned_to_the_hour_before_them():
     out = edr.hour_counts(actuals, subs, {})
     assert [len(l) for _w, _c, l in out] == [3, 3]
     assert out[1][1] == 25.0
+
+
+# --- rejected_frames (the email's list of gate rejections) ---------------------
+
+def test_rejected_frames_lists_hourly_and_between_hours(tmp_path):
+    import pandas as pd
+    from datetime import date
+    preds = tmp_path / "p.csv"
+    pd.DataFrame([
+        {"date": "2026-11-03", "time_local": "09:08", "filename": "crop2026-11-03_09-08-00.jpg",
+         "quality_ok": False, "quality_reason": "dark_or_night"},
+        {"date": "2026-11-03", "time_local": "10:02", "filename": "crop2026-11-03_10-02-00.jpg",
+         "quality_ok": True, "quality_reason": "ok"},
+        {"date": "2026-11-02", "time_local": "06:53", "filename": "crop2026-11-02_06-53-00.jpg",
+         "quality_ok": False, "quality_reason": "dark_or_night"},
+    ]).to_csv(preds, index=False)
+    sub = tmp_path / "s.csv"
+    pd.DataFrame([{"date": "2026-11-03", "time_local": "09:26", "quality_ok": False,
+                   "quality_reason": "foggy_or_blurred"}]).to_csv(sub, index=False)
+    rows = edr.rejected_frames(date(2026, 11, 3), preds, sub)
+    assert [r[1] for r in rows] == ["crop2026-11-03_09-08-00.jpg",
+                                    "sub2026-11-03_09-26_f05.jpg (between-hours set)"]
+    text = edr.rejected_frames_text(rows)
+    assert "too dark" in text and "fog or blur" in text
+    assert edr.rejected_frames_text([]) == ""
