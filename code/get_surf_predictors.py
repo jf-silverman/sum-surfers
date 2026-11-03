@@ -299,9 +299,11 @@ def merge_into_by_hour(by_hour, weather=None, rating=None, tides=None, wave=None
         by_hour[key]["primary_swell_period_s"] = primary.get("period") or 0
         by_hour[key]["primary_swell_direction_deg"] = round(primary.get("direction") or 0, 1)
 
-    # Tides are finer-grained than hourly; snap each to the nearest hour bucket
-    # already created above (or start its own if no weather/wave/rating entry
-    # exists for that hour, which shouldn't normally happen).
+    # Tides can be finer-grained than hourly. Each reading goes to the bucket of
+    # the hour it falls in (local_hour_key floors to the hour), and setdefault
+    # keeps the first one, so an hour holds its on-the-hour tide. A bucket is
+    # started if no weather/wave/rating entry exists for that hour, which
+    # shouldn't normally happen.
     for t in tides or []:
         key = local_hour_key(t["timestamp"], t["utcOffset"])
         by_hour.setdefault(key, {})

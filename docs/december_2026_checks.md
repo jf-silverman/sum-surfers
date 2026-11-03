@@ -60,6 +60,22 @@ the README still score the hourly clip.
   the training target needs hand counts over whole busy hours, which do not
   exist yet.
 
+### 3b. Conditions at the clip's minute, not the start of its hour
+
+Every training row and forecast hour takes Surfline's values for the start of
+the clip's hour: a 7:56 clip gets 7:00's tide, wind and swell, up to 59
+minutes stale. Tide, the model's most-used input, can move a few tenths of a
+foot in that time. Found 2026-11-03 while backfilling 10-31.
+
+- **Test:** rebuild `tide_ft` (and optionally wind) by interpolating between
+  the two surrounding hours at the clip's minute, or by snapping to the
+  nearest hour, and run the usual 16-origin comparison against the current
+  floor. It changes every training row, so it is a model change, adopted only
+  on a clear gain.
+- **Note:** the forecast side predicts on-the-hour rows, so the training
+  rows would move closer to the clip time while forecast rows stay on the
+  hour; check that this mismatch does not cost more than it gains.
+
 ## Pre-set statistical looks
 
 ### 4. Top-end forecast correction (hinge above 20)

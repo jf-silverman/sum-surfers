@@ -473,7 +473,8 @@ Separate from detection, `code/get_surf_predictors.py` pulls conditions
 data for Jack's from Surfline's public forecast API
 (`services.surfline.com/kbyg/spots/forecasts/*`) and writes it to
 `data/predictor_vars/surfline_predictors.csv`, matched to `predictions.csv` rows by
-filename/nearest hour. This is forward-looking only (today + tomorrow) —
+filename and the start of the clip's hour (a 7:56 clip gets the 7:00 values).
+The nightly pull and the historical backfill match the same way. This is forward-looking only (today + tomorrow) —
 it runs on every scheduled pipeline execution and just accumulates
 whatever "today" happens to be each time.
 
