@@ -64,10 +64,11 @@ def live_predictors(row, numeric_cols):
     return p
 
 
-def test_forecast_row_matches_training_row(tmp_path, monkeypatch):
+@pytest.mark.parametrize("correction", [False, True])   # published, shadow
+def test_forecast_row_matches_training_row(tmp_path, monkeypatch, correction):
     rows = training_table(tmp_path / "training_features.csv")
     monkeypatch.setattr(fit, "FEATURES_CSV", tmp_path / "training_features.csv")
-    X, _y, df, numeric_cols = fit.load_and_prepare()
+    X, _y, df, numeric_cols = fit.load_and_prepare(tide_correction=correction)
     assert len(X) == len(rows)
 
     # Unit scaling, so the comparison is of the inputs, not the standardization.
@@ -77,17 +78,20 @@ def test_forecast_row_matches_training_row(tmp_path, monkeypatch):
     for i, row in enumerate(rows):
         when = datetime.strptime(f"{row['date']} {row['time_local']}", "%Y-%m-%d %H:%M")
         served = psc.build_feature_row(when, live_predictors(row, numeric_cols), numeric_cols,
-                                       categories, mean, std, X.columns)
+                                       categories, mean, std, X.columns, tide_correction=correction)
         trained = X.iloc[i]
         for col in X.columns:
             assert served.iloc[0][col] == pytest.approx(float(trained[col])), (
                 f"row {i}: {col} is {served.iloc[0][col]} when served, {trained[col]} in training")
 
 
-def test_tide_correction_reaches_both_paths(tmp_path, monkeypatch):
-    """The specific transform behind the 2026-11-02 defect: both paths add it."""
+def test_tide_correction_only_when_asked(tmp_path, monkeypatch):
+    """Published (default): harmonic tide. Shadow: tide plus the correction.
+    The transform behind the 2026-11-02 defect, in both paths."""
     rows = training_table(tmp_path / "training_features.csv")
     monkeypatch.setattr(fit, "FEATURES_CSV", tmp_path / "training_features.csv")
-    X, _y, _df, numeric_cols = fit.load_and_prepare()
-    assert X["tide_ft"].iloc[1] == pytest.approx(rows[1]["tide_ft"] + 1.38)
-    assert X["tide_ft"].iloc[0] == pytest.approx(rows[0]["tide_ft"])
+    X, _y, _df, _nc = fit.load_and_prepare()
+    assert X["tide_ft"].iloc[1] == pytest.approx(rows[1]["tide_ft"])
+    Xc, _y, _df, _nc = fit.load_and_prepare(tide_correction=True)
+    assert Xc["tide_ft"].iloc[1] == pytest.approx(rows[1]["tide_ft"] + 1.38)
+    assert Xc["tide_ft"].iloc[0] == pytest.approx(rows[0]["tide_ft"])

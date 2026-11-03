@@ -39,7 +39,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FEATURES_CSV = _PROJECT_ROOT / "data" / "training_features.csv"
 
 
-def load_and_prepare():
+def load_and_prepare(tide_correction=False):
     df = pd.read_csv(FEATURES_CSV)
 
     numeric_cols = [
@@ -65,12 +65,15 @@ def load_and_prepare():
     for c in numeric_cols:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    # Kelvin-wave tide correction (2026-11-01): on days after one whose mean
-    # non-tidal residual topped backfill_tide_residual.TIDE_CORRECTION_GATE_FT,
-    # the model sees tide_ft plus that residual; on every other day the
-    # harmonic tide unchanged. predict_surf_count.build_feature_row applies
-    # the same correction when serving.
-    if "tide_correction_ft" in df.columns:
+    # Kelvin-wave tide correction: on days after one whose mean non-tidal
+    # residual topped backfill_tide_residual.TIDE_CORRECTION_GATE_FT, the model
+    # sees tide_ft plus that residual. Adopted 2026-11-01, moved to SHADOW on
+    # 2026-11-02 after it doubled that day's miss (11.5 vs 5.9 MAE): the
+    # published forecast trains on the harmonic tide people read, and
+    # plot_daily_prediction fits a corrected median alongside it for the
+    # December review. Pass tide_correction=True for the corrected matrix;
+    # predict_surf_count.build_feature_row takes the same flag.
+    if tide_correction and "tide_correction_ft" in df.columns:
         df["tide_ft"] = df["tide_ft"] + pd.to_numeric(df["tide_correction_ft"], errors="coerce").fillna(0)
 
     before = len(df)

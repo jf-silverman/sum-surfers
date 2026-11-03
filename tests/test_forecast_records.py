@@ -78,6 +78,21 @@ def test_every_raw_input_is_written():
     assert "raw_nested" not in row                           # non-scalars are left out
 
 
+def test_shadow_columns_default_to_the_published_forecast():
+    row = pdp.forecast_row(date(2026, 11, 3), hour_record({}))
+    assert row["shadow_tide_corr_predicted"] == row["predicted"]
+    assert row["shadow_tide_corr_predicted_raw"] == row["predicted_raw"]
+    assert row["tide_correction_ft"] == 0.0
+
+
+def test_shadow_columns_carry_the_corrected_forecast():
+    r = {**hour_record({}), "tide_correction_ft": 1.381, "shadow_point": 4.2,
+         "shadow_point_raw": 5.0}
+    row = pdp.forecast_row(date(2026, 11, 3), r)
+    assert (row["shadow_tide_corr_predicted"], row["shadow_tide_corr_predicted_raw"],
+            row["tide_correction_ft"]) == (4.2, 5.0, 1.381)
+
+
 def test_record_without_raw_inputs_still_writes():
     row = pdp.forecast_row(date(2026, 11, 3), hour_record(None))
     assert not any(k.startswith("raw_") for k in row)
@@ -101,3 +116,13 @@ def test_log_reads_old_and_new_records_together(tmp_path, monkeypatch):
     assert sorted(log["date"]) == ["2026-11-02", "2026-11-03"]
     scored = log[log["date"] == "2026-11-02"].iloc[0]
     assert scored["actual"] == 12 and bool(scored["inside_band"])
+
+
+def test_shadow_recalibration_is_not_clamped_to_the_published_band():
+    """2026-11-02: clamping into the uncorrected band moved a corrected 0 up to
+    the band's lower edge. The shadow call passes (0, inf) as its bounds."""
+    recal = {"applied": True, "a": -3.38, "b": 1.159}
+    assert pdp.apply_point_recalibration(0.5, 0.0, float("inf"), recal) == 0.0
+    assert pdp.apply_point_recalibration(0.5, 4.66, 22.5, recal) == 4.66
+    src = Path(pdp.__file__).read_text()
+    assert 'apply_point_recalibration(shadow_raw, 0.0, float("inf"), recal)' in src

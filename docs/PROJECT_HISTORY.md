@@ -7035,3 +7035,70 @@ pairs, the raw Surfline weather condition and the tide correction were never
 written. Both records (`forecast_<date>.csv` and `week_<date>.csv`) now carry
 a `raw_<name>` column for every input the hour was built from, unscaled and
 as received, so a forecast can be rebuilt exactly.
+
+## 2026-11-02 — The Kelvin-wave tide correction moves to shadow after its first day
+
+The 2026-11-02 forecast (the redone one) badly under-forecast a fair, 3–5 ft
+morning: 26–35 surfers from 9:35 to 12:17 against forecasts of 7–10. Rerun
+on the same inputs and training rows through 11-01, with and without the
+0.75 ft tide correction:
+
+| | average miss | bias |
+|---|---:|---:|
+| with the correction (published) | 11.5 | −11.5 |
+| without | 5.9 | −2.1 |
+
+Surfline's chart had the morning low under 3 ft; the correction added
++1.38 ft, so the model saw 4.1–4.6 ft and called a high-tide day. The crowd
+followed the chart, as the 2026-10-15 test suggested. Joel chose shadow mode:
+`load_and_prepare` and `build_feature_row` apply the correction only when
+asked (`tide_correction=True`), the published forecast uses the harmonic tide,
+and while the gate is on each run fits a median on the corrected matrix and
+records it as `shadow_tide_corr_predicted` / `_raw` (with `tide_correction_ft`)
+in both forecast records, for the December review. Tests: the parity test runs
+both ways; the record tests cover the shadow columns.
+
+**Joel's read of the day, from watching the video.** It broke even above
+Surfline's 3 ft tide, which he puts down to bigger surf and energy than the
+week before, and the weekend was low energy at high tide, so people likely
+held out for a better day. The numbers agree on the first part: nearshore
+energy 639 kJ against 117–281 the previous seven days, offshore 2,273 against
+414–806, swell period 17.3 s (the week's longest) and surf to 4.2 ft against
+2–3. That size is rare in the training record: nearshore energy at or above
+639 kJ on 3 days (1% of rows) and surf of 4.2 ft or more on 2. On the weekend,
+Saturday's lowest daylight tide was 3.4 ft and peaks were 29 and 20, low for a
+weekend. Both ideas are logged for testing: a good-tide threshold that rises
+with swell energy, and a "pent-up demand" feature for days after a run of poor
+sessions.
+
+Also found: 2026-11-01's predictor rows have tide and surf blank (another
+partial Cloudflare block), so that day drops out of training until backfilled.
+
+**11-02 forecast record redone again, uncorrected (Joel, same evening).** The
+record behind the evening email was the first redo, which still carried the
+correction. It was remade as of the evening of 11-01, published without the
+correction: training rows limited to the 2,130 the 11-01 run had (dates
+through 10-30), inputs unscaled from `week_2026-11-01.csv` with that run's
+(corrected) scaling, wind and swell direction from the 11-02 Surfline rows,
+and the corrected median in the shadow columns. Day score against the
+three-look counts: average miss 6.7, bias −5.4, 7 of 12 hours in range (the
+first redo, corrected, scored about 11). Its `forecast_made_at` is
+2026-11-02T22:38, after the day, so `forecast_log.csv` gives it lead 0; leave
+it out of lead-time analyses.
+
+While doing it, the shadow median turned out to be clamped into the published
+(uncorrected) band by the point recalibration, which pulled corrected zeros up
+to the band's lower edge (2–5 pm on 11-02) and would have flattered the
+correction in December. The shadow is now recalibrated without the band
+clamp, only kept at 0 or above; `tests/test_forecast_records.py` guards it.
+
+**11-03 forecast record redone uncorrected; 11-01 predictors backfilled.** The
+11-03 record from the 11-02 evening run carried the correction; it was remade
+before the day from the same training table (unchanged since the run) and the
+raw inputs recorded in `week_2026-11-02.csv` (the first run to save them), with
+the corrected median in the shadow columns. Published midday forecasts rose
+by 2–9 surfers. `week_2026-11-02.csv` and the published charts keep the run's
+original version. 2026-11-01's predictor rows, blank for tide and surf after a
+partial Cloudflare block, were backfilled with `backfill_historical_predictors.py
+--refetch-incomplete` (13 rows replaced), so the day rejoins training on the
+next run.

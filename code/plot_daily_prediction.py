@@ -454,6 +454,22 @@ def main():
     check_forecast_sources(sp.LAST_MISSING_ENDPOINTS)
     local_tz = pytz.timezone(gc.LOCATION["timezone"])
 
+    # Shadow of the Kelvin-wave tide correction (2026-11-02). The published
+    # forecast uses the harmonic tide; while the 0.75 ft gate is on for any
+    # forecast hour, a median model is also fitted on the corrected training
+    # matrix and its forecast saved beside the published one, so the December
+    # review can score the two on the same days. Median only: MAE is the
+    # comparison, and the band is not in question.
+    shadow = None
+    if any(float(p.get("tide_correction_ft") or 0) > 0 for p in by_hour.values()):
+        Xc, yc, _dfc, _ = load_and_prepare(tide_correction=True)
+        c_mean, c_std = Xc[numeric_cols].mean(), Xc[numeric_cols].std().replace(0, 1)
+        Xc_std = Xc.copy()
+        Xc_std[numeric_cols] = (Xc_std[numeric_cols] - c_mean) / c_std
+        shadow = dict(model=fit_quantile_model_robust(Xc_std, yc, 0.50, allow_degenerate=True)[0],
+                      mean=c_mean, std=c_std, columns=Xc_std.columns)
+        print("  Kelvin-wave correction is on: fitted the shadow (corrected) median.")
+
     recal = fit_point_recalibration()
     print(f"  Point recalibration: "
           + (f"median = {recal['a']:+.2f} + {recal['b']:.3f} x raw ({recal['reason']})"
@@ -485,6 +501,17 @@ def main():
         quantiles[0.50] = apply_point_recalibration(
             point_raw, quantiles[FAN_LEVELS[0]], quantiles[FAN_LEVELS[-1]], recal)
         point = quantiles[0.50]
+        shadow_raw, shadow_point = point_raw, point
+        if shadow is not None and float(predictors.get("tide_correction_ft") or 0) > 0:
+            s_row = build_feature_row(hk, predictors, numeric_cols, weather_categories,
+                                      shadow["mean"], shadow["std"], shadow["columns"],
+                                      tide_correction=True)
+            shadow_raw = max(0.0, float(shadow["model"].predict(s_row)[0]))
+            # Not clamped into the published band: that band belongs to the
+            # uncorrected model, and clamping pulled the shadow toward the
+            # published forecast (2-5 pm on 11-02 moved from 0 to the band's
+            # lower edge), flattering it in the December comparison.
+            shadow_point = apply_point_recalibration(shadow_raw, 0.0, float("inf"), recal)
         weather_simple, is_night = simplify_weather_condition(predictors.get("weather_condition", ""))
         tide_ft = float(predictors.get("tide_ft", 0) or 0)
         in_training_range = TRAINED_HOUR_MIN <= hk.hour <= TRAINED_HOUR_MAX
@@ -522,6 +549,7 @@ def main():
                     weather_simple=weather_simple, is_night=is_night,
                     tide_ft=tide_ft, in_training_range=in_training_range,
                     tide_correction_ft=float(predictors.get("tide_correction_ft") or 0),
+                    shadow_point=shadow_point, shadow_point_raw=shadow_raw,
                     predictor_values=predictor_values,
                     raw_inputs=dict(predictors),
                     missing_predictors=missing,
@@ -1009,6 +1037,13 @@ def forecast_row(target_date, r):
         # this hour had no value for when it is not.
         "n_missing_predictors": len(r["missing_predictors"]),
         "missing_predictors": ";".join(r["missing_predictors"]),
+        # What the Kelvin-wave-corrected model would have published (shadow,
+        # 2026-11-02). Equal to predicted / predicted_raw when the correction
+        # is off for the hour; recalibrated like the median but not clamped
+        # into the published band, only kept at 0 or above.
+        "tide_correction_ft": round(r.get("tide_correction_ft", 0.0), 4),
+        "shadow_tide_corr_predicted": round(r.get("shadow_point", r["point"]), 2),
+        "shadow_tide_corr_predicted_raw": round(r.get("shadow_point_raw", r.get("point_raw", r["point"])), 2),
         # Every input this hour was built from, unscaled and as received
         # (Surfline and Open-Meteo values, wind and swell direction, the raw
         # weather condition, the derived tide features, the residual and the

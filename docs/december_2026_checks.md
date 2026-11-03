@@ -16,7 +16,15 @@ git.
 
 ## Forecast changes made in October, up for review
 
-### 1. Kelvin-wave tide correction (0.75 ft gate)
+### 1. Kelvin-wave tide correction (0.75 ft gate), now in shadow
+
+**Moved to shadow on 2026-11-02**, after its first full day doubled the miss
+(11.5 vs 5.9 average miss). The published forecast uses Surfline's tide; the
+corrected forecast is recorded beside it as `shadow_tide_corr_predicted` in
+`forecast_<date>.csv` and `week_<date>.csv` whenever the gate is on. In
+December, score the two against the same actuals on every gated day; the
+details below were written before the switch.
+
 
 Adopted 2026-11-01 for a recheck at the start of December. When the previous
 day's mean non-tidal residual is above 0.75 ft, the model's tide input is the
@@ -75,6 +83,20 @@ foot in that time. Found 2026-11-03 while backfilling 10-31.
 - **Note:** the forecast side predicts on-the-hour rows, so the training
   rows would move closer to the clip time while forecast rows stay on the
   hour; check that this mismatch does not cost more than it gains.
+
+### 3c. Two ideas from the 2026-11-02 miss (Joel)
+
+- **The good-tide line moves with swell size.** It broke above Surfline's 3 ft
+  tide on a day with nearshore energy 639 kJ (2–5 times the week before),
+  17 s period and 4 ft surf. Test a tide feature measured against an
+  energy-dependent threshold (or tide x energy terms) on the 16 origins. Big
+  days are rare in the record (3 days at that energy), so pre-register the
+  form and expect a noisy answer.
+- **Pent-up demand.** After a weekend of low energy at high tide, a good
+  Monday drew 34 at peak. Test days since the last good session (rated fair
+  or better with a sub-3 ft daylight window), or the previous two days'
+  best rating, as day-level features. Earlier count lags were rejected; this
+  one lags conditions, not counts, so it can serve the 7-day outlook.
 
 ## Pre-set statistical looks
 
