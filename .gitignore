@@ -274,3 +274,7 @@ data/j_shore_cam/subhourly_crops/
 
 # Per-request Surfline log (surfline_request_log.py): local diagnostics only
 data/logs/
+
+# Rain-gate review images and contact sheets (2026-11-03): copies of crops, local only
+data/reviews/rain_gate_review/images/
+data/reviews/rain_gate_review/sheet_*.jpg

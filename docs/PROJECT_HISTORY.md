@@ -7194,3 +7194,32 @@ rejected between-hours set (its middle frame, `sub<date>_<HH-MM>_f05.jpg`, the
 one the gate judges), in both the text and HTML parts. Test in
 `tests/test_count_rules.py`. Gate work for rain is under way in
 `analysis/rain_gate/`.
+
+## 2026-11-03 — Toward a rain gate: what separates rain from fog, and a labelled review set
+
+Exploration in `analysis/rain_gate/` (local), on all 2,402 hourly frames with
+8 sections each (sharpness, and motion between the 1.5 s side frames):
+
+- **Sections against a clear day** depend on the day: surf size and glint move
+  sharpness more than rain does. Against an all-days reference the 11-03 rain
+  frames barely stand out (0–3 of 8 sections under 25%); against the big-surf
+  11-02 they looked bad.
+- **Motion** (adherent drops suppress temporal change, You et al. 2013/2016)
+  barely moved: rain streaks and moving drops add motion of their own.
+- **Fixed edges** (the fence post and the bottom-right bushes, the only edges
+  that are strong in most clear frames; the "expected edges" idea of
+  US10388008) do work as a lens-clarity check: 96–100% of fog-rejected frames
+  score under 0.3 of the hour's clear median, and three of the six rainy frames
+  Joel would reject (8:50, 10:02, 10:29) score under 0.35. But they also flag
+  countable fog, which the 2026-09-21 fog detector exists to keep, and the post
+  is not where the mask expects in 2025 and March 2026 frames (framing changed),
+  so it reads as blurred there.
+
+No single measure separates rain damage from countable fog; the difference is
+spatial (fog fades the frame evenly and with distance, rain leaves local blobs,
+smears and glare). Next: Joel labels a 60-frame review set
+(`data/reviews/rain_gate_review/rain_gate_review.csv`: y usable, n reject,
+p partial; 25 rain-coded, 12 fog, 12 clean, 4 glare, 7 from the 11-03 morning,
+shuffled, groups kept apart in `analysis/rain_gate/review_key.csv`), with the
+11-03 pipeline frames added once the night's run cuts them, and a rule is
+fitted on the labels before anything changes in the gate.
