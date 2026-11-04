@@ -93,6 +93,17 @@ model already uses. Nothing to do; see the 2026-11-03 history entry.
   best rating, as day-level features. Earlier count lags were rejected; this
   one lags conditions, not counts, so it can serve the 7-day outlook.
 
+### 3d. A rain correction (from the 2026-11-03 miss)
+
+The model ignores rating, wind and rain (too few examples; monotonic
+constraints did not help). In the live record, rain hours came in at 0.35 of
+the forecast, but on 7 hours over 3 days. Once winter adds rain hours, fit a
+multiplier for hours whose evening-before weather is rain or showers (the
+forecast inputs had showers for 11-03's 10 am–1 pm), forward in time and
+against the 16-origin baseline; adopt only with a clear gain. Leave general
+"bad conditions" alone unless the record turns: before 11-03, POOR, rain or
+10+ mph wind hours were under-forecast (ratio 1.15).
+
 ## Pre-set statistical looks
 
 ### 4. Top-end forecast correction (hinge above 20)

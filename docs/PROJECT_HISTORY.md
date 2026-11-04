@@ -7265,3 +7265,34 @@ height, rating, nearshore energy), which fold in impact, period and wind, and
 the details mostly duplicate them at 161 days. Consistent with the tide
 result: crowds follow what the app shows, not the physics underneath. Nothing
 adopted; retest once a winter of big WNW swells is in the record.
+
+## 2026-11-04 — Why the 11-03 forecast missed a stormy day, and why constraints cannot fix it
+
+The 11-03 forecast (the uncorrected redo) ran +10.4 per hour over the
+three-look counts: 0–5 surfers from 9:44 on against 16–22 forecast. The
+evening-before inputs said FAIR all day, 4–5 ft, 2–7 mph wind until 1 pm, with
+showers; the day turned POOR_TO_FAIR by 9:44 and POOR by 12:26, with 9–17 mph
+wind, rain and a 4 s local wind swell on top of a mixed SSW/WNW swell.
+
+**The model ignores the conditions.** Refitted on rows through 11-02, its 1 pm
+median was 22.9 for POOR or FAIR_TO_GOOD, 3 or 20 mph wind, clear or rain, and
+3.9 with the tide at 4.5 ft instead of 2.2; rerunning the day on the
+conditions that happened left every hour within about 1 surfer. The training
+record has 45 POOR hours, 15 rain hours and no hour at 15 mph wind or more;
+strong mixed swell with wind of 9 mph or more occurs on 2 days (10-20 and
+11-03), and POOR with surf of 4 ft or more only on 11-03.
+
+**Monotonic constraints** (`analysis/forecast_conditions/test_monotonic.py`,
+local; rating up, wind speed, gust and rain down) changed nothing: 16 origins
++0.018 MAE (p 0.74), rating only +0.000, wind and rain only +0.023, and 11-03
+still about +11 per hour in every arm. A constraint only stops a wrong
+direction; it cannot create an effect the data barely shows.
+
+**The live record does not support a general bad-conditions cut.** Scored
+day-ahead hours, 8 am–4 pm, actual over forecast: all 0.95 (365 hours / 41
+days), POOR 0.75 (12 / 3), wind ≥ 10 mph 1.07 (28 / 11, windy hours are often
+good afternoons), rain 0.35 (7 / 3), and POOR-or-rain-or-wind before 11-03
+1.15 (30 / 12, under-forecast). Only rain shows a clear effect, on too few
+hours to fit. 11-03's empty lineup looks like the combination. Nothing
+changed; a rain correction goes on the December list for when winter adds
+rain hours.
