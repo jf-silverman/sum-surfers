@@ -7223,3 +7223,45 @@ p partial; 25 rain-coded, 12 fog, 12 clean, 4 glare, 7 from the 11-03 morning,
 shuffled, groups kept apart in `analysis/rain_gate/review_key.csv`), with the
 11-03 pipeline frames added once the night's run cuts them, and a rule is
 fitted on the labels before anything changes in the gate.
+
+## 2026-11-03 — How Surfline ranks swells, and why the swell details do not help the forecast
+
+**Surfline's "primary" swell is ranked by impact.** Joel noticed Thursday's
+(11-05) secondary swell in the app was bigger than the primary. Against a
+fresh pull of the swells endpoint, the app's 3-hour table ranks by `impact`
+(how much of a train reaches the spot): at 6 am a 2.8 ft 13 s SSW (impact
+0.462) over a 6.9 ft 12 s WNW (0.383), at 9 am the 6.3 ft WNW (0.284) over a
+2.0 ft SSW (0.272). Height and power both put WNW first at 6 am, so neither is
+the rule. Production's `primary_swell()` ranks by power, and agrees with the
+top-by-impact train in 66% of training rows; near-ties flip the primary
+between very different trains (a 0.012 impact gap swaps 6.3 ft and 2 ft).
+
+**11-02 vs 11-03.** Joel saw 11-02 look better and bigger than 11-03, which
+Surfline forecast bigger (4–6 ft vs 3–4). The swell trains show why: 11-02's
+WNW ran at 19–20 s and its SSW at 16–17 s, with 2–6 mph wind and its wind
+waves from 306° (impact 0.07); 11-03 had 15–16 s swells, 9–12 mph wind and a
+3 ft 4 s wind swell from 206°, in Jack's window (impact 0.15–0.19). Surf guides
+put Pleasure Point's best swell at S-SSW groundswell with NW-NNW offshore wind
+(surf-forecast.com, surfnerd.com).
+
+**Test.** Every train for the record was backfilled
+(`analysis/swell_trains/backfill_swell_trains.py`, 56 requests, all 200, into
+`data/predictor_vars/swell_trains.csv`, gitignored), and
+`analysis/swell_trains/test_swell_features.py` (local) added the top two trains
+by impact (height, period, direction, impact), an impact-weighted period and
+short-period chop (trains of 8 s or less):
+
+| arm | MAE | vs base | p | better |
+|---|---:|---:|---:|---:|
+| base | 6.924 | — | — | — |
+| add all | 7.065 | +0.141 | 0.131 | 6/16 |
+| swap for primary swell | 7.048 | +0.124 | 0.343 | 8/16 |
+| weighted period only | 7.014 | +0.090 | 0.150 | 7/16 |
+| chop only | 6.930 | +0.006 | 0.935 | 10/16 |
+
+Shuffled-block placebo: mean +0.005, sd 0.045, so the real features do worse
+than random columns. The model already has Surfline's own summaries (surf
+height, rating, nearshore energy), which fold in impact, period and wind, and
+the details mostly duplicate them at 161 days. Consistent with the tide
+result: crowds follow what the app shows, not the physics underneath. Nothing
+adopted; retest once a winter of big WNW swells is in the record.

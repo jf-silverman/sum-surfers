@@ -278,3 +278,6 @@ data/logs/
 # Rain-gate review images and contact sheets (2026-11-03): copies of crops, local only
 data/reviews/rain_gate_review/images/
 data/reviews/rain_gate_review/sheet_*.jpg
+
+# Every Surfline swell train per hour (analysis/swell_trains), like surfline_predictors.csv
+data/predictor_vars/swell_trains.csv
