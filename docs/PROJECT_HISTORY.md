@@ -7296,3 +7296,17 @@ good afternoons), rain 0.35 (7 / 3), and POOR-or-rain-or-wind before 11-03
 hours to fit. 11-03's empty lineup looks like the combination. Nothing
 changed; a rain correction goes on the December list for when winter adds
 rain hours.
+
+## 2026-11-08 — Email chart: the tide line spans the forecast hours
+
+Joel noticed the email chart's tide line stopped short of the forecast on
+both ends. It was drawn from the training table, which only has counted hours
+(7 am to 4 pm), while the forecast runs first light to last light (6 am to
+5 pm). `email_daily_report.tide_by_hour` now reads the hourly Surfline tide
+from the day's forecast record, falling back to the training table when there
+is none; both hold the same harmonic tide. Test in `tests/test_count_rules.py`.
+He also asked why 11-07 and 11-08 looked the same: the emails reported
+different days, but both were weekend days with a high morning and low
+afternoon tide about 50 minutes apart, forecast near 0 until 11 am and about
+35 after, counted 45–63 in the afternoon; the shared under-forecast at the top
+is the known top-end shortfall (December pre-set look).

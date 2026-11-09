@@ -403,11 +403,24 @@ def band_health_note():
 
 
 def tide_by_hour(target_date):
-    """[(datetime, tide_ft), ...] for the day, from the training features table.
+    """[(datetime, tide_ft), ...] for the day: the forecast record's hourly
+    Surfline tide when there is one, else the training features table.
 
-    Tide is already joined to every counted hour there, so it needs no second
-    API call and is exactly the value the forecast model saw.
+    The record covers every forecast hour (first light to last light), so the
+    line spans the same x range as the forecast. The training table only has
+    counted hours, which left the line starting and stopping an hour or two
+    inside the forecast's (Joel, 2026-11-08). Both hold the same harmonic tide.
     """
+    record = pdp.FORECASTS_DIR / f"forecast_{target_date.isoformat()}.csv"
+    if record.exists():
+        rec = pd.read_csv(record)
+        if "tide_ft" in rec.columns and rec["tide_ft"].notna().any():
+            out = []
+            for _, r in rec[rec["tide_ft"].notna()].iterrows():
+                hh, mm = map(int, str(r["hour_local"]).split(":")[:2])
+                out.append((datetime(target_date.year, target_date.month, target_date.day, hh, mm),
+                            float(r["tide_ft"])))
+            return sorted(out)
     if not FEATURES_CSV.exists():
         return []
     df = pd.read_csv(FEATURES_CSV, float_precision="round_trip")

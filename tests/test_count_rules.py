@@ -111,3 +111,18 @@ def test_rejected_frames_lists_hourly_and_between_hours(tmp_path):
     text = edr.rejected_frames_text(rows)
     assert "too dark" in text and "fog or blur" in text
     assert edr.rejected_frames_text([]) == ""
+
+
+# --- tide_by_hour (the email chart's tide line) --------------------------------
+
+def test_tide_line_spans_the_forecast_hours(tmp_path, monkeypatch):
+    """2026-11-08: drawn from the training table, the line covered only counted
+    hours (7-16) while the forecast ran 6-17."""
+    import pandas as pd
+    from datetime import date
+    rec = pd.DataFrame({"hour_local": [f"{h:02d}:00" for h in range(6, 18)],
+                        "predicted": 0.0, "tide_ft": [4.0 + 0.1 * h for h in range(6, 18)]})
+    rec.to_csv(tmp_path / "forecast_2026-11-08.csv", index=False)
+    monkeypatch.setattr(edr.pdp, "FORECASTS_DIR", tmp_path)
+    tide = edr.tide_by_hour(date(2026, 11, 8))
+    assert [w.hour for w, _ in tide] == list(range(6, 18))
