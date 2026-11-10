@@ -104,6 +104,25 @@ against the 16-origin baseline; adopt only with a clear gain. Leave general
 "bad conditions" alone unless the record turns: before 11-03, POOR, rain or
 10+ mph wind hours were under-forecast (ratio 1.15).
 
+### 3e. Daylight remaining (Joel, 2026-11-09)
+
+After the switch to standard time the crowd peak settled around 3-4 pm. It
+follows the low tide, but last light caps it: in late October, with lows at
+5-6 pm and last light near 6:40, peaks came 1-2 hours before the low; from
+11-05 to 11-09, lows at 2-4 pm and last light at 5:31, the peak sat on the
+low-tide hour. The forecast's peak ran early on the weekend (1 pm vs 2:14 on
+11-07, 2 pm vs 3:08 on 11-08). The model has clock time and tide but nothing
+saying how much light is left.
+
+- **Test:** add "minutes of daylight remaining at this hour" (last light minus
+  the hour; `get_clips.get_light_window`), and optionally "minutes from the
+  day's low tide to last light", on the 16 origins with a placebo. Score the
+  hourly MAE and, as in known_bugs L11, peak-hour timing, since an earlier
+  within-day test helped timing without moving MAE.
+- **School:** UCSC and Cabrillo dates are now in
+  `data/predictor_vars/academic_calendar.csv`; this week's weekday peaks fell
+  after school hours anyway, so school cannot be separated from tide yet.
+
 ## Pre-set statistical looks
 
 ### 4. Top-end forecast correction (hinge above 20)

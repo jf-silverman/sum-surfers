@@ -7354,3 +7354,25 @@ name. `make_standing_batch.py` now takes `<topic>_<NN>` and writes
 Noticed and left for a decision: the images zips duplicate their folders
 (identical for batches 1, 2, 4, 7 and 8), except glare 03, whose zip holds 3
 images the folder lacks.
+
+## 2026-11-09 — UCSC and Cabrillo calendars in one file; the peak follows the tide, capped by last light
+
+`data/predictor_vars/academic_calendar.csv` holds 52 date ranges (school,
+kind, start, end, note, source): UCSC quarters, finals, holidays and the
+breaks between quarters for 2025-26 and 2026-27, from the UCSC Registrar's
+calendar pages (fall 2026 instruction 09-24 to 12-04, finals 12-07 to 12-11),
+plus Cabrillo's semesters and days off as collected in
+`analysis/packed_hours/test_school_hours.py`. Not yet a feature.
+
+Joel saw the peak settle around 4 pm after the switch to standard time. Daily
+peaks from 10-25 to 11-09 follow the low tide within about an hour; with lows
+near last light in late October (5-6 pm, last light about 6:40) the peak came
+1-2 hours before the low, and with lows at 2-4 pm and last light at 5:31 it sat
+on the low. The forecast's peak ran an hour early on 11-07 and 11-08.
+"Daylight remaining" is on the December list (item 3e).
+
+Batch 07 (Joel's posed export, `standing_07_hu_both.zip`) checked: images and
+sizes match, no degenerate boxes, 114 standing over 16 clips. Four frames
+without a standing rider were dropped at his request (one, 16-37 t17, had all
+29 boxes still `unknown`): 58 images, 1,240 boxes; the original is kept as
+`standing_07_hu_both.before_drop.zip`.
