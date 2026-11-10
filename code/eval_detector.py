@@ -46,7 +46,7 @@ import detect_surfers as ds  # noqa: E402
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 YOLO_DIR = _PROJECT_ROOT / "data" / "cvat_out_yolo_rebuilt"       # tiled images + labels
-COCO_SPLITS_DIR = _PROJECT_ROOT / "data" / "cvat_out_coco" / "splits"  # whole frames + boxes
+COCO_SPLITS_DIR = _PROJECT_ROOT / "data" / "cvat" / "splits"  # whole frames + boxes
 EVAL_OUT_DIR = _PROJECT_ROOT / "data" / "eval_out"
 
 # Published in plot_daily_prediction.py and the README as the detector's

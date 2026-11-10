@@ -7310,3 +7310,47 @@ different days, but both were weekend days with a high morning and low
 afternoon tide about 50 minutes apart, forecast near 0 until 11 am and about
 35 after, counted 45–63 in the afternoon; the shared under-forecast at the top
 is the known top-end shortfall (December pre-set look).
+
+## 2026-11-09 — `data/cvat_out_coco/` becomes `data/cvat/`, with one naming scheme
+
+Joel asked for a shorter folder name (COCO 1.0 is now the only format, so it
+need not be in the name) and consistent names inside it:
+`<topic>_<NN>_<ai|hu>_<boxed|labeled|both>`, where `ai` is detector
+pre-labels and `hu` is human work, and `boxed` / `labeled` / `both` say
+whether boxes, poses or both were done. Images staged for upload are
+`<topic>_<NN>_images`. A zip and a folder holding the same thing share a name.
+The folder was moved with `git mv` (the tracked `splits/` and `splits_tiled/`
+keep their history). Entries above this one use the old names.
+
+| old | new |
+|---|---|
+| `posture_57/`, `posture_export_57_coco.zip` | `original_00_hu_both/`, `.zip` |
+| `reimport_existing_57/`, `.zip` | `original_00_hu_boxed/`, `.zip` (no poses) |
+| `batch01_73/`, `labeling_batch_01_coco.zip` | `general_01_hu_both/`, `.zip` |
+| `labeling_batch_01/`, `_images.zip` | `general_01_images/`, `.zip` |
+| `winter_7/`, `winter_batch_annot_w_posture.zip` | `winter_02_hu_both/`, `.zip` |
+| `labeling_batch_02_winter/`, `_images.zip` | `winter_02_images/`, `.zip` |
+| `glare_12/` | `glare_03_hu_both/` (prefixes stripped; what training uses) |
+| `glare_batch_annot_w_post.zip` | `glare_03_hu_both_raw.zip` (the raw export, 12 images / 66 boxes vs the folder's 11 / 30) |
+| `glare_more_5/`, `more-glare-annot-w-poses.zip` | `glare_03b_hu_both/`, `.zip` |
+| `labeling_batch_03_glare/`, `_images.zip` | `glare_03_images/`, `.zip` |
+| `fog_19/`, `fog-annot-w-poses.zip` | `fog_04_hu_both/`, `.zip` |
+| `labeling_batch_04_fog/`, `_images.zip` | `fog_04_images/`, `.zip` |
+| `labeling_batch_0{5..8}_standing/`, `_prelabels.zip` | `standing_0{5..8}_ai_boxed/`, `.zip` |
+| `labeling_batch_0{5..8}_standing_images.zip` | `standing_0{5..8}_images.zip` |
+| `labeling_batch_6_standing_man_corr/` | `standing_06_hu_both/` |
+| `standing_batch_7_posed.zip` | `standing_07_hu_both.zip` (62 images, 1,323 boxes, 114 standing, `Birds` label) |
+| `empty_frame_review/`, `glare_review/` | moved to `data/reviews/` |
+
+Unchanged: the `splits*` folders (built from batches, `splits/` public) and
+`data/cvat_out_yolo_rebuilt*` (Joel: leave as is). Code, analysis scripts,
+the notebook, tests and the current docs were updated; every script's
+default input path was checked to exist, and the split builder loads the same
+172-image pool. `.gitignore` replaced its per-item rules with `data/cvat/*`
+plus exceptions for the two tracked splits, so new batches are covered by
+name. `make_standing_batch.py` now takes `<topic>_<NN>` and writes
+`<topic>_<NN>_ai_boxed/`, `_ai_boxed.zip` and `_images.zip`.
+
+Noticed and left for a decision: the images zips duplicate their folders
+(identical for batches 1, 2, 4, 7 and 8), except glare 03, whose zip holds 3
+images the folder lacks.

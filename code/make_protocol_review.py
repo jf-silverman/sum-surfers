@@ -69,7 +69,7 @@ import detect_surfers as ds  # noqa: E402
 
 CROPS = _ROOT / "data" / "j_shore_cam" / "surf_crops"
 PREDS = _ROOT / "data" / "predictions" / "predictions.csv"
-SPLITS = _ROOT / "data" / "cvat_out_coco" / "splits_tiled_20260921_fog"
+SPLITS = _ROOT / "data" / "cvat" / "splits_tiled_20260921_fog"
 SPOTCHECK = _ROOT / "data" / "reviews" / "model_spotcheck_50" / "review_counts.csv"
 REVIEW_ALL = _ROOT / "data" / "reviews" / "review_all.csv"
 OUT = _ROOT / "data" / "reviews" / "protocol_review"

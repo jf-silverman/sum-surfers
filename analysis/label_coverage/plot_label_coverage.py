@@ -11,7 +11,7 @@ Two charts, both written next to this script:
                               check in predictions.csv
 
 The labeled set is the six raw CVAT exports, one entry per frame.
-`posture_57` is the pose relabel of `reimport_existing_57` (same 57 frames), so
+`original_00_hu_both` is the pose relabel of `original_00_hu_boxed` (same 57 frames), so
 only the newer one is read. The totals match `splits_v2` (172 frames, 3,426
 boxes), which is what the production model trained on.
 
@@ -40,10 +40,10 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
-CVAT = ROOT / "data" / "cvat_out_coco"
+CVAT = ROOT / "data" / "cvat"
 PREDS = ROOT / "data" / "predictions" / "predictions.csv"
 OUT = Path(__file__).resolve().parent
-EXPORTS = ["batch01_73", "fog_19", "glare_12", "glare_more_5", "posture_57", "winter_7"]
+EXPORTS = ["general_01_hu_both", "fog_04_hu_both", "glare_03_hu_both", "glare_03b_hu_both", "original_00_hu_both", "winter_02_hu_both"]
 
 BG, INK, DIM, GRID = "black", "white", "#bbbbbb", "#333333"
 AQUA, LIME = "#3ab4c9", "#9de35a"
@@ -84,7 +84,7 @@ def _footer(fig, text):
 
 def _cvat_note(cv):
     return (f"Labeled set: {len(cv)} frames from {cv.date.min()} to {cv.date.max()}.\n"
-            f"CVAT exports {', '.join(EXPORTS)} (data/cvat_out_coco/).")
+            f"CVAT exports {', '.join(EXPORTS)} (data/cvat/).")
 
 
 def counts_chart(cv):

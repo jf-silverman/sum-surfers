@@ -255,7 +255,7 @@ open-source browser tool for drawing bounding boxes on images. Each
 surfer in each training image got a box drawn around it; CVAT then
 exports that as a dataset the model can train on, in either **COCO** or
 **YOLO** annotation format (see glossary below) — both formats were
-exported and are kept in `data/cvat_out_coco/` and
+exported and are kept in `data/cvat/` and
 `data/cvat_out_yolo_rebuilt/`.
 
 The exported images were tiled to match the same 4-tile split described

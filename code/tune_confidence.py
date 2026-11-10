@@ -19,7 +19,7 @@ The equivalence is asserted against the real production path at CONF_THRESH.
 Raw boxes are cached to --cache so repeat sweeps are instant.
 
 Usage:
-    python code/tune_confidence.py --coco-dir data/cvat_out_coco/splits_v2
+    python code/tune_confidence.py --coco-dir data/cvat/splits_v2
 """
 
 import argparse
@@ -198,7 +198,7 @@ def parse_args():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--coco-dir", type=Path,
-                   default=_PROJECT_ROOT / "data" / "cvat_out_coco" / "splits_v2")
+                   default=_PROJECT_ROOT / "data" / "cvat" / "splits_v2")
     p.add_argument("--split", action="append", choices=["train", "val", "test"],
                    help="repeatable; default val+test")
     p.add_argument("--floor", type=float, default=0.02)

@@ -7,7 +7,7 @@ Part of the training-data-expansion plan (docs/PROJECT_HISTORY.md's
 The original CVAT task for the existing 57 labeled images no longer exists
 (deleted after export), so adding the new "posture" attribute requires
 re-importing them as a fresh CVAT task. This script merges the current
-data/cvat_out_coco/splits/{train,val,test} (a clean, non-overlapping
+data/cvat/splits/{train,val,test} (a clean, non-overlapping
 partition of the original 57 images/1451 annotations -- verified: image
 ids 1-57 and annotation ids 1-1451 with zero collisions across splits)
 back into a single flat COCO 1.0 export, in the exact directory layout
@@ -36,9 +36,9 @@ import zipfile
 from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-SPLITS_DIR = _PROJECT_ROOT / "data" / "cvat_out_coco" / "splits"
-OUT_DIR = _PROJECT_ROOT / "data" / "cvat_out_coco" / "reimport_existing_57"
-OUT_ZIP = _PROJECT_ROOT / "data" / "cvat_out_coco" / "reimport_existing_57.zip"
+SPLITS_DIR = _PROJECT_ROOT / "data" / "cvat" / "splits"
+OUT_DIR = _PROJECT_ROOT / "data" / "cvat" / "original_00_hu_boxed"
+OUT_ZIP = _PROJECT_ROOT / "data" / "cvat" / "original_00_hu_boxed.zip"
 
 SPLITS = ["train", "val", "test"]
 

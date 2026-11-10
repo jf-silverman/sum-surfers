@@ -34,8 +34,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_PROJECT_ROOT / "code"))
 import detect_surfers as ds  # noqa: E402
 
-V2_DIR = _PROJECT_ROOT / "data" / "cvat_out_coco" / "splits_v2"
-TILED_DIR = _PROJECT_ROOT / "data" / "cvat_out_coco" / "splits_tiled_20260921_fog"
+V2_DIR = _PROJECT_ROOT / "data" / "cvat" / "splits_v2"
+TILED_DIR = _PROJECT_ROOT / "data" / "cvat" / "splits_tiled_20260921_fog"
 
 
 def held_out_frames():

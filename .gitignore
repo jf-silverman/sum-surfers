@@ -42,8 +42,6 @@ analysis/count_variability/hour_dense/hourly_variability_analysis.csv
 analysis/count_variability/hour_dense/hourly_variability_full.csv
 analysis/count_variability/hour_dense/hourly_full_counts_2026-08-28.png
 analysis/training_data_expansion/labeling_candidates.csv
-data/cvat_out_coco/reimport_existing_57/
-data/cvat_out_coco/reimport_existing_57.zip
 data/charts/daily/
 data/charts/published/
 data/.last_local_success
@@ -205,16 +203,7 @@ data/eval_out/
 
 # Ultralytics label caches — regenerated on demand and they embed absolute paths
 data/cvat_out_yolo_rebuilt/labels/*.cache
-data/cvat_out_coco/splits/*.cache
-
-# Regenerable from splits/ by build_stratified_splits.py (deterministic given --seed)
-data/cvat_out_coco/splits_v2/
-
-# Raw CVAT export; its normalized contents live in data/cvat_out_coco/posture_57/
-data/cvat_out_coco/posture_export_57_coco.zip
-
-# Labeling batches staged for CVAT upload (copies of surf_crops)
-data/cvat_out_coco/labeling_batch_*
+data/cvat/splits/*.cache
 
 # Sidecar recording which day the published animation covers (local state)
 
@@ -225,22 +214,18 @@ data/compare_detector_*/
 # were committed between 2026-09-14 and 09-21 and remain in git history; they
 # are untracked from here on. Anything to be shared publicly goes out as a
 # deliberately chosen subset, not by default.
-data/cvat_out_coco/posture_57/
-data/cvat_out_coco/batch01_73/
-data/cvat_out_coco/winter_7/
-data/cvat_out_coco/glare_12/
-data/cvat_out_coco/glare_more_5/
-data/cvat_out_coco/fog_19/
-
-# Ablation split: original 57 boxes + new images (local only)
-data/cvat_out_coco/splits_ablation/
+# data/cvat/ (renamed from cvat_out_coco 2026-11-09): everything is local
+# except the two tracked splits. Batch exports are named
+# <topic>_<NN>_<ai|hu>_<boxed|labeled|both>, images as <topic>_<NN>_images.
+data/cvat/*
+!data/cvat/splits/
+!data/cvat/splits_tiled/
 
 # Prioritized bug register — private, like bugs.md
 docs/known_bugs.md
 
 # Night-window human review (crops + verdicts) — local only
 data/reviews/night_window_review/
-
 
 # Hero-image candidates (working set; the chosen one gets committed on its own)
 data/hero_candidates/

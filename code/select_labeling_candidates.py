@@ -16,7 +16,7 @@ just a starting shortlist.
 2. Gap-fill tier: candidates from data/training_features.csv sampled to
    fill in real, verified underrepresentation in the existing training set
    -- by month, tide range, surfer-count range, and weather category --
-   using data/cvat_out_coco/splits/instances_*.json to see what's already
+   using data/cvat/splits/instances_*.json to see what's already
    labeled (excluded from candidates) and training_features.csv's real
    distribution to see what's thin.
 
@@ -40,7 +40,7 @@ DATA_DIR = _PROJECT_ROOT / "data"
 CROPS_DIR = DATA_DIR / "j_shore_cam" / "surf_crops"
 SPOTCHECK_CSV = DATA_DIR / "reviews" / "model_spotcheck_50" / "review_counts.csv"
 TRAINING_FEATURES_CSV = DATA_DIR / "training_features.csv"
-CVAT_SPLITS_DIR = DATA_DIR / "cvat_out_coco" / "splits"
+CVAT_SPLITS_DIR = DATA_DIR / "cvat" / "splits"
 OUT_CSV = _PROJECT_ROOT / "analysis" / "training_data_expansion" / "labeling_candidates.csv"
 
 TIDE_BUCKETS = [(-2, 0, "<0ft"), (0, 2, "0-2ft"), (2, 4, "2-4ft"), (4, 6, "4-6ft"), (6, 8, ">6ft")]

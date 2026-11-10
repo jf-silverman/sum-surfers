@@ -46,7 +46,7 @@ OUT = ROOT / "docs" / "images"
 FEATURES = ROOT / "data" / "training_features.csv"
 FLOG = ROOT / "data" / "forecasts" / "forecast_log.csv"
 CROPS = ROOT / "data" / "j_shore_cam" / "surf_crops"
-CVAT = ROOT / "data" / "cvat_out_coco"
+CVAT = ROOT / "data" / "cvat"
 CLIPS = ROOT / "data" / "not_needed_in_repo" / "surf_clips"
 
 BG, INK, INK_DIM, GRID = "black", "white", "#bbbbbb", "#333333"
@@ -61,11 +61,11 @@ NODATA = "#1a1a1a"
 PIPE_DATE, PIPE_TIME, PIPE_TIME_LABEL = "2026-09-25", "16:20", "4:20 pm"
 PIPE_ZOOM = (640, 1280)     # the right half of the strip, where the lineup sits
 DIM_OUTSIDE = 0.65          # brightness kept outside the counted band in step 1
-# A labeled frame holding a clear example of each pose (batch01_73). The
+# A labeled frame holding a clear example of each pose (general_01_hu_both). The
 # standing example is picked by its box's left edge: the largest "standing"
 # box in the old pick was a paddleboarder, and this one is riding a wave.
 POSE_FRAME = "crop2025-10-15_11-50-00.jpg"
-POSE_SET = "batch01_73"
+POSE_SET = "general_01_hu_both"
 POSE_STANDING_X = 884
 
 

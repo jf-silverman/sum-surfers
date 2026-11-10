@@ -77,7 +77,7 @@ look fine box-by-box while still undercounting crowded frames.
 
 The weights in this repo are the production detector, retrained in September
 2026 on labeled fog, glare and pose data. The evaluator will also run on the
-older labeled splits in `data/cvat_out_coco/splits/`, but those predate the
+older labeled splits in `data/cvat/splits/`, but those predate the
 retrain and the new model trained on some of their frames, so it skips those
 frames automatically (they are listed in
 `data/model_out/20260921_fog/train_filenames.txt`). Per-box precision and

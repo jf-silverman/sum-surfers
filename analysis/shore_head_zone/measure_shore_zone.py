@@ -37,7 +37,7 @@ _ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT / "code"))
 import detect_surfers as ds  # noqa: E402
 
-SPLITS = _ROOT / "data" / "cvat_out_coco" / "splits_tiled_20260921_fog"
+SPLITS = _ROOT / "data" / "cvat" / "splits_tiled_20260921_fog"
 CROPS = _ROOT / "data" / "j_shore_cam" / "surf_crops"
 PREDS_CSV = _ROOT / "data" / "predictions" / "predictions.csv"
 OUT_DIR = Path(__file__).resolve().parent
@@ -78,8 +78,8 @@ def ground_truth():
 
 def untiled_images():
     idx = {}
-    for p in (glob.glob(str(_ROOT / "data/cvat_out_coco/*/images/*.jpg"))
-              + glob.glob(str(_ROOT / "data/cvat_out_coco/splits*/*/*.jpg"))):
+    for p in (glob.glob(str(_ROOT / "data/cvat/*/images/*.jpg"))
+              + glob.glob(str(_ROOT / "data/cvat/splits*/*/*.jpg"))):
         b = os.path.basename(p)
         if "_tile" in b:
             continue

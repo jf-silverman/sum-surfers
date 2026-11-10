@@ -20,16 +20,16 @@ current production model/training data -- nothing production-facing
 changes until you manually point detect_surfers.py's MODEL_PATH (or the
 MODEL_PATH env var) at the new weights, after reviewing the printed
 validation metrics:
-    data/cvat_out_coco/splits_tiled_<run-name>/
+    data/cvat/splits_tiled_<run-name>/
     data/cvat_out_yolo_rebuilt_<run-name>/
     data/model_out/<run-name>/train/weights/best.pt
 
 Usage:
-    # Retrain from the current CVAT export (data/cvat_out_coco/splits/):
+    # Retrain from the current CVAT export (data/cvat/splits/):
     python code/train_model.py
 
     # Retrain from a new/larger CVAT export, with a custom run name:
-    python code/train_model.py --cvat-coco-dir data/cvat_out_coco/splits_2026_11 --run-name 2026_11_retrain --epochs 80
+    python code/train_model.py --cvat-coco-dir data/cvat/splits_2026_11 --run-name 2026_11_retrain --epochs 80
 """
 import argparse
 import json
@@ -58,7 +58,7 @@ SPLITS = ["train", "val", "test"]
 
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--cvat-coco-dir", type=Path, default=DATA_DIR / "cvat_out_coco" / "splits",
+    p.add_argument("--cvat-coco-dir", type=Path, default=DATA_DIR / "cvat" / "splits",
                     help="CVAT COCO export root: expects instances_{train,val,test}.json "
                          "+ {train,val,test}/ image folders (default: the current export)")
     p.add_argument("--run-name", default=datetime.now().strftime("%Y%m%d"),
@@ -238,7 +238,7 @@ def main():
     if not args.cvat_coco_dir.exists():
         raise SystemExit(f"--cvat-coco-dir not found: {args.cvat_coco_dir}")
 
-    tiled_dir = DATA_DIR / "cvat_out_coco" / f"splits_tiled_{args.run_name}"
+    tiled_dir = DATA_DIR / "cvat" / f"splits_tiled_{args.run_name}"
     yolo_dir = DATA_DIR / f"cvat_out_yolo_rebuilt_{args.run_name}"
     model_out_dir = DATA_DIR / "model_out" / args.run_name
 

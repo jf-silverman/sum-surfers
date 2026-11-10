@@ -42,8 +42,8 @@ production training path keeps working until a retrain is actually adopted.
 
 Usage:
     python code/build_stratified_splits.py
-    python code/build_stratified_splits.py --input-dir data/cvat_out_coco/splits \
-                                           --input-dir data/cvat_out_coco/new_export
+    python code/build_stratified_splits.py --input-dir data/cvat/splits \
+                                           --input-dir data/cvat/new_export
     python code/build_stratified_splits.py --test-crowded-min 8 --seed 7
     python code/build_stratified_splits.py --force-test crop2026-08-03_10-02-00.jpg
 """
@@ -61,13 +61,13 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # The pose-tagged, box-corrected export of the original 57 (2026-09-14)
 # supersedes splits/ as the labeled pool.
 # Both labeled exports. --input-dir overrides this; repeat it to add more.
-DEFAULT_INPUT = [_PROJECT_ROOT / "data" / "cvat_out_coco" / "posture_57",
-                 _PROJECT_ROOT / "data" / "cvat_out_coco" / "batch01_73",
-                 _PROJECT_ROOT / "data" / "cvat_out_coco" / "winter_7",
-                 _PROJECT_ROOT / "data" / "cvat_out_coco" / "glare_12",
-                 _PROJECT_ROOT / "data" / "cvat_out_coco" / "glare_more_5",
-                 _PROJECT_ROOT / "data" / "cvat_out_coco" / "fog_19"]
-DEFAULT_OUTPUT = _PROJECT_ROOT / "data" / "cvat_out_coco" / "splits_v2"
+DEFAULT_INPUT = [_PROJECT_ROOT / "data" / "cvat" / "original_00_hu_both",
+                 _PROJECT_ROOT / "data" / "cvat" / "general_01_hu_both",
+                 _PROJECT_ROOT / "data" / "cvat" / "winter_02_hu_both",
+                 _PROJECT_ROOT / "data" / "cvat" / "glare_03_hu_both",
+                 _PROJECT_ROOT / "data" / "cvat" / "glare_03b_hu_both",
+                 _PROJECT_ROOT / "data" / "cvat" / "fog_04_hu_both"]
+DEFAULT_OUTPUT = _PROJECT_ROOT / "data" / "cvat" / "splits_v2"
 
 SPLITS = ["train", "val", "test"]
 DEFAULT_RATIOS = {"train": 0.56, "val": 0.26, "test": 0.18}  # matches the current 32/15/10
