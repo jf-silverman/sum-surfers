@@ -126,3 +126,60 @@ def test_tide_line_spans_the_forecast_hours(tmp_path, monkeypatch):
     monkeypatch.setattr(edr.pdp, "FORECASTS_DIR", tmp_path)
     tide = edr.tide_by_hour(date(2026, 11, 8))
     assert [w.hour for w, _ in tide] == list(range(6, 18))
+
+
+# --- hour_frames (which frame the email shows for an hour) ----------------------
+
+def test_frames_follow_the_table_count(tmp_path, monkeypatch):
+    """2026-11-11: the table's 3 pm hour counted 82 from its 3:44 set, but the
+    frame picker used the hourly clips alone and called 4:02 pm (68) the
+    busiest hour and the biggest miss."""
+    import pandas as pd
+    from datetime import date
+    hourly = {"13:20": 2, "15:08": 48, "16:02": 68}
+    pd.DataFrame([{"date": "2026-11-11", "time_local": t, "quality_ok": True, "surfer_count": c,
+                   "filename": f"crop2026-11-11_{t.replace(':', '-')}-00.jpg",
+                   **{k: c for k in edr.HOURLY_FRAME_COLS}} for t, c in hourly.items()]
+                 ).to_csv(tmp_path / "p.csv", index=False)
+    sets = {"13:38": 3, "13:56": 13, "15:26": 57, "15:44": 82, "16:20": 64, "16:38": 58}
+    rows = []
+    for t, c in sets.items():
+        frames = [c - 5] * 10
+        frames[7] = c
+        rows.append({"date": "2026-11-11", "time_local": t, "quality_ok": True, "set_count": c,
+                     **{f"count_f{i:02d}": v for i, v in enumerate(frames)}})
+    pd.DataFrame(rows).to_csv(tmp_path / "s.csv", index=False)
+    monkeypatch.setattr(edr, "PREDICTIONS_CSV", tmp_path / "p.csv")
+    monkeypatch.setattr(edr, "SUBHOURLY_CSV", tmp_path / "s.csv")
+    hours = {h["hour"].strftime("%H:%M"): h for h in edr.hour_frames(date(2026, 11, 11))}
+    assert hours["15:08"]["count"] == 82
+    assert hours["15:08"]["path"].name == "sub2026-11-11_15-44_f07.jpg"
+    assert hours["16:02"]["path"].name == "crop2026-11-11_16-02-00.jpg"      # its own clip is the max
+    assert hours["13:20"]["path"].name == "crop2026-11-11_13-20-00.jpg"      # a median hour keeps its clip
+    assert max(hours.values(), key=lambda h: h["count"])["hour"].strftime("%H:%M") == "15:08"
+
+
+def test_extreme_frames_draws_the_picked_frames(tmp_path, monkeypatch):
+    """Smoke test of the drawing step: a variable clash there (the hour entry
+    and the image height both named h) crashed the email on 2026-11-13."""
+    import numpy as np
+    import pandas as pd
+    from datetime import date
+    crops = tmp_path / "crops"; crops.mkdir()
+    rows = []
+    for t, c in {"07:02": 0, "13:20": 3, "16:02": 40}.items():
+        name = f"crop2026-11-11_{t.replace(':', '-')}-00.jpg"
+        import cv2
+        cv2.imwrite(str(crops / name), np.zeros((180, 1280, 3), np.uint8))
+        rows.append({"date": "2026-11-11", "time_local": t, "quality_ok": True, "surfer_count": c,
+                     "filename": name, **{k: c for k in edr.HOURLY_FRAME_COLS}})
+    pd.DataFrame(rows).to_csv(tmp_path / "p.csv", index=False)
+    monkeypatch.setattr(edr, "PREDICTIONS_CSV", tmp_path / "p.csv")
+    monkeypatch.setattr(edr, "SUBHOURLY_CSV", tmp_path / "absent.csv")
+    monkeypatch.setattr(edr, "OUT_DIR", tmp_path)
+    monkeypatch.setattr(edr.pdp.ds, "CROPS_DIR", crops)
+    monkeypatch.setattr(edr.pdp, "render_detection_frame",
+                        lambda path, model: (np.zeros((180, 1280, 3), np.uint8), 7))
+    out = edr.extreme_frames(date(2026, 11, 11), model=object())
+    assert [label for label, *_ in out] == ["Busiest hour", "Empty hour", "Quietest hour above zero"]
+    assert all(p.exists() for _l, p, _v, _s in out)

@@ -440,6 +440,56 @@ def tide_by_hour(target_date):
     return out
 
 
+SUBHOURLY_CROPS = _PROJECT_ROOT / "data" / "j_shore_cam" / "subhourly_crops"
+
+
+def hour_frames(target_date):
+    """One entry per counted hour, with the count the table shows and the frame
+    that count came from: [{"hour", "count", "shot", "path"}, ...].
+
+    Since 2026-11-01 the table and chart use each hour's three-look count
+    (hour_counts), but extreme_frames kept choosing hours by the hourly clip
+    alone, so the "busiest" and "biggest miss" frames could name a different
+    hour from the table (11-11: the table's 3 pm hour counted 82 from its
+    3:44 set; the frames picked 4:02 pm at 68). When an hour took the max of
+    its looks and that max is a between-hours set's, the frame shown is that
+    set's most crowded frame; otherwise (the hourly clip's own count, or a
+    median) it is the hourly clip's primary crop.
+    """
+    preds = pd.read_csv(PREDICTIONS_CSV, float_precision="round_trip")
+    preds = preds[(preds["date"] == target_date.isoformat())
+                  & (preds["quality_ok"].astype(str) == "True") & preds["surfer_count"].notna()]
+    day = (target_date.year, target_date.month, target_date.day)
+    files = {datetime(*day, *map(int, str(r["time_local"]).split(":")[:2])): r["filename"]
+             for _, r in preds.iterrows()}
+    sub_rows = {}
+    if SUBHOURLY_CSV.exists():
+        sub = pd.read_csv(SUBHOURLY_CSV)
+        sub = sub[(sub["date"] == target_date.isoformat())
+                  & (sub["quality_ok"].astype(str) == "True") & sub["set_count"].notna()]
+        sub_rows = {datetime(*day, *map(int, str(r["time_local"]).split(":")[:2])): r
+                    for _, r in sub.iterrows()}
+    actuals = actual_counts(target_date)
+    subs = subhourly_counts(target_date)
+    out = []
+    for i, (when, count, looks) in enumerate(hour_counts(actuals, subs, frame_counts(target_date))):
+        entry = {"hour": when, "count": count, "shot": when,
+                 "path": pdp.ds.CROPS_DIR / files.get(when, "")}
+        took_max = len(looks) > 1 and sum(v >= HOUR_CUT for v in looks) > len(looks) / 2
+        if took_max and count != looks[0]:
+            end = actuals[i + 1][0] if i + 1 < len(actuals) else datetime.max
+            for t in sorted(sub_rows):
+                r = sub_rows[t]
+                if when < t < end and float(r["set_count"]) == count:
+                    counts = [r.get(f"count_f{k:02d}") for k in range(10)]
+                    best = max(range(10), key=lambda k: -1 if pd.isna(counts[k]) else counts[k])
+                    name = f"sub{target_date.isoformat()}_{t.strftime('%H-%M')}_f{best:02d}.jpg"
+                    entry.update(shot=t, path=SUBHOURLY_CROPS / target_date.isoformat() / name)
+                    break
+        out.append(entry)
+    return out
+
+
 def extreme_frames(target_date, model=None, forecast_rows=None):
     """Detector frames at the day's telling hours.
 
@@ -455,63 +505,48 @@ def extreme_frames(target_date, model=None, forecast_rows=None):
 
     Returns [(label, path, visible_count, stamp), ...].
     """
-    df = pd.read_csv(PREDICTIONS_CSV, float_precision="round_trip")
-    df = df[(df["date"] == target_date.isoformat())
-            & (df["quality_ok"].astype(str) == "True")
-            & df["surfer_count"].notna()]
-    if df.empty:
+    hours = hour_frames(target_date)
+    if not hours:
         return []
 
-    picks = []          # (label, row, extra banner text)
-    busiest = df.loc[df["surfer_count"].idxmax()]
+    picks = []          # (label, hour entry, extra banner text)
+    busiest = max(hours, key=lambda h: h["count"])
     picks.append(("Busiest hour", busiest, ""))
-    zeros = df[df["surfer_count"] == 0]
-    if not zeros.empty:
-        picks.append(("Empty hour", zeros.iloc[0], ""))
-    nonzero = df[df["surfer_count"] > 0]
-    if not nonzero.empty:
-        quietest = nonzero.loc[nonzero["surfer_count"].idxmin()]
-        if quietest["filename"] != busiest["filename"]:
+    zeros = [h for h in hours if h["count"] == 0]
+    if zeros:
+        picks.append(("Empty hour", zeros[0], ""))
+    nonzero = [h for h in hours if h["count"] > 0]
+    if nonzero:
+        quietest = min(nonzero, key=lambda h: h["count"])
+        if quietest["path"] != busiest["path"]:
             picks.append(("Quietest hour above zero", quietest, ""))
 
-    # The hour the forecast missed by the most. Matched on the hour number, the
-    # same way the hour-by-hour table matches, so a clip taken at 10:02 is
-    # scored against the 10:00 forecast.
     if forecast_rows:
         by_hour = {r["hour"].hour: r for r in forecast_rows}
-        best_gap, best_row, best_f = -1.0, None, None
-        for _i, row in df.iterrows():
-            hr = int(str(row["time_local"]).split(":")[0])
-            f = by_hour.get(hr)
+        best_gap, best_h, best_f = -1.0, None, None
+        for h in hours:
+            f = by_hour.get(h["hour"].hour)
             if f is None:
                 continue
-            gap = abs(f["point"] - row["surfer_count"])
+            gap = abs(f["point"] - h["count"])
             if gap > best_gap:
-                best_gap, best_row, best_f = gap, row, f
-        if best_row is not None and best_gap > 0:
-            direction = "over" if best_f["point"] > best_row["surfer_count"] else "under"
+                best_gap, best_h, best_f = gap, h, f
+        if best_h is not None and best_gap > 0:
+            direction = "over" if best_f["point"] > best_h["count"] else "under"
             note = f"  |  forecast {best_f['point']:.1f}, {direction} by {best_gap:.1f}"
-            dup = next((i for i, (_l, r, _e) in enumerate(picks)
-                        if r["filename"] == best_row["filename"]), None)
+            dup = next((i for i, (_l, h, _e) in enumerate(picks) if h["path"] == best_h["path"]), None)
             if dup is None:
-                picks.append(("Biggest forecast miss", best_row, note))
+                picks.append(("Biggest forecast miss", best_h, note))
             else:
-                # The worst-missed hour is sometimes also the busiest, emptiest
-                # or quietest one. Dropping the entry in that case -- which is
-                # what this did until 2026-10-01 -- loses the single most useful
-                # fact in the report with no mention of it, and the reader just
-                # sees one fewer attachment. Fold the miss into the frame that is
-                # already there instead, so it is still reported and the image is
-                # not attached twice.
-                label, row, _old = picks[dup]
-                picks[dup] = (f"{label} (also the biggest forecast miss)", row, note)
+                label, h, _old = picks[dup]
+                picks[dup] = (f"{label} (also the biggest forecast miss)", h, note)
 
     if model is None:
         model = pdp.ds.load_model()
 
     out = []
-    for label, row, extra in picks:
-        img_path = pdp.ds.CROPS_DIR / row["filename"]
+    for label, ent, extra in picks:
+        img_path = ent["path"]
         if not img_path.exists():
             continue
         frame, visible = pdp.render_detection_frame(img_path, model)
@@ -521,11 +556,11 @@ def extreme_frames(target_date, model=None, forecast_rows=None):
         h, w = frame.shape[:2]
         canvas = np.zeros((h + banner_h, w, 3), dtype=np.uint8)
         canvas[:h] = frame
-        hh, mm = map(int, str(row["time_local"]).split(":")[:2])
-        stamp = datetime(target_date.year, target_date.month, target_date.day,
-                         hh, mm).strftime("%-I:%M %p")
-        caption = (f"{label}  |  {stamp}  |  {visible} in this frame "
-                   f"(hour counted {row['surfer_count']:.0f}){extra}")
+        stamp = ent["shot"].strftime("%-I:%M %p")
+        where = ("" if ent["shot"] == ent["hour"]
+                 else f" (between-hours set, {ent['hour'].strftime('%-I:%M %p')} hour)")
+        caption = (f"{label}  |  {stamp}{where}  |  {visible} in this frame "
+                   f"(hour counted {ent['count']:.0f}){extra}")
         # Shrink to fit rather than run off the edge. The caption grew variable
         # in length once a frame could carry two roles plus the forecast miss,
         # and at a fixed 0.9 the longest version was silently clipped -- losing

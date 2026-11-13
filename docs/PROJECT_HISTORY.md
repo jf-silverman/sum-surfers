@@ -7376,3 +7376,18 @@ sizes match, no degenerate boxes, 114 standing over 16 clips. Four frames
 without a standing rider were dropped at his request (one, 16-37 t17, had all
 29 boxes still `unknown`): 58 images, 1,240 boxes; the original is kept as
 `standing_07_hu_both.before_drop.zip`.
+
+## 2026-11-13 — Email frames now follow the table's hour counts
+
+Joel saw the 11-11 email table put the day's top count at 3 pm (82) but the
+"busiest hour" and "biggest forecast miss" frames at 4:02 pm (68). The frame
+picker had never moved to the three-look counts of 2026-11-01: it ranked hours
+by the hourly clip alone (3:08 pm clip 48, 4:02 pm clip 68), while the table's
+3 pm hour took the max of its looks, 82, from the 3:44 between-hours set.
+`email_daily_report.hour_frames` now gives each hour the table's count and the
+frame it came from: when an hour took the max of its looks and that max is a
+between-hours set's, the set's most crowded frame; otherwise the hourly
+clip's primary crop (median hours keep their clip). The caption names the
+set and its hour. Re-rendered 11-11: busiest and biggest miss are the 3 pm
+hour, shown at 3:44 with 82 boxes, forecast 26.8, under by 55.2. Logged as
+F51; two tests.
