@@ -104,6 +104,14 @@ against the 16-origin baseline; adopt only with a clear gain. Leave general
 "bad conditions" alone unless the record turns: before 11-03, POOR, rain or
 10+ mph wind hours were under-forecast (ratio 1.15).
 
+**Add strong wind (2026-11-13).** 11-12 was empty all day (0–1 surfers, POOR,
+14–17 mph wind every afternoon hour, no rain) while every version of the
+forecast said about 20–30 from 2 pm; frames were clear and confirmed empty by
+eye. Before 11-02 the record had no hour at 15+ mph; now 11-03 and 11-12 both
+supply empty ones. Test a correction for POOR rating with wind of about 14+
+mph alongside the rain one, same method, and check it would not have cut the
+busy 10+ mph afternoons (those ran at 1.07 of forecast).
+
 ### 3e. Daylight remaining (Joel, 2026-11-09)
 
 After the switch to standard time the crowd peak settled around 3-4 pm. It

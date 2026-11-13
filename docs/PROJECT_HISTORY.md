@@ -7404,3 +7404,17 @@ within the hour (11-11: 23 → 41 → 48 at 2 pm, 48 → 57 → 82 at 3 pm, then
 68 → 64 → 58 at 4 pm toward last light). The max-of-looks count therefore
 leans to the end of a building hour; worth remembering if it is ever compared
 with hand counts taken at the hourly clip.
+
+## 2026-11-13 — A three-look forecast target on 11-12: an empty, windy day
+
+Joel asked what a forecast trained on the three-look hour count (the
+2026-11-01 rule) would have said for 11-12. Retrained on rows through 11-11
+from the inputs saved with the 11-12 record, median only, no recalibration:
+hourly-clip target 8.0 MAE (bias +7.8) against the three-look counts; mixed
+(three-look from 10-22, 263 hours on 21 days, mean 15.7 vs 12.2 on the clip)
+8.9 (+8.7); three-look only 9.0 (+8.6), with a sharper 4 pm peak (31). The
+published, recalibrated forecast scored 6.8. The day was empty: 0–1 surfers
+all day, POOR with 14–17 mph wind every afternoon hour, frames clear and
+checked by eye, so it cannot judge the target; it does repeat 11-03's lesson
+that the model ignores bad conditions. Strong wind added to the December
+stormy-day item (3d).
