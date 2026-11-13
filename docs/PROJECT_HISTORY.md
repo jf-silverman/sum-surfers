@@ -7391,3 +7391,16 @@ clip's primary crop (median hours keep their clip). The caption names the
 set and its hour. Re-rendered 11-11: busiest and biggest miss are the 3 pm
 hour, shown at 3:44 with 82 boxes, forecast 26.8, under by 55.2. Logged as
 F51; two tests.
+
+**Why the three looks differ so much on busy hours (same day).** Joel
+suggested the pumping swell hid more surfers between waves, widening the
+spread. Over 99 busy hours (any look 15+) on 20 days since 10-22, the spread
+of the three looks ((max − min) / max, median 0.37; 11-11 0.41) is unrelated
+to nearshore energy (rank correlation −0.07, p 0.50), surf height (−0.06),
+period (+0.12, p 0.24) or consistency (−0.05). What does stand out is
+direction: the looks rise through the hour in 35% of busy hours and fall in
+17%, against about 17% each by chance, so the crowd is often still building
+within the hour (11-11: 23 → 41 → 48 at 2 pm, 48 → 57 → 82 at 3 pm, then
+68 → 64 → 58 at 4 pm toward last light). The max-of-looks count therefore
+leans to the end of a building hour; worth remembering if it is ever compared
+with hand counts taken at the hourly clip.
