@@ -7418,3 +7418,27 @@ all day, POOR with 14–17 mph wind every afternoon hour, frames clear and
 checked by eye, so it cannot judge the target; it does repeat 11-03's lesson
 that the model ignores bad conditions. Strong wind added to the December
 stormy-day item (3d).
+
+## 2026-11-13 — Training on the three-look scale: no gain over mapping the forecast
+
+Joel proposed training on the three-look hour count where it exists (from
+10-22) and the hourly clip before (mixed). The alternative was mapping the
+clip history onto the three-look scale. `analysis/hour_max_view/test_three_look_calibrated.py`
+(local) fitted an isotonic map from clip count to three-look count on 269
+overlap hours from 22 days (clip 5 → 9.1, 10 → 15.0, 20 → 30.9, 40 → 51.1,
+60 → 61.0; map error 3.25 against 3.86 for a flat ×1.289) and scored three
+arms on 16 origins against the three-look count where it exists and the mapped
+clip count elsewhere:
+
+| arm | MAE | vs base | p | better |
+|---|---:|---:|---:|---:|
+| current model, predictions mapped (base) | 7.716 | — | — | — |
+| mixed target | 8.429 | +0.713 | 0.094 | 7/16 |
+| history mapped, then trained | 7.871 | +0.155 | 0.335 | 5/16 |
+
+On the 3 origins with 20+ real three-look test hours, against real three-look
+counts only: 7.52 / 7.74 / 7.42. Mixed is worst, as expected from the scale
+jump at 10-22; retraining on mapped history gains nothing over mapping the
+current forecast afterwards. Joel's longer plan stands (train on three-look
+counts once there is about a year of them). The map is fitted on detector
+counts only; which count is closer to the true crowd still needs hand counts.
