@@ -7442,3 +7442,24 @@ jump at 10-22; retraining on mapped history gains nothing over mapping the
 current forecast afterwards. Joel's longer plan stands (train on three-look
 counts once there is about a year of them). The map is fitted on detector
 counts only; which count is closer to the true crowd still needs hand counts.
+
+## 2026-11-13 — `watch_live.py` ready for a dense all-day trial
+
+Joel asked whether the free live stream could give a look every 2 minutes all
+day. `watch_live.py` already records a few seconds of the public HLS stream
+(no account), cuts frames the pipeline's way and counts them. Added
+`--primary-only`: keep and count only the 2.5 s frame (the side frames are
+1.5 s either side and near-identical), so a 2-minute run stores about 30
+full-quality frames an hour, 17-20 GB a year, against about 55 GB with all
+three. The stream lookup (`services.surfline.com`) and each ffmpeg recording
+are now logged in `data/logs/surfline_requests.csv` (kinds `live_reports`,
+`live_hls`). Checked with one live grab (after dark, correctly gated as too
+dark; one frame saved; both requests logged) and on the 11-11 3:08 pm clip fed
+in place of the stream (48 counted from one frame). Test in
+`tests/test_watch_live.py`. Joel will pick the trial day; it only collects
+while the Mac is awake and the process runs.
+
+Also recorded: the kept hourly clips run from 2025-10-11 to now, 177 days
+(Oct 2025 18, Nov 20, Dec 7, Mar 2026 5, May 5, Jul 20, Aug 29, Sep 30,
+Oct 31, Nov 12), mostly 6.2 s long, already recounted at five frames on
+2026-10-26.

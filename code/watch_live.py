@@ -64,6 +64,8 @@ from get_cropped_frame import (  # noqa: E402
     FRAME_TIME_SEC, SIDE_FRAME_OFFSET_SEC, ROI_X, ROI_Y, ROI_W, ROI_H, extract_frame_at,
 )
 import detect_surfers as ds  # noqa: E402
+import surfline_request_log as srl  # noqa: E402
+from types import SimpleNamespace  # noqa: E402
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -98,8 +100,13 @@ def resolve_stream_url():
     required — services.surfline.com puts a Cloudflare bot check in front of
     plain requests, which 403s regardless of whether a token is present.
     """
-    resp = requests.get(REPORTS_URL, params={"spotId": SPOT_ID},
-                        headers=REQUEST_HEADERS, timeout=20)
+    try:
+        resp = requests.get(REPORTS_URL, params={"spotId": SPOT_ID},
+                            headers=REQUEST_HEADERS, timeout=20)
+    except requests.RequestException:
+        srl.record("live_reports", REPORTS_URL, None)
+        raise
+    srl.record("live_reports", REPORTS_URL, resp)
     resp.raise_for_status()
     data = resp.json()
     cameras = (data.get("spot") or {}).get("cameras") or data.get("cameras") or []
@@ -133,7 +140,14 @@ def record_clip(stream_url, dest_path, duration_sec=CLIP_DURATION_SEC):
         "-i", stream_url,
         "-t", str(duration_sec), "-c", "copy", "-y", str(dest_path),
     ]
+    started = time.monotonic()
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT_SEC)
+    # Logged like a request (surfline_request_log, 2026-11-13) so a block or an
+    # outage on the stream shows up beside the API's; ffmpeg gives no HTTP code.
+    ok = proc.returncode == 0 and dest_path.exists()
+    srl.record("live_hls", stream_url, SimpleNamespace(
+        status_code=200 if ok else f"ffmpeg_rc{proc.returncode}", url=stream_url, headers={},
+        elapsed=timedelta(seconds=time.monotonic() - started)))
     if proc.returncode != 0 or not dest_path.exists():
         raise RuntimeError(f"ffmpeg failed (rc={proc.returncode}): {proc.stderr.strip()[:300]}")
 
@@ -211,8 +225,15 @@ def migrate_csv_header(out_csv):
         + f"). Previous file saved as {backup.name}.")
 
 
-def collect_once(model, stream_url, frames_dir, out_csv):
-    """One clip -> three crops -> quality gate -> detection. Returns the row written."""
+def collect_once(model, stream_url, frames_dir, out_csv, primary_only=False):
+    """One clip -> three crops -> quality gate -> detection. Returns the row written.
+
+    primary_only (2026-11-13, for an all-day dense run): cut, keep and count only
+    the 2.5 s frame. The side frames are 1.5 s either side and nearly the same
+    picture, and at one grab every 2 minutes keeping all three at full quality
+    is about 55 GB a year against 17-20 GB for one. The row then carries the
+    single count in surfer_count and frame_count_2, the side columns blank.
+    """
     now = datetime.now(pytz.timezone(LOCATION["timezone"]))
     stamp = now.strftime("%Y-%m-%d_%H-%M-%S")
     # "live" prefix, not the pipeline's "crop", so these files can never be
@@ -228,8 +249,9 @@ def collect_once(model, stream_url, frames_dir, out_csv):
         # Same three offsets the production cropper uses, so per-frame counts
         # here are sampled the same way as every row already in the dataset.
         extract_frame_at(clip_path, FRAME_TIME_SEC, primary_path)
-        extract_frame_at(clip_path, FRAME_TIME_SEC - SIDE_FRAME_OFFSET_SEC, side1_path)
-        extract_frame_at(clip_path, FRAME_TIME_SEC + SIDE_FRAME_OFFSET_SEC, side2_path)
+        if not primary_only:
+            extract_frame_at(clip_path, FRAME_TIME_SEC - SIDE_FRAME_OFFSET_SEC, side1_path)
+            extract_frame_at(clip_path, FRAME_TIME_SEC + SIDE_FRAME_OFFSET_SEC, side2_path)
     finally:
         # The clip is only a means to the three crops; keeping them would fill
         # a disk fast at this cadence.
@@ -237,7 +259,14 @@ def collect_once(model, stream_url, frames_dir, out_csv):
 
     quality_ok, reason, brightness, lap_var = ds.compute_image_quality(primary_path)
     glare_frac = ds.compute_glare_frac(primary_path)
-    if quality_ok:
+    if quality_ok and primary_only:
+        boxes = ds.run_inference_with_boxes(model, primary_path)
+        n = len(boxes)
+        counts = {"surfer_count": n,
+                  "confidence_avg": round(sum(b[4] for b in boxes) / n, 4) if n else "",
+                  "frame_count_1": "", "frame_count_2": n, "frame_count_3": "",
+                  "frame_count_mean": n, "frame_count_stdev": ""}
+    elif quality_ok:
         counts = ds.run_inference_multi(model, primary_path)
     else:
         # Same policy as detect_surfers.py: don't spend inference on a frame the
@@ -328,6 +357,8 @@ def parse_args():
                    help="Collect regardless of the daylight window (for testing)")
     p.add_argument("--wait", action="store_true",
                    help="At night, wait for first light without asking")
+    p.add_argument("--primary-only", action="store_true",
+                   help="Keep and count only the main frame of each grab (for dense all-day runs)")
     p.add_argument("--frames-dir", type=Path, default=DEFAULT_FRAMES_DIR)
     p.add_argument("--out-csv", type=Path, default=DEFAULT_OUT_CSV)
     return p.parse_args()
@@ -390,7 +421,8 @@ def main():
                 log(f"WARNING: could not refresh stream URL ({e}); reusing the previous one")
 
         try:
-            row = collect_once(model, stream_url, args.frames_dir, args.out_csv)
+            row = collect_once(model, stream_url, args.frames_dir, args.out_csv,
+                               primary_only=args.primary_only)
             failures = 0
             if row["quality_ok"]:
                 log(f"{row['filename']}: {row['surfer_count']} surfers "
