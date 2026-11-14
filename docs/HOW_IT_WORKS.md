@@ -512,6 +512,17 @@ the published one (`shadow_tide_corr_predicted`), so the early-December review
 can score both on the same days. The week chart's yellow outline still marks
 hours that stay under 3 ft even with the correction.
 
+**Official weather warnings (from 2026-11-14).** Each night
+`code/fetch_nws_alerts.py` records National Weather Service alerts for Jack's
+land zone (CAZ529, Northern Monterey Bay) and marine zone (PZZ535, Monterey
+Bay) from the public NWS feed into `data/predictor_vars/nws_alerts.csv`, along
+with the Iowa Environmental Mesonet archive of earlier alerts. When a High Surf,
+Wind, Flood, Gale or Storm warning covers the forecast day, the forecast chart,
+the week chart and the evening email say so ("expect fewer surfers than
+forecast"). The model does not use them yet: none of those warnings has
+overlapped a counted day so far. Beach Hazards Statements are recorded but not
+flagged, since they go out on big-swell days that draw surfers.
+
 ## Forecast accuracy and calibration
 
 The forecast model is off by about **7.6 surfers** ([MAE](#term-mae)) on a

@@ -122,7 +122,7 @@ def test_fires_when_every_lower_edge_is_pinned(isolated):
     fdir, _ = isolated
     write_forecast(fdir, "forecast_2026-11-01.csv", [0.0, 0.0, 0.0, 0.0])
     note = edr.band_health_note()
-    assert "does not vary at all" in note and "every hour at 0.00" in note
+    assert "does not vary at all" in note and "every one at 0.00" in note
 
 
 def test_fires_when_the_edge_is_flat_but_not_zero(isolated):
@@ -157,7 +157,7 @@ def test_fires_on_a_near_total_pin(isolated):
     fdir, _ = isolated
     write_forecast(fdir, "forecast_2026-11-01.csv", [0.0, 0.0, 0.0, 0.0, 6.5])
     note = edr.band_health_note()
-    assert "sits at zero on 4 of 5 hours" in note
+    assert "sits at zero on 4 of the 5 hours forecast at 5+" in note
 
 
 def test_the_pinned_share_trigger_is_inclusive(isolated):
@@ -165,7 +165,7 @@ def test_the_pinned_share_trigger_is_inclusive(isolated):
     n_zero = int(round(10 * edr.LOWER_EDGE_PINNED_SHARE_TRIGGER))
     edges = [0.0] * n_zero + [float(i + 1) for i in range(10 - n_zero)]
     write_forecast(fdir, "forecast_2026-11-01.csv", edges)
-    assert f"sits at zero on {n_zero} of 10 hours" in edr.band_health_note()
+    assert f"sits at zero on {n_zero} of the 10 hours forecast at 5+" in edr.band_health_note()
 
 
 def test_a_single_hour_forecast_is_not_called_a_collapse(isolated):
@@ -259,3 +259,17 @@ def test_hurdle_eval_uses_a_forward_day_split():
     assert "train_test_split" not in src, (
         "eval_hurdle_model is back on a random row split, which leaks (B21)")
     assert 'scheme="forward"' in src
+
+
+def test_quiet_when_zero_edges_sit_under_quiet_forecasts(isolated):
+    """2026-11-13: a stormy, high-tide day forecast near zero for 10 of 12
+    hours, each with a zero lower edge -- the hurdle correctly saying "empty".
+    Only zero edges under busy forecasts are a collapse."""
+    fdir, _ = isolated
+    rows = ([{"predicted": 0.0, "lower_q10": 0.0}] * 10
+            + [{"predicted": 16.4, "lower_q10": 4.0}, {"predicted": 19.3, "lower_q10": 5.4}])
+    pd.DataFrame([{"date": "2026-11-13", "hour_local": f"{6 + i:02d}:00", **r,
+                   "upper_q90": r["predicted"] + 20, "band_lower_q": 0.15, "band_upper_q": 0.90}
+                  for i, r in enumerate(rows)], columns=FORECAST_COLS).to_csv(
+        fdir / "forecast_2026-11-13.csv", index=False)
+    assert edr.band_health_note() == ""

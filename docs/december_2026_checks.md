@@ -104,6 +104,8 @@ against the 16-origin baseline; adopt only with a clear gain. Leave general
 "bad conditions" alone unless the record turns: before 11-03, POOR, rain or
 10+ mph wind hours were under-forecast (ratio 1.15).
 
+**Add NWS warnings (2026-11-14).** `data/predictor_vars/nws_alerts.csv` now records High Surf / Wind / Flood / Gale / Storm warnings nightly (the first one during collection, a High Surf Warning, covered 11-13 evening to 11-15). Test a "warning in effect" flag alongside rain and wind, if enough warned days have been counted by then.
+
 **Add strong wind (2026-11-13).** 11-12 was empty all day (0–1 surfers, POOR,
 14–17 mph wind every afternoon hour, no rain) while every version of the
 forecast said about 20–30 from 2 pm; frames were clear and confirmed empty by

@@ -54,7 +54,8 @@ from sklearn.inspection import permutation_importance
 from sklearn.model_selection import train_test_split
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import get_clips as gc  # noqa: E402 — needed for get_light_window() (real dawn/dusk)
+import get_clips as gc  # noqa: E402
+import fetch_nws_alerts as nws  # noqa: E402 — needed for get_light_window() (real dawn/dusk)
 import get_surf_predictors as sp  # noqa: E402
 import detect_surfers as ds  # noqa: E402
 from fit_surfer_count_model import (  # noqa: E402
@@ -691,6 +692,14 @@ def main():
     for spine in ax2.spines.values():
         spine.set_color(GRID_COLOR)
 
+    # Official NWS warnings for the day (fetch_nws_alerts.py, 2026-11-14). The
+    # model does not see them; the line warns the reader on stormy days like
+    # 11-03 and 11-12, which it forecast busy and which were empty.
+    nws_note = nws.flag_text(target_date)
+    if nws_note:
+        ax.text(0.5, 0.97, nws_note, transform=ax.transAxes, ha="center", va="top",
+                fontsize=11, color="black", zorder=10,
+                bbox=dict(boxstyle="round,pad=0.35", facecolor=CORAL, edgecolor="none"))
     ax.set_title(f"Predicted surfer count — {target_date.strftime('%A, %B %d, %Y')}",
                  color=TEXT_COLOR, pad=18)
     ax.set_xlabel("Time", color=TEXT_COLOR)
@@ -1336,7 +1345,8 @@ def generate_week_chart(made_date, day_records, n_train_rows):
     ax.set_xticks([i + 0.5 for i in range(n_cols)])
     ax.set_xticklabels([datetime(2000, 1, 1, h).strftime("%-I%p").lower() for h in hour_cols])
     ax.set_yticks([i + 0.5 for i in range(n_rows)])
-    ax.set_yticklabels([d.strftime("%a %-d %b") for d, _ in day_records])
+    warned = {d: nws.flag_text(d) for d, _ in day_records}
+    ax.set_yticklabels([d.strftime("%a %-d %b") + (" *" if warned[d] else "") for d, _ in day_records])
     ax.tick_params(axis="both", colors=TEXT_COLOR, length=0)
     ax.set_title(f"Crowd outlook — {day_records[0][0].strftime('%a %-d %b')} to "
                  f"{day_records[-1][0].strftime('%a %-d %b %Y')}", color=TEXT_COLOR)
@@ -1409,6 +1419,9 @@ def generate_week_chart(made_date, day_records, n_train_rows):
     if good_surf_cells:
         notes.append(f"{good_surf_cells} of those also have a purple inner outline: "
                      f"Surfline rates the surf fair or better that hour")
+    for d, text in warned.items():
+        if text:
+            notes.append(f"* {d.strftime('%a %-d')}: {text}")
     short = FORECAST_DAYS - len(day_records)
     if short:
         notes.append(f"{short} of the {FORECAST_DAYS} requested days had no forecast data "

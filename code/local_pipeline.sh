@@ -154,6 +154,15 @@ log "Step 6b — Fetching the NOAA tide residual..."
 run_step "Step 6b (tide residual)" "$PYTHON" code/backfill_tide_residual.py
 log "Step 6b done."
 
+# ── Step 6c: NWS alerts (High Surf / Wind / Flood warnings) ───────────────────
+# Added 2026-11-14. Records official warnings for Jack's land and marine zones
+# (public NWS API, no account) into data/predictor_vars/nws_alerts.csv. The
+# forecast chart and the email flag tomorrow's warnings; the model does not use
+# them yet. Must run before step 9.
+log "Step 6c — Fetching NWS alerts..."
+run_step "Step 6c (NWS alerts)" "$PYTHON" code/fetch_nws_alerts.py
+log "Step 6c done."
+
 # ── Step 7: Rebuild the model's training table ───────────────────────────────
 # Joins predictions (target) with all predictor sources (features). Also
 # manual-only until 2026-09-09 — see Step 6. Rebuilt from scratch each run.

@@ -7463,3 +7463,30 @@ Also recorded: the kept hourly clips run from 2025-10-11 to now, 177 days
 (Oct 2025 18, Nov 20, Dec 7, Mar 2026 5, May 5, Jul 20, Aug 29, Sep 30,
 Oct 31, Nov 12), mostly 6.2 s long, already recounted at five frames on
 2026-10-26.
+
+## 2026-11-14 — NWS warnings recorded and flagged; band check stops crying wolf
+
+Joel got the forecast band warning on 11-13's forecast and asked whether
+official "stay out of the water" calls could predict empty days.
+
+**Band check (F52).** The lower-edge test counted every hour, so a correctly
+quiet forecast (11-13: VERY_POOR, 15–23 mph wind, rain, midday tide 4.2–4.8 ft,
+forecast 0 on 10 of 12 hours) tripped "pinned at zero". It now looks only at
+hours forecast at 5+ surfers. The same email's other note stands: empty hours
+passed 30% of the last 30 days (31%), the October-agreed point to revisit the
+hurdle model for the median.
+
+**NWS alerts.** The Iowa Environmental Mesonet archive gives 104 alerts for
+Jack's point since 2025-09 (zone CAZ529). On counted daylight hours: Beach
+Hazards Statement 422 hours on 46 days, mean count 18.2 against 15.0 otherwise,
+forecast on target (1.01); Coastal Flood Advisory 370 hours, 11.8 vs 17.0,
+forecast 1.06 (tide covers it); High Surf, Wind and Flood warnings none at all
+(they fell in uncounted months or at night). So the strong warnings cannot be
+tested yet. `code/fetch_nws_alerts.py` (pipeline step 6c) now records alerts
+nightly for CAZ529 and the marine zone PZZ535 from the public NWS API, with the
+archive backfilled; `flag_text()` drives a banner on the forecast chart, a
+starred day plus note on the week chart, and a line in the email when a High
+Surf, Wind, Flood, Gale or Storm warning covers the day. The first live case,
+a High Surf Warning from 11-13 6 pm to 11-15 4 am, is on 11-14's chart. Tests
+in `tests/test_nws_alerts.py`; 120 pass. Testing a warning flag as a model
+input joins the December stormy-day item.

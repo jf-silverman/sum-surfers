@@ -41,6 +41,7 @@ import pandas as pd  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import plot_daily_prediction as pdp  # noqa: E402
 import surfline_request_log as srl  # noqa: E402
+import fetch_nws_alerts as nws  # noqa: E402
 from send_email import send_email  # noqa: E402
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -248,6 +249,12 @@ EMPTY_SHARE_TRIGGER = 0.30
 # the worst legitimate share seen and below a genuine collapse, which is 1.00.
 LOWER_EDGE_PINNED_SHARE_TRIGGER = 0.80
 FLAT_EDGE_TOLERANCE = 0.01   # an edge this flat across a day is a constant
+# Both edge tests look only at hours the forecast itself calls busy. A zero
+# lower edge under a zero forecast is the hurdle saying "empty", which is what
+# a stormy, high-tide day should look like; on 2026-11-13 (VERY_POOR, 15-23 mph
+# wind, rain, midday tide 4.2-4.8 ft) 10 of 12 hours were that, and the check
+# raised a false alarm. A collapse shows as zero edges under BUSY forecasts.
+BUSY_FORECAST_MIN = 5.0
 EMPTY_SHARE_WINDOW_DAYS = 30
 
 
@@ -343,15 +350,17 @@ def band_health_note():
         try:
             fc = pd.read_csv(newest[-1])
             lo_q = float(fc["band_lower_q"].iloc[0]) if "band_lower_q" in fc else 0.10
-            lower = pd.to_numeric(fc["lower_q10"], errors="coerce").dropna()
+            busy = pd.to_numeric(fc["predicted"], errors="coerce") >= BUSY_FORECAST_MIN
+            lower = pd.to_numeric(fc.loc[busy, "lower_q10"], errors="coerce").dropna()
             pinned = int((lower <= 0).sum())
             share = pinned / len(lower) if len(lower) else 0.0
             # A single hour cannot be "constant"; don't call one a collapse.
             flat = len(lower) > 1 and float(lower.max() - lower.min()) <= FLAT_EDGE_TOLERANCE
             if flat or share >= LOWER_EDGE_PINNED_SHARE_TRIGGER:
-                why = (f"does not vary at all across the day (every hour at "
-                       f"{lower.iloc[0]:.2f})" if flat else
-                       f"sits at zero on {pinned} of {len(lower)} hours")
+                why = (f"does not vary at all across the hours forecast at "
+                       f"{BUSY_FORECAST_MIN:g}+ (every one at {lower.iloc[0]:.2f})" if flat else
+                       f"sits at zero on {pinned} of the {len(lower)} hours forecast at "
+                       f"{BUSY_FORECAST_MIN:g}+ surfers")
                 lines.append(
                     f"The forecast band's lower edge {why} in {newest[-1].name} "
                     f"(nominal lower quantile q{lo_q:g}). A band that cannot be missed "
@@ -889,6 +898,15 @@ def main():
         look.append("the week ahead")
     lookahead_note = ("\nAlso attached, looking forward rather than back: "
                       + " and ".join(look) + ".\n") if look else ""
+    # Official NWS warnings for the day the newest forecast covers (2026-11-14).
+    newest_fc = sorted(pdp.FORECASTS_DIR.glob("forecast_20*.csv"))
+    nws_note = ""
+    if newest_fc:
+        fc_day = datetime.strptime(newest_fc[-1].stem.split("_")[1], "%Y-%m-%d").date()
+        flag = nws.flag_text(fc_day)
+        if flag:
+            nws_note = f"Tomorrow ({fc_day.strftime('%a %b %d')}): {flag}."
+            lookahead_note = f"\n{nws_note}\n" + lookahead_note
 
     body = (f"Surf crowd forecast vs. actual for {target_date.strftime('%A, %B %d, %Y')}\n\n"
             f"{headline}\n"
@@ -922,6 +940,9 @@ def main():
         + (f'<p style="margin:0 0 14px 0;padding:10px 12px;background:#fdecea;'
            f'border-left:3px solid #c62828;color:#5a1a14;font-size:13px;">'
            f'{block_note}</p>' if block_note else "")
+        + (f'<p style="margin:0 0 14px 0;padding:10px 12px;background:#fdecea;'
+           f'border-left:3px solid #c62828;color:#5a1a14;font-size:13px;">'
+           f'<b>{nws_note}</b></p>' if nws_note else "")
         + (f'<p style="margin:0 0 14px 0;color:#444;">{tide_note.strip()}</p>' if tide_note else "")
         + f'<h3 style="font-size:14px;margin:18px 0 6px 0;">Hour by hour</h3>'
         + hourly_table_html(forecast_rows, actuals, subs, looks)
