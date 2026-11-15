@@ -266,3 +266,5 @@ data/reviews/rain_gate_review/sheet_*.jpg
 
 # Every Surfline swell train per hour (analysis/swell_trains), like surfline_predictors.csv
 data/predictor_vars/swell_trains.csv
+# Last good Open-Meteo forecast, the fallback when its forecast server is unreachable
+data/predictor_vars/.openmeteo_forecast_cache.json

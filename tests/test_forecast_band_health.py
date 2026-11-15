@@ -48,6 +48,7 @@ def isolated(tmp_path, monkeypatch):
     feats = tmp_path / "training_features.csv"
     monkeypatch.setattr(pdp, "FORECASTS_DIR", fdir)
     monkeypatch.setattr(edr, "FEATURES_CSV", feats)
+    monkeypatch.setattr(pdp, "FORECAST_LOG_PATH", tmp_path / "no_forecast_log.csv")
     write_features(feats, 100, 5)          # 5% empty: well under the trigger
     return fdir, feats
 
@@ -191,28 +192,52 @@ def test_the_log_file_is_not_mistaken_for_a_forecast(isolated):
 
 
 # --------------------------------------------------------------------------
-# Signal 2: the empty-hour share that drives it
+# Signal 2: the band's live coverage (replaced the empty-hour share 2026-11-14)
 # --------------------------------------------------------------------------
-def test_quiet_below_the_empty_share_trigger(isolated):
-    fdir, feats = isolated
+def write_log(path, n, below, above):
+    from datetime import date, timedelta
+    rows = []
+    for i in range(n):
+        actual = -1.0 if i < below else (99.0 if i < below + above else 10.0)
+        rows.append({"date": (date.today() - timedelta(days=i % 20)).isoformat(),
+                     "forecast_kind": "day_ahead", "actual": actual, "lower_q10": 5.0,
+                     "upper_q90": 20.0, "band_lower_q": 0.15, "band_upper_q": 0.90})
+    pd.DataFrame(rows).to_csv(path, index=False)
+
+
+def test_quiet_when_coverage_is_on_target(isolated, tmp_path, monkeypatch):
+    fdir, _ = isolated
     write_forecast(fdir, "forecast_2026-11-01.csv", [1.0, 2.0])
-    write_features(feats, 100, int(100 * (edr.EMPTY_SHARE_TRIGGER - 0.05)))
+    monkeypatch.setattr(pdp, "FORECAST_LOG_PATH", tmp_path / "log.csv")
+    write_log(tmp_path / "log.csv", 200, below=30, above=18)          # 15% / 9%
     assert edr.band_health_note() == ""
 
 
-def test_fires_above_the_empty_share_trigger(isolated):
+def test_fires_when_too_many_hours_fall_below(isolated, tmp_path, monkeypatch):
+    fdir, _ = isolated
+    write_forecast(fdir, "forecast_2026-11-01.csv", [1.0, 2.0])
+    monkeypatch.setattr(pdp, "FORECAST_LOG_PATH", tmp_path / "log.csv")
+    write_log(tmp_path / "log.csv", 200, below=50, above=10)          # 25% below
+    note = edr.band_health_note()
+    assert "25% of hours fell below" in note
+
+
+def test_the_empty_share_no_longer_fires(isolated, tmp_path, monkeypatch):
+    """Retired 2026-11-14: 35% empty hours with a well-covered band is fine."""
     fdir, feats = isolated
     write_forecast(fdir, "forecast_2026-11-01.csv", [1.0, 2.0])
     write_features(feats, 100, 35)
-    note = edr.band_health_note()
-    assert "35%" in note and "hurdle" in note
+    monkeypatch.setattr(pdp, "FORECAST_LOG_PATH", tmp_path / "log.csv")
+    write_log(tmp_path / "log.csv", 200, below=30, above=18)
+    assert edr.band_health_note() == ""
 
 
-def test_the_trigger_boundary_is_inclusive(isolated):
-    fdir, feats = isolated
+def test_too_few_scored_hours_stay_quiet(isolated, tmp_path, monkeypatch):
+    fdir, _ = isolated
     write_forecast(fdir, "forecast_2026-11-01.csv", [1.0, 2.0])
-    write_features(feats, 100, int(100 * edr.EMPTY_SHARE_TRIGGER))
-    assert edr.band_health_note() != ""
+    monkeypatch.setattr(pdp, "FORECAST_LOG_PATH", tmp_path / "log.csv")
+    write_log(tmp_path / "log.csv", 50, below=40, above=0)
+    assert edr.band_health_note() == ""
 
 
 # --------------------------------------------------------------------------

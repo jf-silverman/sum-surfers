@@ -7490,3 +7490,27 @@ Surf, Wind, Flood, Gale or Storm warning covers the day. The first live case,
 a High Surf Warning from 11-13 6 pm to 11-15 4 am, is on 11-14's chart. Tests
 in `tests/test_nws_alerts.py`; 120 pass. Testing a warning flag as a model
 input joins the December stormy-day item.
+
+## 2026-11-14 — The empty-hour alarm retired; an Open-Meteo outage gets a fallback
+
+**Empty hours.** The evening email warned that empty hours had passed 30% of
+the last 30 days (31%), "the agreed point to take up the hurdle model". That
+trigger dates from September; the hurdle has drawn the band's edges since
+2026-10-20, and the nightly recalibration (10-21) handles the median's
+quiet-hour bias. On the last 30 days of scored day-ahead hours (343, 30%
+empty) the band sat on target, 15% of hours below (target 15%) and 9% above
+(target 10%); empty hours carried 12% of the total absolute error, with a mean
+forecast of 2.2 on them. Last winter's empty share reached 34% (Nov) and 39%
+(Dec), so the trigger would have fired nightly until spring. It is replaced
+with a coverage alarm: over the last 30 days, more than 20% of hours below the
+band or more than 15% above (at least 100 scored hours). Tests rewritten; the
+shared test fixture no longer reads the real forecast log.
+
+**Open-Meteo (F53).** Joel asked why 11-15's forecast listed 4 missing
+predictors: the Open-Meteo forecast server timed out on the 11-12, 11-13 and
+11-14 runs (the archive server, used by step 6, answered in under a second;
+the forecast server failed over IPv4 and IPv6 at 60 s that evening and came
+back later). The fetch now retries twice with a 30 s timeout and saves every
+successful forecast; on failure it uses the newest saved one if under 5 days
+old. The saved copy was seeded from the raw Open-Meteo inputs in
+`week_2026-11-11.csv`.

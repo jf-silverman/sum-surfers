@@ -349,9 +349,58 @@ def fetch_openmeteo_forecast(days=DAYS):
         "timezone": CAMERA_LOCATION["timezone"],
         "forecast_days": days,
     }
-    r = requests.get(url, params=params, timeout=20)
-    r.raise_for_status()
-    return r.json()["hourly"]
+    last_exc = None
+    for attempt, wait in enumerate(OPENMETEO_RETRY_WAITS_SEC + [None]):
+        try:
+            r = requests.get(url, params=params, timeout=OPENMETEO_TIMEOUT_SEC)
+            r.raise_for_status()
+            hourly = r.json()["hourly"]
+            save_openmeteo_forecast(hourly)
+            return hourly
+        except (requests.exceptions.RequestException, KeyError, ValueError) as e:
+            last_exc = e
+            if wait is not None:
+                time.sleep(wait)
+    # The forecast server can be unreachable for days while the archive server
+    # answers (2026-11-12 to 11-14, three nightly runs in a row). Rather than
+    # drop four inputs, fall back to the newest saved Open-Meteo forecast, which
+    # covers 8 days ahead: same source and fields, a few days stale.
+    cached = load_openmeteo_forecast()
+    if cached is not None:
+        hourly, age_h = cached
+        print(f"  NOTE: Open-Meteo forecast unreachable ({type(last_exc).__name__}); using the "
+              f"saved forecast from {age_h:.0f} h ago for the real_* fields.")
+        return hourly
+    raise last_exc
+
+
+OPENMETEO_TIMEOUT_SEC = 30
+OPENMETEO_RETRY_WAITS_SEC = [10, 30]          # two retries after the first try
+OPENMETEO_CACHE_PATH = PROJECT_ROOT / "data" / "predictor_vars" / ".openmeteo_forecast_cache.json"
+OPENMETEO_CACHE_MAX_AGE_H = 120               # an 8-day forecast still covers tomorrow at 5 days old
+
+
+def save_openmeteo_forecast(hourly, path=None):
+    try:
+        p = Path(path) if path else OPENMETEO_CACHE_PATH
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps({"fetched_at": datetime.now().isoformat(timespec="seconds"),
+                                 "hourly": hourly}))
+    except OSError as e:
+        print(f"  WARNING: could not save the Open-Meteo forecast ({e})")
+
+
+def load_openmeteo_forecast(path=None, max_age_h=None):
+    """(hourly, age in hours) of the newest saved Open-Meteo forecast, or None."""
+    p = Path(path) if path else OPENMETEO_CACHE_PATH
+    try:
+        blob = json.loads(p.read_text())
+        age_h = (datetime.now() - datetime.fromisoformat(blob["fetched_at"])).total_seconds() / 3600
+    except (OSError, ValueError, KeyError):
+        return None
+    if age_h > (max_age_h if max_age_h is not None else OPENMETEO_CACHE_MAX_AGE_H):
+        return None
+    return blob["hourly"], age_h
 
 
 def merge_openmeteo_forecast(by_hour, hourly):

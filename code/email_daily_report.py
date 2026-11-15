@@ -243,7 +243,12 @@ FEATURES_CSV = _PROJECT_ROOT / "data" / "training_features.csv"
 # code/eval_hurdle_model.py -- already measured 2026-09-22, better pinball on
 # 5 of 5 seeds, left unadopted -- is worth the model-family swap. This note
 # exists so that decision is prompted by the data rather than remembered.
-EMPTY_SHARE_TRIGGER = 0.30
+EMPTY_SHARE_TRIGGER = 0.30   # retired 2026-11-14; kept for the history above
+# Band coverage alarm (2026-11-14): targets are 15% below and 10% above.
+COVERAGE_WINDOW_DAYS = 30
+COVERAGE_MIN_HOURS = 100
+BELOW_BAND_TRIGGER = 0.20
+ABOVE_BAND_TRIGGER = 0.15
 # A hurdle lower edge is legitimately zero on quiet hours (35 of 90 on the
 # 2026-10-21 outlook), so only a near-total pin is a symptom. 0.80 sits above
 # the worst legitimate share seen and below a genuine collapse, which is 1.00.
@@ -334,10 +339,9 @@ def band_health_note():
        2026-10-21 outlook that is 35 of 90 hours. So a zero on its own is no
        longer a symptom; what is, is an edge that does not VARY, or one that
        is zero on nearly every hour.
-    2. The share of empty hours, cumulative and over the trailing window. The
-       leading indicator -- it is what drags the low quantiles onto the floor
-       in the first place, and it moves seasonally, so it gives warning before
-       the band actually collapses.
+    2. The band's live coverage over the last 30 days: misses below and above
+       against the targets. (Until 2026-11-14 this was the share of empty
+       hours, a reminder to adopt the hurdle model, which was done 2026-10-20.)
 
     Returns "" when both are fine, so the email stays quiet unless there is
     something to act on.
@@ -375,38 +379,33 @@ def band_health_note():
             lines.append(f"Could not read {newest[-1].name} to check the band "
                          f"({type(e).__name__}).")
 
-    # 2. the empty-hour share that drives it
-    if FEATURES_CSV.exists():
-        try:
-            df = pd.read_csv(FEATURES_CSV, float_precision="round_trip")
-            df = df[df["surfer_count"].notna()]
-            if len(df):
-                share_all = float((df["surfer_count"] == 0).mean())
-                cutoff = (datetime.now().date()
-                          - timedelta(days=EMPTY_SHARE_WINDOW_DAYS)).isoformat()
-                recent = df[df["date"].astype(str) >= cutoff]
-                share_recent = (float((recent["surfer_count"] == 0).mean())
-                                if len(recent) else None)
-                hits = []
-                if share_all >= EMPTY_SHARE_TRIGGER:
-                    hits.append(f"{share_all:.0%} of all {len(df):,} recorded hours")
-                if share_recent is not None and share_recent >= EMPTY_SHARE_TRIGGER:
-                    hits.append(f"{share_recent:.0%} of the last "
-                                f"{EMPTY_SHARE_WINDOW_DAYS} days ({len(recent):,} hours)")
-                if hits:
-                    lines.append(
-                        f"Empty hours have passed the {EMPTY_SHARE_TRIGGER:.0%} mark: "
-                        + "; ".join(hits)
-                        + ". That was the agreed point to take up the hurdle model in "
-                          "code/eval_hurdle_model.py -- P(anyone out) times the count "
-                          "quantiles fit on non-empty rows only -- rather than keep "
-                          "lowering the band's edge. It was measured on 2026-09-22 "
-                          "(better pinball on 5 of 5 seeds) and left unadopted because "
-                          "it moved 80% coverage the wrong way on 3 of 5; the trade is "
-                          "different once this many hours are empty.")
-        except (OSError, ValueError, KeyError) as e:
-            lines.append(f"Could not read the training table to check the empty-hour "
-                         f"share ({type(e).__name__}).")
+    # 2. the band's live coverage over the last month (replaced the empty-hour
+    # share trigger on 2026-11-14). That trigger asked for the hurdle model,
+    # which has drawn the band's edges since 2026-10-20; with last winter's
+    # empty share reaching 34-39% it would have fired every night until spring
+    # with advice already taken. What can still go wrong is the band itself,
+    # so this watches its misses against the scored record.
+    try:
+        log = (pd.read_csv(pdp.FORECAST_LOG_PATH) if Path(pdp.FORECAST_LOG_PATH).exists()
+               else pd.DataFrame(columns=["forecast_kind", "actual", "date"]))
+        log = log[(log["forecast_kind"] == "day_ahead") & log["actual"].notna()]
+        cutoff = (datetime.now().date() - timedelta(days=COVERAGE_WINDOW_DAYS)).isoformat()
+        recent = log[log["date"].astype(str) >= cutoff]
+        if len(recent) >= COVERAGE_MIN_HOURS:
+            below = float((recent["actual"] < recent["lower_q10"]).mean())
+            above = float((recent["actual"] > recent["upper_q90"]).mean())
+            lo_q = float(recent["band_lower_q"].iloc[-1]) if "band_lower_q" in recent else 0.15
+            hi_q = float(recent["band_upper_q"].iloc[-1]) if "band_upper_q" in recent else 0.90
+            if below > BELOW_BAND_TRIGGER or above > ABOVE_BAND_TRIGGER:
+                lines.append(
+                    f"Over the last {COVERAGE_WINDOW_DAYS} days ({len(recent):,} scored hours) "
+                    f"{below:.0%} of hours fell below the forecast band (target {lo_q:.0%}) and "
+                    f"{above:.0%} above it (target {1 - hi_q:.0%}). The band no longer describes "
+                    f"the spread it claims; check the 'Hurdle band:' line in the chart step's "
+                    f"output and the lead-band factors (calibrate_lead_bands.py).")
+    except (OSError, ValueError, KeyError) as e:
+        lines.append(f"Could not read the forecast log to check the band's coverage "
+                     f"({type(e).__name__}).")
 
     return ("\n".join(f"Forecast band check: {ln}" for ln in lines) + "\n") if lines else ""
 
