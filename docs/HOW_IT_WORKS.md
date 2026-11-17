@@ -164,6 +164,20 @@ simply never get `frame_count_*` populated — `run_inference_multi()` falls
 back to single-frame behavior automatically when side frames aren't
 available, so nothing breaks, it just can't be improved retroactively.
 
+### Tracked count (recorded from 2026-11-16)
+
+Beside the hybrid, `detect_surfers.py` records `frame_count_tracked`: the
+detector's boxes on all 7 frames (0.5–4.5 s) are matched frame to frame
+(`code/track_frames.py`), and a surfer counts as present at 2.5 s if seen at
+that moment or both before and after it. It recovers surfers the detector
+misses in one frame because they sit in foam or partly behind a wave. On Joel's
+batch 8, where he boxed every surfer by scrubbing the clip, a single frame
+counted 0.86 of the truth, the hybrid 0.95 and the tracked count 1.02; against
+the 215 hand counts its mean miss was 1.18 against 1.33 for the hybrid. What
+the tracker adds over a single frame grows with surf size (+6.8% at 2 ft or
+less to +11% at 4 ft on busy clips). `surfer_count` stays the hybrid until a
+decision in December.
+
 ## Image-quality gate
 
 Fog, lens condensation, low light, and night frames all degrade detection

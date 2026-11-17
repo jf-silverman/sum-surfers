@@ -151,6 +151,9 @@ CSV_HEADER = [
     "quality_ok", "quality_reason", "brightness", "lap_var", "glare_frac", "human_count",
     "frame_count_1", "frame_count_2", "frame_count_3", "frame_count_mean", "frame_count_stdev",
     "frame_count_t05", "frame_count_t15", "frame_count_t35", "frame_count_t45", "frame_count_hybrid",
+    # Surfers present at 2.5 s across all 7 frames (track_frames.py, 2026-11-16).
+    # Recorded beside the hybrid; surfer_count is still the hybrid.
+    "frame_count_tracked",
 ]
 
 # Five frames one second apart (0.5, 1.5, 2.5, 3.5, 4.5 s; the 2.5 s one is the
@@ -479,15 +482,17 @@ def run_inference_multi(model, primary_img_path):
     frame_paths = [side1_path, primary_img_path, side2_path]  # chronological order
     available = [p for p in frame_paths if p.exists()]
 
-    counts, confs = [], []
+    counts, confs, boxes = [], [], []
     for p in frame_paths:
         if not p.exists():
             counts.append(None)
             confs.append(None)
+            boxes.append(None)
             continue
-        count, avg_conf = run_inference(model, p)
-        counts.append(count)
-        confs.append(avg_conf)
+        kept = run_inference_with_boxes(model, p)
+        boxes.append(kept)
+        counts.append(len(kept))
+        confs.append(round(sum(b[4] for b in kept) / len(kept), 4) if kept else 0.0)
 
     valid_counts = [c for c in counts if c is not None]
     mean_count = statistics.mean(valid_counts)
@@ -501,6 +506,7 @@ def run_inference_multi(model, primary_img_path):
         "surfer_count": round(mean_count), "confidence_avg": round(mean_conf, 4),
         "n_frames_used": len(valid_counts),
         **{f"frame_count_{s}": "" for s in SECOND_FRAME_SUFFIXES}, "frame_count_hybrid": "",
+        "frame_count_tracked": "",
     }
 
     # With all four one-second frames and the primary on disk, the hour's count
@@ -508,12 +514,20 @@ def run_inference_multi(model, primary_img_path):
     # that only cut the side frames) it stays the mean of three, as before.
     seconds = second_frame_paths(primary_img_path)
     if counts[1] is not None and all(p.exists() for p in seconds):
-        sec = [run_inference(model, p)[0] for p in seconds]
+        sec_boxes = [run_inference_with_boxes(model, p) for p in seconds]
+        sec = [len(b) for b in sec_boxes]
         for s, c in zip(SECOND_FRAME_SUFFIXES, sec):
             result[f"frame_count_{s}"] = c
         five = sec[:2] + [counts[1]] + sec[2:]
         result["frame_count_hybrid"] = hybrid_count(five)
         result["surfer_count"] = result["frame_count_hybrid"]
+        if all(b is not None for b in boxes):
+            # All 7 frames, in time order: 0.5, 1.0 (side1), 1.5, 2.5, 3.5, 4.0 (side2), 4.5 s.
+            frames = [(0.5, sec_boxes[0]), (1.0, boxes[0]), (1.5, sec_boxes[1]), (2.5, boxes[1]),
+                      (3.5, sec_boxes[2]), (4.0, boxes[2]), (4.5, sec_boxes[3])]
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            import track_frames  # noqa: PLC0415 -- scipy only loaded when needed
+            result["frame_count_tracked"] = track_frames.present_count(frames, 2.5)
     return result
 
 
@@ -613,7 +627,7 @@ def append_row(csv_path, row):
         if have != CSV_HEADER:
             raise RuntimeError(
                 f"{csv_path.name} has {len(have)} columns, this build writes {len(CSV_HEADER)}; "
-                "run code/migrate_hybrid_counts.py --apply first")
+                "run code/migrate_tracked_counts.py --apply first")
     with open(csv_path, "a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_HEADER)
         if write_header:
@@ -718,6 +732,7 @@ def main():
                 "frame_count_1": "", "frame_count_2": "", "frame_count_3": "",
                 "frame_count_mean": "", "frame_count_stdev": "",
                 **{f"frame_count_{s}": "" for s in SECOND_FRAME_SUFFIXES}, "frame_count_hybrid": "",
+                "frame_count_tracked": "",
             }
 
         append_row(PREDS_CSV, {
@@ -734,6 +749,7 @@ def main():
             "frame_count_stdev": result["frame_count_stdev"],
             **{f"frame_count_{s}": result[f"frame_count_{s}"] for s in SECOND_FRAME_SUFFIXES},
             "frame_count_hybrid": result["frame_count_hybrid"],
+            "frame_count_tracked": result["frame_count_tracked"],
         })
 
     print(f"\nDone. Results appended to {PREDS_CSV}")

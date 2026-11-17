@@ -133,6 +133,21 @@ saying how much light is left.
   `data/predictor_vars/academic_calendar.csv`; this week's weekday peaks fell
   after school hours anyway, so school cannot be separated from tide yet.
 
+### 3f. Tracked hour count as the official count (from 2026-11-16)
+
+`predictions.csv` now carries `frame_count_tracked`: surfers present at 2.5 s
+across the clip's 7 frames (`code/track_frames.py`), beside the median/max
+hybrid that is still `surfer_count`; backfilled for 2,314 hours.
+
+- **Baseline:** against the 215 hand counts MAE 1.18 vs the hybrid's 1.33
+  (day-clustered CI −0.33 to +0.07, 16 days); against Joel's scrubbed batch 8
+  boxes (11 frames with ±2 s) 1.02 of truth vs 0.95, mean miss 3.6 vs 4.3.
+  Switching would move the record by +0.09 on average.
+- **Decide** with the new scrubbed truth Joel collects (every surfer boxed by
+  scrubbing, ideally including hourly clips). If adopted: `surfer_count` takes
+  the tracked count, history recounted on the same scale as on 2026-10-26, and
+  the forecast refit.
+
 ## Pre-set statistical looks
 
 ### 4. Top-end forecast correction (hinge above 20)

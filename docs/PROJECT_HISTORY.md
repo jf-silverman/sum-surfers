@@ -7579,3 +7579,16 @@ forecast's level would not move.
 
 Recommended to Joel: record the tracked count nightly beside the hybrid,
 collect more scrubbed truth, and decide in December.
+
+**Recorded nightly from 2026-11-16 (Joel).** `code/track_frames.py` holds the
+tracker (copied from the analysis), and `detect_surfers.run_inference_multi`
+now keeps each frame's boxes (it already ran the detector on all 7) and writes
+`frame_count_tracked` beside `frame_count_hybrid`; `surfer_count` is
+unchanged. `code/migrate_tracked_counts.py --apply` added the column to
+predictions.csv, filled for 2,314 rows from the analysis run and blank for 270
+without all 7 crops (backup `predictions.csv.bak-2026-11-16`); the detector's
+new path reproduced the analysis values on spot-checked clips (11-06 16:02
+hybrid 42 / tracked 45, 11-11 15:08 48 / 56). The backfilled values come from
+the current detector, while some older rows' hybrids were counted with earlier
+settings. Tests in `tests/test_track_frames.py`; 131 pass. The switch to the
+tracked count is December item 3f.
