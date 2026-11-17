@@ -7514,3 +7514,35 @@ back later). The fetch now retries twice with a 30 s timeout and saves every
 successful forecast; on failure it uses the newest saved one if under 5 days
 old. The saved copy was seeded from the raw Open-Meteo inputs in
 `week_2026-11-11.csv`.
+
+## 2026-11-16 — Batch 8 as truth: the detector misses about 15% on busy frames; tracking recovers most of it
+
+Joel exported batch 8 (`data/cvat/standing_08_hu_both.zip`): 24 frames from
+10-12 s riding clips on the 11-05 and 11-06 afternoons, every surfer boxed
+including those he found only by scrubbing nearby frames (marked occluded,
+33), poses on standing (61) and SUP (5) only, 12 birds. Against his 880 surfer
+boxes the production detector's pre-labels found 84% (735), 85% of those not
+marked occluded and 11 of 33 occluded, at 97-98% precision (6 of 17 extra
+boxes sat on his birds); per frame it counted 0.85 of the truth and was under
+on 22 of 24 frames. As Joel noted, most misses are visible surfers in foam or
+partly behind a wave, not fully hidden ones.
+
+`analysis/occlusion_tracking/` (local): `track_union.py` follows detections
+across frames (Hungarian matching on box centres, a faster allowance for tall
+boxes, broken tracks re-linked) and `eval_batch08.py` counts a surfer as
+present at the frame's time t if its track, over frames every 0.5 s within
+±2 s, has a detection at t or detections both before and after:
+
+| per frame, vs Joel's boxes | count / truth | recall | precision | mean miss | bias | within 2 |
+|---|---:|---:|---:|---:|---:|---:|
+| single frame | 0.86 | 84% | 97% | 5.4 | −5.2 | 5 / 24 |
+| tracker, present at t | 0.98 | 89% | 91% | 3.2 | −0.8 | 15 / 24 |
+
+The tracker's 75 unmatched boxes are mostly real surfers drawn at a
+neighbouring frame's position (riders move far in 2 s), plus some duplicates
+and whitewater, so its box precision understates it; on counts it removes
+most of the undercount. The October hand counts' proportional undercount
+(about 13% at busy hours) fits this. Hourly clips already hold 7 frames over
+0.5-4.5 s around the 2.5 s frame, the window tested here. Next: run it on all
+kept hourly clips, score against the 215 hand counts (also of the 2.5 s
+frame), and test Joel's question of whether the gap grows with wave height.
