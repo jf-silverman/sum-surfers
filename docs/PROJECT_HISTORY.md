@@ -7546,3 +7546,36 @@ most of the undercount. The October hand counts' proportional undercount
 0.5-4.5 s around the 2.5 s frame, the window tested here. Next: run it on all
 kept hourly clips, score against the 215 hand counts (also of the 2.5 s
 frame), and test Joel's question of whether the gap grows with wave height.
+
+## 2026-11-16 — Tracked counts on every kept hourly clip: a little better than the hybrid; the wave effect is real but small
+
+`analysis/occlusion_tracking/track_all_hourly.py` (local) ran the detector on
+all 7 crops of 2,314 kept hourly clips (177 days) and tracked across them;
+`analyse_tracked.py` scored the result.
+
+**Against the 215 hand counts** (Joel's counts of the single 2.5 s frame):
+
+| count | MAE | bias | 0–5 | 6–15 | 16–30 | 31+ |
+|---|---:|---:|---:|---:|---:|---:|
+| single 2.5 s frame | 1.49 | −1.30 | +0.02 | −0.84 | −1.97 | −2.78 |
+| hybrid (production) | 1.33 | −0.10 | +0.06 | −0.07 | −0.12 | −0.33 |
+| tracker, present at 2.5 s | 1.18 | −0.11 | +0.18 | −0.29 | −0.29 | −0.11 |
+| tracker, seen 2+ | 1.48 | +0.73 | +0.32 | +0.09 | +0.88 | +1.74 |
+
+Tracker minus hybrid MAE −0.149, day-clustered 95% CI [−0.326, +0.065] over
+16 days (better on 56 frames, worse on 42, tied 117): leaning better, not
+settled. On the 11 batch 8 frames with ±2 s of clip, against Joel's scrubbed
+boxes: single frame 0.88 of truth (bias −4.4), hybrid 0.95 (−1.7), tracker
+1.02 (+0.9), mean miss 4.9 / 4.3 / 3.6.
+
+**Joel's wave-height question.** On 1,231 busy clips (hybrid 10+), what the
+tracker adds over the single 2.5 s frame grows with surf: +6.8% at up to 2 ft
+(841 clips), +8.9% at 3 ft (343), +11.1% at 4 ft (42), +12.0% at 5 ft+ (5);
+rank correlation with surf height +0.11 and nearshore energy +0.13 (p < 0.001).
+Over the hybrid it is −1.1%, +1.1%, +2.4%: the hybrid's max rule already
+recovers much of it. Switching the record to the tracked count would change
+1,063 of 2,314 hours, by +0.09 on average (+0.03 on busy hours), so the
+forecast's level would not move.
+
+Recommended to Joel: record the tracked count nightly beside the hybrid,
+collect more scrubbed truth, and decide in December.
