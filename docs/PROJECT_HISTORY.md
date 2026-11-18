@@ -7629,3 +7629,31 @@ noise. Only 5 counted days had 1 mm+ of daylight rain forecast (mean 5.9
 surfers vs 14.9) and 6 had a warning. The archive forecast no daylight rain for
 11-03 or 11-12; 11-13 had 25.9 mm and a Flood Advisory and was already forecast
 low. Neither goes into the model; December item 3d re-runs the test.
+
+## 2026-11-18 — A swell "jumble index": Surfline's rating agrees with it, crowds don't
+
+Joel asked what makes a swell mix "jumbled" (Surfline, 11-18: "Jumbled swell
+mix builds in"). The literature points to trains that cross well off each
+other's direction (the Bureau of Meteorology calls 45°+ a cross sea) with
+short-period, disorganised windswell involved, which breaks up the peel
+surfers need (Scarfe et al. 2009). `analysis/swell_trains/test_jumble_index.py`
+(local) scores each hour from every Surfline swell train (`swell_trains.csv`,
+extended to 11-19): the power share of trains arriving 30–60°+ off the most
+powerful one, counted only when it or the main train is 10 s or less. 0 is one
+clean swell; 11-18 scored 0.40 over daylight (0.49 at noon), with a 9 ft 7 s
+S windswell about 95° off a 12 s WNW groundswell.
+
+- **It measures what forecasters call bad.** Surfline's rating, adjusted for
+  surf size and wind, falls as the index rises: rank correlation −0.21 by hour,
+  −0.31 by day (178 days, p < 0.001); mean rating 2.60 below 0.1, 2.08 above 0.5.
+- **Crowds don't follow it.** Mean counts by band 14.1 / 15.7 / 14.2 / 17.4
+  (0–0.1 / 0.1–0.3 / 0.3–0.5 / 0.5+; 1,246 / 662 / 348 / 89 hours).
+- **Backtest (16 origins):** base MAE 6.866; + hourly index 6.819 (p 0.45),
+  + daylight mean 6.788 (p 0.24), + both 6.750 (−0.116, p 0.09, better on
+  9/16). Shuffled-by-day placebos ranged −0.203 to +0.160, so the gain is
+  within noise.
+- **The storm misses were not jumbled:** 11-03 and 11-12 scored 0.00 and 11-13
+  0.14. Adding the index moved their forecasts by under 1 surfer.
+
+Not adopted. The discussions collected from 11-18 will show whether Surfline's
+"jumbled" days line up with the index.
