@@ -7592,3 +7592,40 @@ hybrid 42 / tracked 45, 11-11 15:08 48 / 56). The backfilled values come from
 the current detector, while some older rows' hybrids were counted with earlier
 settings. Tests in `tests/test_track_frames.py`; 131 pass. The switch to the
 tracked count is December item 3f.
+
+## 2026-11-18 — Forecast rain, NWS alerts and Surfline's written forecast: collected; no gain yet
+
+After the stormy, empty days 11-03, 11-12 and 11-13 were forecast busy, a
+hypothetical test (`analysis/forecast_conditions/storm_learning_curve.py`,
+local) added k synthetic storm days (POOR, 15–20 mph wind, rain, near-empty) to
+training: 2–5 such days cut the forecast for the real ones from 8.4 to about
+5 (actual 0.8), and more did not help, because the real days' inputs did not
+look like storms (rating 0.4–1.5, wind 10 mph on two of them, rain in 12–33% of
+hours). Only 66 counted hours on 13 days were rated POOR or VERY POOR (mean
+9.0 and 0.0 surfers, against 14.3 for POOR_TO_FAIR and 16.0 for FAIR).
+
+New collectors, both in the nightly run:
+- `code/fetch_rain_forecast.py` (step 6d): hourly forecast rain amount and
+  chance from Open-Meteo and the NWS gridpoint forecast (MTR/93,66; amount in
+  6-hour blocks spread over the hours), every night's snapshot, plus Open-Meteo's
+  historical-forecast archive back to 2025-10-01 for training.
+- `code/fetch_surfline_discussion.py` (step 5b): Surfline's Santa Cruz forecast
+  headline and discussion (regional `forecasts/conditions`, no token). `start=`
+  is ignored, so there is no history; 11-18 read "Jumbled swell mix builds in.
+  Strong onshore S wind to start…".
+
+Backtest (`analysis/forecast_conditions/test_rain_nws.py`, 16 origins):
+
+| arm | MAE | vs base | p |
+|---|---:|---:|---:|
+| base | 6.866 | | |
+| + hour rain | 6.924 | +0.058 | 0.43 |
+| + daylight rain | 6.841 | −0.025 | 0.66 |
+| + both | 6.823 | −0.043 | 0.57 |
+| + NWS warning flag | 6.887 | +0.021 | 0.38 |
+
+Shuffled daylight-rain placebos ranged −0.090 to +0.105, so nothing beat
+noise. Only 5 counted days had 1 mm+ of daylight rain forecast (mean 5.9
+surfers vs 14.9) and 6 had a warning. The archive forecast no daylight rain for
+11-03 or 11-12; 11-13 had 25.9 mm and a Flood Advisory and was already forecast
+low. Neither goes into the model; December item 3d re-runs the test.

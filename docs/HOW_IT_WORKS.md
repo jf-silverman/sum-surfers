@@ -537,6 +537,17 @@ forecast"). The model does not use them yet: none of those warnings has
 overlapped a counted day so far. Beach Hazards Statements are recorded but not
 flagged, since they go out on big-swell days that draw surfers.
 
+**Forecast rain and Surfline's written forecast (collected from 2026-11-18).**
+`code/fetch_rain_forecast.py` saves hourly forecast rain (amount and chance)
+for Jack's each night from Open-Meteo and from the NWS gridpoint forecast,
+plus Open-Meteo's archive of past forecasts for training. Counted days with
+1 mm+ of daylight rain forecast averaged 5.9 surfers against 14.9 on dry days,
+but there are only 5 of them, and adding rain or an NWS-warning flag did not
+change the rolling backtest. `code/fetch_surfline_discussion.py` saves the
+forecaster's daily headline and discussion for Santa Cruz ("Jumbled swell mix
+builds in. Strong onshore S wind…"). Surfline keeps no history of it, so it
+starts now. None of these is a model input yet.
+
 ## Forecast accuracy and calibration
 
 The forecast model is off by about **7.6 surfers** ([MAE](#term-mae)) on a

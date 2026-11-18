@@ -106,6 +106,18 @@ against the 16-origin baseline; adopt only with a clear gain. Leave general
 
 **Add NWS warnings (2026-11-14).** `data/predictor_vars/nws_alerts.csv` now records High Surf / Wind / Flood / Gale / Storm warnings nightly (the first one during collection, a High Surf Warning, covered 11-13 evening to 11-15). Test a "warning in effect" flag alongside rain and wind, if enough warned days have been counted by then.
 
+**Forecast rain and NWS flag tested (2026-11-18).** With Open-Meteo's archived
+forecast rain (hour and daylight totals) and a day-level NWS warning flag, the
+16-origin backtest did not move (base MAE 6.866; rain both 6.823, p 0.57;
+NWS 6.887, p 0.38; shuffled-rain placebos −0.09 to +0.11). Only 5 counted days
+had 1 mm+ of daylight rain forecast (mean 5.9 surfers vs 14.9 dry) and 6 had a
+warning. The archive forecast 0 mm in daylight for 11-03 and 11-12, so those
+two misses were not rain days to the forecast; 11-13 (25.9 mm, Flood Advisory)
+was already forecast low (3.4). Re-run `analysis/forecast_conditions/test_rain_nws.py`
+in December; NWS hourly rain (`rain_forecast.csv` source `nws`) and Surfline's
+discussion text (`surfline_discussion.csv`) are collected from 11-18, with no
+history, so they need months before a test.
+
 **Add strong wind (2026-11-13).** 11-12 was empty all day (0–1 surfers, POOR,
 14–17 mph wind every afternoon hour, no rain) while every version of the
 forecast said about 20–30 from 2 pm; frames were clear and confirmed empty by

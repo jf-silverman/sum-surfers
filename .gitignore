@@ -268,3 +268,6 @@ data/reviews/rain_gate_review/sheet_*.jpg
 data/predictor_vars/swell_trains.csv
 # Last good Open-Meteo forecast, the fallback when its forecast server is unreachable
 data/predictor_vars/.openmeteo_forecast_cache.json
+
+# Surfline forecast text (2026-11-18): Surfline content, kept local like surfline_predictors.csv
+data/predictor_vars/surfline_discussion.csv

@@ -134,6 +134,14 @@ log "Step 5/10 — Pulling Surfline predictors for Jack's..."
 run_step "Step 5 (surf predictors)" "$PYTHON" code/get_surf_predictors.py
 log "Step 5 done."
 
+# ── Step 5b: Surfline's written forecast (headline + discussion) ─────────────
+# Added 2026-11-18. Santa Cruz regional forecast text for today and the next
+# days into data/predictor_vars/surfline_discussion.csv, no token. No history
+# exists, so every night's snapshot is kept. Not a model input yet.
+log "Step 5b — Fetching Surfline's forecast discussion..."
+run_step "Step 5b (Surfline discussion)" "$PYTHON" code/fetch_surfline_discussion.py
+log "Step 5b done."
+
 # ── Step 6: Backfill real observed weather (Open-Meteo archive) ──────────────
 # Free, no auth, and it refetches the whole date range in one request, so this
 # is a full rewrite rather than an append — safe and idempotent to run daily.
@@ -162,6 +170,15 @@ log "Step 6b done."
 log "Step 6c — Fetching NWS alerts..."
 run_step "Step 6c (NWS alerts)" "$PYTHON" code/fetch_nws_alerts.py
 log "Step 6c done."
+
+# ── Step 6d: Forecast rain (Open-Meteo + NWS gridpoint) ─────────────────────
+# Added 2026-11-18. Hourly forecast rain amount and chance for Jack's into
+# data/predictor_vars/rain_forecast.csv (every night's snapshot), plus the last
+# week of Open-Meteo's forecast archive for training rows. Not a model input
+# yet: too few rainy counted days (December item 3d).
+log "Step 6d — Fetching forecast rain..."
+run_step "Step 6d (rain forecast)" "$PYTHON" code/fetch_rain_forecast.py
+log "Step 6d done."
 
 # ── Step 7: Rebuild the model's training table ───────────────────────────────
 # Joins predictions (target) with all predictor sources (features). Also
