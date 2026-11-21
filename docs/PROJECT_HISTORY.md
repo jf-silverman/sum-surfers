@@ -7676,3 +7676,14 @@ hatched on the daily and week charts, labelled "rare conditions", summarised
 in the footers, and written as `n_rare_inputs` / `rare_inputs` in the forecast
 and week files. A scratch run for 11-19 flagged 11 am (wind 16 mph, 19 h;
 gusts 25 mph, 19 h). Tests in `tests/test_rare_inputs.py`.
+
+## 2026-11-21 — Legends at the bottom of all three charts
+
+The rare-conditions note added a footer line on 11-19 that ran the week chart's
+footer into its legend, which sat at a fixed margin. `plot_daily_prediction.
+stack_legend_and_footer()` now measures the rendered footer and lays out the
+bottom of each chart as plot and axis labels, legend, footer, with a fixed gap
+between them, so a new footer line pushes the plot up instead of overlapping.
+The daily forecast, the week chart and the email's forecast-vs-actual chart all
+use it; the forecast-vs-actual legend moved from above the plot to below it,
+as on the other two (Joel).

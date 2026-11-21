@@ -665,8 +665,10 @@ def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path, tide
         h2, l2 = ax2.get_legend_handles_labels()
         handles += h2
         labels += l2
-    # Above the plot, not on it, so it never covers the tide line or the counts.
-    legend = ax.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 1.02),
+    # Below the plot, above the footer, like the forecast and week charts
+    # (2026-11-21; it sat above the plot before). Never on the plot, so it
+    # cannot cover the tide line or the counts.
+    legend = ax.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 0.0),
                        ncol=2, facecolor=pdp.AXES_BG, edgecolor=pdp.GRID_COLOR)
     for text in legend.get_texts():
         text.set_color(pdp.TEXT_COLOR)
@@ -679,9 +681,12 @@ def build_chart(target_date, forecast_rows, actuals, recorded_at, out_path, tide
     else:
         provenance = ("Forecast RECONSTRUCTED after the fact (no record existed for this "
                       "date) — refit on rows before this day, so not the original forecast")
-    fig.text(0.5, 0.01, provenance, fontsize=8, ha="center", va="bottom", color=pdp.MUTED_TEXT)
+    footer = fig.text(0.5, 0.01, provenance, fontsize=8, ha="center", va="bottom", color=pdp.MUTED_TEXT)
 
+    legend.set_visible(False)            # laid out by stack_legend_and_footer, not tight_layout
     fig.tight_layout(rect=[0, 0.04, 1, 1])
+    legend.set_visible(True)
+    pdp.stack_legend_and_footer(fig, ax, legend, footer)
     fig.savefig(out_path, dpi=150, facecolor=fig.get_facecolor())
     plt.close(fig)
     return out_path

@@ -745,8 +745,8 @@ def main():
             f"\n{', '.join(f'{lv:.0%}' for lv in degenerate_levels)} band flat: "
             f"{zero_pct:.0%} of recorded hours had no surfers, so that percentile is 0"
         )
-    fig.text(0.055, 0.02, info_text, fontsize=9, ha="left", va="bottom",
-             color=MUTED_TEXT, linespacing=1.5)
+    footer = fig.text(0.055, 0.02, info_text, fontsize=9, ha="left", va="bottom",
+                      color=MUTED_TEXT, linespacing=1.5)
 
     ax2 = ax.twinx()
     ax2.set_facecolor(AXES_BG)
@@ -835,7 +835,7 @@ def main():
     # table axes are incompatible), so the bottom margin is set explicitly
     # afterwards. Needed once the degenerate-band note added a third footer
     # line, which ran straight into the "Time" axis label.
-    fig.subplots_adjust(bottom=0.225 + 0.022 * (info_text.count("\n") - 1))
+    stack_legend_and_footer(fig, ax, legend, footer)
 
     CHARTS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = DAILY_DIR / f"surfer_count_{target_date.isoformat()}.png"
@@ -1049,6 +1049,36 @@ def render_detection_frame(img_path, model, draw_boxes=True, boxes=None):
 
 
 FORECASTS_DIR = _PROJECT_ROOT / "data" / "forecasts"
+
+
+LEGEND_GAP = 0.02   # figure fraction between footer, legend and the axis labels
+
+
+def stack_legend_and_footer(fig, ax, legend, footer, gap=LEGEND_GAP):
+    """Lay out the bottom of a chart as, top to bottom: the plot with its tick
+    and axis labels, the legend, the footer text, each `gap` apart (2026-11-21).
+
+    Measured from the rendered text, not fixed margins: the footer grows a line
+    whenever a note is added (the rare-conditions note on 11-19 pushed the week
+    chart's footer up into its legend). `legend` must belong to `ax`; `footer`
+    is the fig.text anchored at the bottom. Call last, after everything is drawn.
+    """
+    inv = fig.transFigure.inverted()
+    fig.canvas.draw()
+    r = fig.canvas.get_renderer()
+    foot_top = inv.transform(footer.get_window_extent(r))[1][1]
+    pos = ax.get_position()
+    legend.set_loc("lower center")
+    legend.set_bbox_to_anchor((pos.x0 + pos.width / 2, foot_top + gap), transform=fig.transFigure)
+    fig.canvas.draw()
+    leg_top = inv.transform(legend.get_window_extent(r))[1][1]
+    # Room the tick labels and axis label take below the axes, kept as it is.
+    # The legend is a child of ax, so hide it while measuring.
+    legend.set_visible(False)
+    label_pad = pos.y0 - inv.transform(ax.get_tightbbox(r))[0][1]
+    legend.set_visible(True)
+    fig.subplots_adjust(bottom=leg_top + gap + label_pad)
+    # The axes moved; the legend's anchor is in figure units, so it stays put.
 
 
 def crowd_key_text(n_rows=None, short=False):
@@ -1520,11 +1550,12 @@ def generate_week_chart(made_date, day_records, n_train_rows):
     )
     # One note per line, left-justified: joined on one line with "|" they ran
     # off both edges of the figure once the purple-outline note was added.
-    fig.text(0.075, 0.02, footer, fontsize=7.5, ha="left", va="bottom", color=MUTED_TEXT,
-             linespacing=1.4)
+    footer_text = fig.text(0.075, 0.02, footer, fontsize=7.5, ha="left", va="bottom", color=MUTED_TEXT,
+                           linespacing=1.4)
     # Explicit margins, not tight_layout: the table axes makes tight_layout warn
     # and then lay the footer over the x-axis label and the legend.
     fig.subplots_adjust(left=0.075, right=0.985, top=0.91, bottom=0.26)
+    stack_legend_and_footer(fig, ax, legend, footer_text)
 
     CHARTS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = CHARTS_DIR / WEEK_CHART_NAME
