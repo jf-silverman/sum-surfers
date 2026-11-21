@@ -7657,3 +7657,22 @@ S windswell about 95° off a 12 s WNW groundswell.
 
 Not adopted. The discussions collected from 11-18 will show whether Surfline's
 "jumbled" days line up with the index.
+
+## 2026-11-19 — The forecast flags rare conditions
+
+Joel asked why 11-18's band was so wide: forecast 4–7 from 9 to 11 am, upper
+edge 19–28, actual 0–4. That morning had 21–28 mph wind gusting to 40 and a
+VERY POOR rating; training has 8 hours with 20+ mph wind and 16 VERY POOR
+hours, too few for the quantile models (min_samples_leaf 20) to learn from, so
+the 90% model leaned on the building swell and falling tide. The upper edge
+for hours with a 3–8 forecast is usually about 15 (90th percentile 23.9 over
+115 logged hours). `in_training_range` checks only the hour of day, so nothing
+was flagged.
+
+`plot_daily_prediction.rare_inputs()` now lists inputs with fewer than
+`RARE_MIN_HOURS` (20) training hours at least as extreme on their side of the
+median (wind, gusts, rating, surf, swell, nearshore energy). Flagged hours are
+hatched on the daily and week charts, labelled "rare conditions", summarised
+in the footers, and written as `n_rare_inputs` / `rare_inputs` in the forecast
+and week files. A scratch run for 11-19 flagged 11 am (wind 16 mph, 19 h;
+gusts 25 mph, 19 h). Tests in `tests/test_rare_inputs.py`.

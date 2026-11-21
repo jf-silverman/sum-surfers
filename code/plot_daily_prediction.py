@@ -132,6 +132,56 @@ TRAINED_HOUR_MIN, TRAINED_HOUR_MAX = 5, 20
 FAN_LEVELS = [BAND_LOWER_Q, 0.50, BAND_UPPER_Q]
 BAND_LABEL = f"{round((FAN_LEVELS[-1] - FAN_LEVELS[0]) * 100)}%"
 
+# Conditions the training data has too few hours of (added 2026-11-19).
+# in_training_range only checks the hour of day. 11-18's morning had 21-28 mph
+# wind (8 training hours at 20+) and a VERY POOR rating (16 hours): inside the
+# range seen, so nothing was flagged, yet too rare for a tree to learn from,
+# and the 90% edge reached 19-28 for a day that came in at 0-4. An input is
+# rare when fewer than RARE_MIN_HOURS training hours are at least as extreme,
+# on the side of the median it falls; 20 is the quantile models'
+# min_samples_leaf, so below it no leaf can be fitted to that tail.
+RARE_MIN_HOURS = 20
+# (column, label, unit, tail): "high" checks the upper tail, "low" the lower.
+RARE_CHECKS = [
+    ("wind_speed_mph", "wind", "mph", "high"),
+    ("wind_gust_mph", "gusts", "mph", "high"),
+    ("rating_value", "rating", "", "low"),
+    ("surf_max_ft", "surf", "ft", "high"),
+    ("primary_swell_height_ft", "swell", "ft", "high"),
+    ("energy_nearshore_kj", "nearshore energy", "kJ", "high"),
+]
+RATING_NAMES = {0: "VERY POOR", 1: "POOR", 2: "POOR TO FAIR", 3: "FAIR", 4: "FAIR TO GOOD", 5: "GOOD"}
+
+
+def rare_inputs(predictors, train, min_hours=RARE_MIN_HOURS, checks=RARE_CHECKS):
+    """Inputs for one hour that fewer than `min_hours` training hours match or
+    exceed, as short strings: ["wind 25 mph (8 h)", "rating VERY POOR (16 h)"].
+    `predictors` holds raw (unstandardized) values; `train` is the raw training
+    matrix."""
+    out = []
+    for col, label, unit, tail in checks:
+        if col not in train.columns:
+            continue
+        try:
+            x = float(predictors.get(col))
+        except (TypeError, ValueError):
+            continue
+        if np.isnan(x):
+            continue
+        t = pd.to_numeric(train[col], errors="coerce").dropna()
+        med = t.median()
+        if tail == "high" and x > med:
+            n = int((t >= x).sum())
+        elif tail == "low" and x < med:
+            n = int((t <= x).sum())
+        else:
+            continue
+        if n < min_hours:
+            shown = (RATING_NAMES.get(int(round(x)), f"{x:g}") if col == "rating_value"
+                     else f"{x:.0f} {unit}".strip())
+            out.append(f"{label} {shown} ({n} h)")
+    return out
+
 # How many days past today the week chart covers. The daily chart still
 # targets tomorrow alone; this is the outlook chart's span (tomorrow through
 # tomorrow+6). The predictor fetch asks for FORECAST_DAYS + 1 days because
@@ -385,6 +435,7 @@ def main():
     weather_categories = set(df["weather_simple"].unique())
     train_mean = X[numeric_cols].mean()
     train_std = X[numeric_cols].std().replace(0, 1)
+    train_raw = X[numeric_cols].copy()   # for rare_inputs(): raw values, before standardizing
     X_std = X.copy()
     X_std[numeric_cols] = (X_std[numeric_cols] - train_mean) / train_std
 
@@ -516,6 +567,7 @@ def main():
         weather_simple, is_night = simplify_weather_condition(predictors.get("weather_condition", ""))
         tide_ft = float(predictors.get("tide_ft", 0) or 0)
         in_training_range = TRAINED_HOUR_MIN <= hk.hour <= TRAINED_HOUR_MAX
+        rare = rare_inputs(predictors, train_raw)
         # Which model features this hour actually HAS. Further out in the
         # forecast, or after a failed endpoint fetch, a feature can simply be
         # absent; the GBT still returns a number (it takes the "missing"
@@ -553,7 +605,7 @@ def main():
                     shadow_point=shadow_point, shadow_point_raw=shadow_raw,
                     predictor_values=predictor_values,
                     raw_inputs=dict(predictors),
-                    missing_predictors=missing,
+                    missing_predictors=missing, rare_inputs=rare,
                     crowd_level=level, crowd_level_value=level_value,
                     crowd_level_low=crowd_level(quantiles[FAN_LEVELS[0]]),
                     crowd_level_high=crowd_level(quantiles[FAN_LEVELS[-1]]))
@@ -601,7 +653,7 @@ def main():
             ax.axvspan(row["hour"] - timedelta(minutes=30), row["hour"] + timedelta(minutes=30),
                        facecolor=NIGHT_COLOR, alpha=0.20, hatch="//", edgecolor=NIGHT_COLOR, linewidth=0, zorder=0)
     for _, row in d.iterrows():
-        if not row["in_training_range"] or row["missing_predictors"]:
+        if not row["in_training_range"] or row["missing_predictors"] or row["rare_inputs"]:
             ax.axvspan(row["hour"] - timedelta(minutes=30), row["hour"] + timedelta(minutes=30),
                        facecolor=CORAL, alpha=0.12, hatch="xx", edgecolor=CORAL, linewidth=0, zorder=0)
 
@@ -635,9 +687,12 @@ def main():
             label += "\n(no training\ndata this hour)"
         if row["missing_predictors"]:
             label += f"\n({len(row['missing_predictors'])} predictors\nmissing)"
+        if row["rare_inputs"]:
+            label += "\n(rare\nconditions)"
         ax.annotate(label, (row["hour"], row["point"]), textcoords="offset points",
                     xytext=(0, 10), ha="center", fontsize=8,
-                    color=CORAL if (not row["in_training_range"] or row["missing_predictors"])
+                    color=CORAL if (not row["in_training_range"] or row["missing_predictors"]
+                                    or row["rare_inputs"])
                     else MUTED_TEXT)
 
     seen_names, predictor_lines = [], []
@@ -670,6 +725,18 @@ def main():
         worst = max(len(r["missing_predictors"]) for r in incomplete)
         info_text += (f"\n{len(incomplete)} of {len(records)} hours are missing up to {worst} "
                       f"predictor(s) — those hours are marked and are weaker forecasts")
+    rare_hours = [r for r in records if r["rare_inputs"]]
+    if rare_hours:
+        # Name the rarest conditions once, with how many training hours had
+        # them: the reader learns why the band is wide and the median shaky.
+        seen = {}
+        for r in rare_hours:
+            for item in r["rare_inputs"]:
+                name = item.split(" (")[0].split(" ")[0]
+                seen.setdefault(name, item)
+        info_text += (f"\n{len(rare_hours)} of {len(records)} hours have rare conditions "
+                      f"(fewer than {RARE_MIN_HOURS} similar training hours: "
+                      f"{', '.join(list(seen.values())[:3])}) — less certain, band may be wide")
     if degenerate_levels:
         # Say so on the chart itself: a band pinned flat is a real statement
         # about the data, and a reader should not mistake it for a fitted curve.
@@ -1046,6 +1113,10 @@ def forecast_row(target_date, r):
         # this hour had no value for when it is not.
         "n_missing_predictors": len(r["missing_predictors"]),
         "missing_predictors": ";".join(r["missing_predictors"]),
+        # Inputs with fewer than RARE_MIN_HOURS training hours as extreme
+        # (2026-11-19), e.g. "wind 25 mph (8 h)". Empty in the normal case.
+        "n_rare_inputs": len(r.get("rare_inputs") or []),
+        "rare_inputs": ";".join(r.get("rare_inputs") or []),
         # What the Kelvin-wave-corrected model would have published (shadow,
         # 2026-11-02). Equal to predicted / predicted_raw when the correction
         # is off for the hour; recalibrated like the median but not clamped
@@ -1292,7 +1363,7 @@ def generate_week_chart(made_date, day_records, n_train_rows):
     ax = fig.add_subplot(gs[0], facecolor=AXES_BG)
     ax_table = fig.add_subplot(gs[1], facecolor=AXES_BG)
 
-    flagged = good_tide_cells = good_surf_cells = kelvin_low_cells = 0
+    good_tide_cells = good_surf_cells = kelvin_low_cells = 0
     for row_i, (day, records) in enumerate(day_records):
         by_hour_num = {r["hour"].hour: r for r in records}
         low_frac = low_tide_fraction(records)
@@ -1327,9 +1398,8 @@ def generate_week_chart(made_date, day_records, n_train_rows):
                     0.94 - 2 * GOOD_SURF_INSET, 0.90 - 2 * GOOD_SURF_INSET,
                     facecolor="none", edgecolor=GOOD_SURF_RING,
                     linewidth=GOOD_SURF_RING_WIDTH, zorder=3.5))
-            low_confidence = (not r["in_training_range"]) or r["missing_predictors"]
+            low_confidence = (not r["in_training_range"]) or r["missing_predictors"] or r.get("rare_inputs")
             if low_confidence:
-                flagged += 1
                 # Same coral cross-hatch the daily chart uses for an hour the
                 # model has no training data for, extended to cover an hour
                 # scored on fewer predictors than the model was trained on.
@@ -1433,9 +1503,14 @@ def generate_week_chart(made_date, day_records, n_train_rows):
                      f"hatched — the model scored them on less than it was trained on")
     else:
         notes.append("every hour shown has the full predictor set")
-    if flagged and not incomplete:
-        notes.append(f"{flagged} hatched hour(s) fall outside the hours the model has training "
-                     f"data for")
+    rare = [r for _, records in day_records for r in records if r.get("rare_inputs")]
+    if rare:
+        notes.append(f"{len(rare)} hatched hour(s) have rare conditions (fewer than {RARE_MIN_HOURS} "
+                     f"similar training hours, e.g. {rare[0]['rare_inputs'][0]}) — less certain")
+    out_of_hours = [r for _, records in day_records for r in records if not r["in_training_range"]]
+    if out_of_hours and not incomplete:
+        notes.append(f"{len(out_of_hours)} hatched hour(s) fall outside the hours the model has "
+                     f"training data for")
 
     footer = (
         f"Each cell is the predicted surfer count for that hour; its colour is the crowd level.  "

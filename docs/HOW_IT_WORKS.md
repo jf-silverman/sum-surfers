@@ -548,6 +548,16 @@ forecaster's daily headline and discussion for Santa Cruz ("Jumbled swell mix
 builds in. Strong onshore S wind…"). Surfline keeps no history of it, so it
 starts now. None of these is a model input yet.
 
+**Rare conditions (from 2026-11-19).** The forecast flags an hour whose wind,
+gusts, rating, surf, swell or nearshore energy is so extreme that fewer than
+20 training hours were at least as extreme (20 is the smallest group a model
+leaf can be fitted to). Those hours are hatched on both charts, labelled
+"rare conditions", named in the chart footer with their counts ("wind 25 mph
+(8 h)"), and recorded in the forecast files as `rare_inputs`. The trees cannot
+learn from so few hours, so the band's upper edge falls back on swell and tide:
+on 11-18, with 21–28 mph wind and a VERY POOR rating, the forecast was 4–7 but
+the band reached 19–28, and the day came in at 0–4.
+
 ## Forecast accuracy and calibration
 
 The forecast model is off by about **7.6 surfers** ([MAE](#term-mae)) on a
