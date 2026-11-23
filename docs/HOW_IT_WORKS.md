@@ -592,6 +592,21 @@ The record so far covers autumn only. Neither the hurdle-fitted band edges nor
 the nightly recalibration of the median, both adopted 2026-10-20/21 and
 described below, is in these figures yet.
 
+**Band edges calibrated nightly (from 2026-11-23).** The band's edges are
+fitted quantiles, and the record showed them off on busy hours: over the 30
+days to 11-21, 30% of hours forecast at 5+ surfers came in below the band,
+against 15% intended, while the forecast itself was right on average. Each
+night `code/band_calibration.py` now reads the last 30 days of scored
+day-ahead forecasts and, on hours forecast at 5+, stretches the distance from
+the forecast to each edge until that edge is missed at its target rate (15%
+below, 10% above). It never narrows the band, and it always fits on the edges
+as the model produced them (`lower_raw`, `upper_raw` in the forecast files),
+never on its own output. On 11-23 it lowered the lower edge by a factor of
+1.57 and left the upper one almost unchanged (1.02); tested out of sample it
+brought busy-hour misses below from 30% to 15%. The week chart's lead-time
+widening (`calibrate_lead_bands.py`) is fitted on top of it: refitted the same
+day for the current 75% band, it widens by 0–11% from 3 to 7 days out.
+
 Empirical coverage of the GBT quantile [prediction intervals](#term-prediction-interval)
 is checked directly against a held-out split by
 `analysis/surf_count_model_calibration/plot_calibration.py`, rather than trusted

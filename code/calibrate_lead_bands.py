@@ -44,6 +44,9 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import band_calibration as bc  # noqa: E402
+
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 LOG = _PROJECT_ROOT / "data" / "forecasts" / "forecast_log.csv"
 OUT = _PROJECT_ROOT / "data" / "forecasts" / "lead_band_calibration.json"
@@ -75,8 +78,26 @@ def main():
     if not LOG.exists():
         print(f"  calibrate_lead_bands: {LOG} not found — nothing to calibrate")
         return 1
-    s = pd.read_csv(LOG)
-    s = s[s.actual.notna() & s.lead_days.notna()].copy()
+    log = pd.read_csv(LOG)
+    s = log[log.actual.notna() & log.lead_days.notna()].copy()
+    # Since 2026-11-23: only the current band (its quantiles from the newest
+    # row), its edges rebuilt as the nightly run now publishes them -- raw
+    # edges with any earlier lead widening undone, then the record-based edge
+    # calibration (band_calibration.py) applied -- so the factors written here
+    # stack on top of that calibration instead of repeating it or fitting on
+    # their own output.
+    global TARGET_COVERAGE
+    if "band_lower_q" in s:
+        lq, uq = float(s.band_lower_q.iloc[-1]), float(s.band_upper_q.iloc[-1])
+        s = s[np.isclose(s.band_lower_q, lq) & np.isclose(s.band_upper_q, uq)].copy()
+        TARGET_COVERAGE = round(uq - lq, 4)
+        cal = bc.fit(log, datetime.now().date(), lq, uq)
+        lo, hi = bc.raw_edges(s)
+        new = [bc.apply(p, l, h, cal) for p, l, h in zip(s.predicted, lo, hi)]
+        s["lower_q10"] = [a for a, _ in new]
+        s["upper_q90"] = [b for _, b in new]
+        print(f"band q{lq:g}-q{uq:g} (target coverage {TARGET_COVERAGE:.0%}); edge calibration "
+              f"lower x{cal['k_lower']:.2f}, upper x{cal['k_upper']:.2f} applied first\n")
     s["lead_days"] = s.lead_days.astype(int)
     if s.empty:
         print("  calibrate_lead_bands: no scored rows yet")

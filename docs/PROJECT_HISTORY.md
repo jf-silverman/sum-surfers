@@ -7704,3 +7704,19 @@ calibrated only on earlier days of the q0.15 era (21 test days, 117 busy
 hours): below the band 30% -> 15%, above unchanged at 8%; k 1.45-1.80 (1.63 on
 the whole era, 1.49 without the stormy days); the lower edge moves down by 4.8
 surfers on average and the band widens from 24.1 to 28.9.
+
+**Adopted the same day (Joel), for both edges.** `code/band_calibration.py`
+runs inside the forecast step: on hours forecast 5+, each edge's distance from
+the point is stretched by the smallest factor (at least 1, at most 3) that
+leaves its target share outside over the last 30 scored days of the current
+band (60 busy hours minimum). The forecast files now carry `lower_raw`,
+`upper_raw`, `edge_k_lower` and `edge_k_upper`, and the fit reads the raw
+edges, so it never fits on its own output. On 11-23: lower x1.57, upper x1.02
+(155 busy hours, 30% below / 10% above the raw band). The crowd level is still
+read off the raw quantiles, which its five bands were cut on.
+`calibrate_lead_bands.py` was found to be stale (fitted once on 10-01 on the
+old q0.10 band and, refitted now, it would have read week edges it had widened
+itself); it now restricts to the current band, rebuilds the raw edges (undoing
+`band_factor`), applies the edge calibration first and targets the band's own
+75%. Refitted: factors 1.00 at 1–2 days out to 1.11 at 7 (were 1.02–1.21).
+148 tests pass; known_bugs F54.

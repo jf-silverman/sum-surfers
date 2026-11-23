@@ -58,6 +58,7 @@ import get_clips as gc  # noqa: E402
 import fetch_nws_alerts as nws  # noqa: E402 — needed for get_light_window() (real dawn/dusk)
 import get_surf_predictors as sp  # noqa: E402
 import detect_surfers as ds  # noqa: E402
+import band_calibration as bc  # noqa: E402
 from fit_surfer_count_model import (  # noqa: E402
     load_and_prepare, fit_quantile_model_robust, fit_hurdle_band, split_by_day,
     BAND_LOWER_Q, BAND_UPPER_Q,
@@ -526,6 +527,11 @@ def main():
     print(f"  Point recalibration: "
           + (f"median = {recal['a']:+.2f} + {recal['b']:.3f} x raw ({recal['reason']})"
              if recal["applied"] else f"not applied -- {recal['reason']}"))
+    # Band edges calibrated from the scored record (band_calibration.py,
+    # 2026-11-23): busy hours' edges stretched until each misses at its target.
+    edge_cal = bc.load_and_fit(FORECAST_LOG_PATH, datetime.now().date(), FAN_LEVELS[0], FAN_LEVELS[-1])
+    print(f"  Band edge calibration: lower x{edge_cal['k_lower']:.2f}, upper x{edge_cal['k_upper']:.2f} "
+          f"({edge_cal['reason']})")
 
     def predict_for_hour(hk):
         """Runs the fitted quantile models for one by_hour key. Shared by the
@@ -579,6 +585,12 @@ def main():
         # alarm, not the routine case.
         missing = [c for c in numeric_cols if pd.isna(feat_row.iloc[0].get(c, np.nan))]
         level, level_value = rating_from_quantiles(quantiles)
+        # Crowd level above is read off the raw quantiles on purpose: its five
+        # bands are equal fifths of history on that scale (crowd_rating.py).
+        # The band's edges are then calibrated against the record; the raw
+        # ones are kept so the next night's fit never reads its own output.
+        lower_raw, upper_raw = quantiles[FAN_LEVELS[0]], quantiles[FAN_LEVELS[-1]]
+        quantiles[FAN_LEVELS[0]], quantiles[FAN_LEVELS[-1]] = bc.apply(point, lower_raw, upper_raw, edge_cal)
         # Every numeric predictor the model was actually given, carried through
         # so save_week_forecast_record can write them per lead time. Until
         # 2026-10-01 the week file recorded only tide_ft and weather_simple,
@@ -606,6 +618,9 @@ def main():
                     predictor_values=predictor_values,
                     raw_inputs=dict(predictors),
                     missing_predictors=missing, rare_inputs=rare,
+                    lower_raw=lower_raw, upper_raw=upper_raw,
+                    edge_k_lower=edge_cal["k_lower"] if point >= bc.BUSY_MIN else 1.0,
+                    edge_k_upper=edge_cal["k_upper"] if point >= bc.BUSY_MIN else 1.0,
                     crowd_level=level, crowd_level_value=level_value,
                     crowd_level_low=crowd_level(quantiles[FAN_LEVELS[0]]),
                     crowd_level_high=crowd_level(quantiles[FAN_LEVELS[-1]]))
@@ -1125,6 +1140,13 @@ def forecast_row(target_date, r):
         "upper_q90": round(q[FAN_LEVELS[-1]], 2),
         "band_lower_q": FAN_LEVELS[0],
         "band_upper_q": FAN_LEVELS[-1],
+        # The edges before the record-based calibration (band_calibration.py,
+        # 2026-11-23) and the stretch applied to each. lower_q10 / upper_q90
+        # are what was published; these are what the next fit reads.
+        "lower_raw": round(r.get("lower_raw", q[FAN_LEVELS[0]]), 2),
+        "upper_raw": round(r.get("upper_raw", q[FAN_LEVELS[-1]]), 2),
+        "edge_k_lower": round(r.get("edge_k_lower", 1.0), 3),
+        "edge_k_upper": round(r.get("edge_k_upper", 1.0), 3),
         "weather_simple": r["weather_simple"],
         "tide_ft": round(r["tide_ft"], 2),
         "in_training_range": r["in_training_range"],
