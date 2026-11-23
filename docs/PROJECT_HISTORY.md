@@ -7687,3 +7687,20 @@ between them, so a new footer line pushes the plot up instead of overlapping.
 The daily forecast, the week chart and the email's forecast-vs-actual chart all
 use it; the forecast-vs-actual legend moved from above the plot to below it,
 as on the other two (Joel).
+
+## 2026-11-23 — The band's lower edge is too high on busy hours; a record-based stretch fixes it
+
+The email's band check fired on 11-21: over 30 days 20.5% of scored hours fell
+below the band (target 15%, trigger 20%). Quiet hours (forecast under 5) were
+at 11%; hours forecast 5+ at 31%, though on days without an NWS warning their
+mean forecast matched the actual (20.1 vs 19.0). Warned days added 18 busy
+hours forecast 12.6 that came in at 0.6.
+
+`analysis/forecast_band/test_lower_edge_calibration.py` (local) stretches the
+distance from the forecast down to the lower edge by k on busy hours, with k
+the smallest value (at least 1) that leaves 15% of earlier busy hours below,
+as `calibrate_lead_bands.py` does for lead time. Out of sample, each day
+calibrated only on earlier days of the q0.15 era (21 test days, 117 busy
+hours): below the band 30% -> 15%, above unchanged at 8%; k 1.45-1.80 (1.63 on
+the whole era, 1.49 without the stormy days); the lower edge moves down by 4.8
+surfers on average and the band widens from 24.1 to 28.9.
