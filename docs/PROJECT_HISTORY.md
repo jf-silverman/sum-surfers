@@ -7720,3 +7720,12 @@ itself); it now restricts to the current band, rebuilds the raw edges (undoing
 `band_factor`), applies the edge calibration first and targets the band's own
 75%. Refitted: factors 1.00 at 1–2 days out to 1.11 at 7 (were 1.02–1.21).
 148 tests pass; known_bugs F54.
+
+## 2026-11-24 — Email table: below / in / above range, and the tide
+
+At Joel's request the evening email's hour-by-hour table now says where each
+counted hour fell against its forecast band, "below range" (blue ▼), "in
+range" (green ✓) or "above range" (orange ▲), instead of "in range" /
+"outside", and has a Tide (ft) column: the hourly Surfline tide the forecast
+used, at the start of the clip's hour. The plain-text version names the side
+too. `email_daily_report.range_position()`, tests in `tests/test_count_rules.py`.

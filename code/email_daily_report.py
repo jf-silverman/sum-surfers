@@ -709,11 +709,11 @@ def summarize(forecast_rows, actuals):
             continue
         err = f["point"] - count
         errs.append(err)
-        hit = f["lower"] <= count <= f["upper"]
-        inside += int(hit)
+        pos = range_position(count, f["lower"], f["upper"])
+        inside += int(pos == "in")
         lines.append(f"  {when.strftime('%-I:%M %p'):>9}   actual {count:>5.0f}   "
                      f"forecast {f['point']:>5.1f}   range {f['lower']:.0f}-{f['upper']:.0f}   "
-                     f"{'in range' if hit else 'OUTSIDE'}")
+                     f"{pos} range")
     stats = None
     if errs:
         stats = dict(mae=float(np.mean(np.abs(errs))), bias=float(np.mean(errs)),
@@ -721,7 +721,27 @@ def summarize(forecast_rows, actuals):
     return "\n".join(lines), stats
 
 
-def hourly_table_html(forecast_rows, actuals, subs=None, looks=None):
+# Where a counted hour fell against its forecast band (Joel, 2026-11-24: the
+# table said only "in range" / "outside"). Word and symbol carry the meaning;
+# the colour reinforces it, blue below and orange above so the pair stays
+# apart for colour-blind readers.
+RANGE_MARKS = {
+    "below": ("&#9660; below range", "#1565c0"),
+    "in": ("&#10003; in range", "#2e7d32"),
+    "above": ("&#9650; above range", "#e65100"),
+}
+
+
+def range_position(count, lower, upper):
+    """'below', 'in' or 'above' the forecast band."""
+    if count < lower:
+        return "below"
+    if count > upper:
+        return "above"
+    return "in"
+
+
+def hourly_table_html(forecast_rows, actuals, subs=None, looks=None, tide=None):
     """The hour-by-hour comparison as a real HTML table.
 
     The plain-text version of this is column-aligned with spaces, which only
@@ -736,7 +756,8 @@ def hourly_table_html(forecast_rows, actuals, subs=None, looks=None):
     head = ("<tr>"
             + "".join(f'<th style="padding:6px 10px;text-align:{a};border-bottom:2px solid #444;'
                       f'font-family:system-ui,sans-serif;font-size:13px;">{h}</th>'
-                      for h, a in [("Hour", "left"), ("Counted", "right"), ("Forecast", "right"),
+                      for h, a in [("Hour", "left"), ("Tide (ft)", "right"),
+                                   ("Counted", "right"), ("Forecast", "right"),
                                    (f"{forecast_rows[0]['band_label']} range"
                                     if forecast_rows else "range", "right"),
                                    ("", "left")]
@@ -744,6 +765,9 @@ def hourly_table_html(forecast_rows, actuals, subs=None, looks=None):
             + "</tr>")
 
     by_hour = {r["hour"].hour: r for r in forecast_rows} if forecast_rows else {}
+    # The tide at the start of the clip's hour, the same hourly Surfline tide
+    # the forecast used (tide_by_hour).
+    tide_at = {t.hour: ft for t, ft in (tide or [])}
     looks = looks or []
     rows = []
     for i, (when, count) in enumerate(actuals):
@@ -756,19 +780,20 @@ def hourly_table_html(forecast_rows, actuals, subs=None, looks=None):
         bg = "#fafafa" if i % 2 else "#ffffff"
         cell = (f'padding:5px 10px;border-bottom:1px solid #e8e8e8;'
                 f'font-family:system-ui,sans-serif;font-size:13px;background:{bg};')
+        tide_ft = tide_at.get(when.hour)
+        tide_cell = (f'<td style="{cell}text-align:right;color:#666;">'
+                     f'{"&ndash;" if tide_ft is None else f"{tide_ft:.1f}"}</td>')
         f = by_hour.get(when.hour)
         if f is None:
-            rows.append(f'<tr><td style="{cell}">{when.strftime("%-I:%M %p")}</td>'
+            rows.append(f'<tr><td style="{cell}">{when.strftime("%-I:%M %p")}</td>{tide_cell}'
                         f'<td style="{cell}text-align:right;"><b>{count:.0f}</b></td>'
                         f'<td style="{cell}text-align:right;color:#999;" colspan="3">no forecast for this hour</td>'
                         f'{sub_cell}</tr>')
             continue
-        hit = f["lower"] <= count <= f["upper"]
-        # Not colour alone: the word carries the meaning, the colour reinforces it.
-        mark = ('<span style="color:#2e7d32;">&#10003; in range</span>' if hit
-                else '<span style="color:#c62828;">&#10007; outside</span>')
+        text, colour = RANGE_MARKS[range_position(count, f["lower"], f["upper"])]
+        mark = f'<span style="color:{colour};">{text}</span>'
         rows.append(
-            f'<tr><td style="{cell}">{when.strftime("%-I:%M %p")}</td>'
+            f'<tr><td style="{cell}">{when.strftime("%-I:%M %p")}</td>{tide_cell}'
             f'<td style="{cell}text-align:right;"><b>{count:.0f}</b></td>'
             f'<td style="{cell}text-align:right;">{f["point"]:.1f}</td>'
             f'<td style="{cell}text-align:right;color:#666;">{f["lower"]:.0f}&ndash;{f["upper"]:.0f}</td>'
@@ -949,7 +974,7 @@ def main():
            f'<b>{nws_note}</b></p>' if nws_note else "")
         + (f'<p style="margin:0 0 14px 0;color:#444;">{tide_note.strip()}</p>' if tide_note else "")
         + f'<h3 style="font-size:14px;margin:18px 0 6px 0;">Hour by hour</h3>'
-        + hourly_table_html(forecast_rows, actuals, subs, looks)
+        + hourly_table_html(forecast_rows, actuals, subs, looks, tide)
         + (f'<p style="margin:6px 0 0 0;color:#666;font-size:12px;">Counted: each hour has '
            f'three looks, the hourly clip and two more about 18 and 36 min later, each counted '
            f'as the median of its frames under 6, otherwise the highest frame. The hour is the '

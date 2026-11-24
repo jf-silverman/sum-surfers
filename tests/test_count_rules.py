@@ -183,3 +183,25 @@ def test_extreme_frames_draws_the_picked_frames(tmp_path, monkeypatch):
     out = edr.extreme_frames(date(2026, 11, 11), model=object())
     assert [label for label, *_ in out] == ["Busiest hour", "Empty hour", "Quietest hour above zero"]
     assert all(p.exists() for _l, p, _v, _s in out)
+
+
+def test_range_position_names_the_side_of_a_miss():
+    """2026-11-24: the email table said only 'in range' / 'outside'."""
+    import email_daily_report as er
+    assert er.range_position(2, 5, 20) == "below"
+    assert er.range_position(5, 5, 20) == "in"
+    assert er.range_position(20, 5, 20) == "in"
+    assert er.range_position(21, 5, 20) == "above"
+
+
+def test_hour_table_shows_tide_and_each_range_position():
+    from datetime import datetime
+    import email_daily_report as er
+    d = datetime(2026, 11, 23)
+    rows = [dict(hour=d.replace(hour=h), point=10.0, lower=5.0, upper=20.0, band_label="75%") for h in (9, 10, 11)]
+    actuals = [(d.replace(hour=9, minute=8), 2), (d.replace(hour=10, minute=2), 12), (d.replace(hour=11, minute=56), 30)]
+    tide = [(d.replace(hour=h), 1.0 + h / 10) for h in (9, 10, 11)]
+    html = er.hourly_table_html(rows, actuals, tide=tide)
+    assert "Tide (ft)" in html and ">1.9<" in html and ">2.1<" in html
+    assert "below range" in html and "in range" in html and "above range" in html
+    assert "#1565c0" in html and "#2e7d32" in html and "#e65100" in html
