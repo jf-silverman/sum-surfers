@@ -7729,3 +7729,30 @@ range" (green ✓) or "above range" (orange ▲), instead of "in range" /
 "outside", and has a Tide (ft) column: the hourly Surfline tide the forecast
 used, at the start of the clip's hour. The plain-text version names the side
 too. `email_daily_report.range_position()`, tests in `tests/test_count_rules.py`.
+
+## 2026-11-24 — Three-look target and recent-weeks training: one good day, no backtest gain
+
+Joel asked whether busy hours look under-forecast because the detector finds
+more surfers now. It does not: the detector is unchanged since 2026-09-21 with
+all history recounted, and every month back to 2025-10 is on the hourly
+hybrid count. The email, though, has shown the three-look count since 11-01,
+which on busy-forecast hours (10-28 to 11-23, 151 hours) averaged 21.3 against
+16.8 for the single hourly clip the model is trained and scored on (forecast
+18.0); 26% fell above the band on that scale against 14% on the hourly one.
+
+Experiment (`analysis/hour_max_view/three_look_forecast_1123.py`, local):
+trained on the three-look count of the 325 hours since 10-27, the model
+forecast 11-23 with a mean miss of 3.6 against the three-look count (published
+10.3; a mixed target over all history 7.6). But the same 27 days trained on the
+ordinary hourly count also did well (2.6 against the hourly count; x1.24 gave
+4.1 against three-look), so the gain came from training on recent weeks, not
+the scale.
+
+Rolling backtest of recency (`analysis/forecast_recency/test_recency.py`,
+local; 24 origins, 14 in autumn): training on only the last 28 / 42 / 63
+counted days, or weighting rows by age (half-life 14 / 30 / 60 / 120 days),
+never beat all history with equal weights. MAE 6.641 for base; last-28 7.468
+(p 0.04), last-42 6.881, last-63 6.892, half-life 14 7.302 (p 0.04), 30 7.008,
+60 6.827, 120 6.751. On the autumn origins alone the best was half-life 60 at
+−0.024 (p 0.89). 11-23 was a day where recent weeks happened to fit; not
+adopted.
